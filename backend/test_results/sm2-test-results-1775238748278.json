@@ -1,0 +1,48 @@
+[
+  {
+    "test": "SM2密钥对生成",
+    "publicKeyLength": 130,
+    "privateKeyLength": 64,
+    "status": "成功",
+    "message": "密钥对生成成功"
+  },
+  {
+    "test": "SM2签名和验证",
+    "message": "签名和验证成功",
+    "isValid": true,
+    "status": "成功"
+  },
+  {
+    "test": "SM2签名和验证",
+    "message": "签名和验证成功",
+    "isValid": true,
+    "status": "成功"
+  },
+  {
+    "test": "SM2签名和验证",
+    "message": "签名和验证成功",
+    "isValid": true,
+    "status": "成功"
+  },
+  {
+    "test": "SM2抗篡改能力",
+    "originalValid": true,
+    "tamperedValid": false,
+    "status": "成功",
+    "message": "抗篡改能力验证成功"
+  },
+  {
+    "test": "SM2批量签名验证",
+    "messageCount": 10,
+    "allValid": true,
+    "status": "成功",
+    "message": "批量验证成功"
+  },
+  {
+    "test": "SM2性能",
+    "signTime": 31,
+    "verifyTime": 28,
+    "status": "成功",
+    "message": "签名100次: 31ms, 验证100次: 28ms"
+  }
+]

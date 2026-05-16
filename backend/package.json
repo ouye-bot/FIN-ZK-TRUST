@@ -1,0 +1,49 @@
+{
+  "name": "fin-zk-trust-backend",
+  "version": "1.0.0",
+  "description": "Backend for FinZkTrust - ZK proof generation and API aggregation",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "proxy-ssl": "local-ssl-proxy --source 8443 --target 3003",
+    "test:performance": "node test/performance-test.js",
+    "test:crypto": "node test/crypto.test.js"
+  },
+  "dependencies": {
+    "axios": "^1.13.6",
+    "bcrypt": "^6.0.0",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^8.3.1",
+    "express-session": "^1.19.0",
+    "express-validator": "^7.3.1",
+    "helmet": "^7.2.0",
+    "joi": "^18.1.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^9.3.3",
+    "morgan": "^1.10.0",
+    "mysql2": "^3.22.2",
+    "node-schedule": "^2.1.1",
+    "otplib": "^13.4.0",
+    "pem": "^1.14.8",
+    "selfsigned": "^5.5.0",
+    "sm-crypto": "^0.4.0",
+    "snarkjs": "^0.7.6",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1"
+  },
+  "devDependencies": {
+    "@nomiclabs/hardhat-ethers": "^2.2.3",
+    "@nomiclabs/hardhat-waffle": "^2.0.6",
+    "chai": "^4.3.7",
+    "eslint": "^10.1.0",
+    "ethereum-waffle": "^4.0.10",
+    "ethers": "^5.7.2",
+    "hardhat": "^2.12.7",
+    "local-ssl-proxy": "^2.0.5",
+    "nodemon": "^3.0.1"
+  }
+}

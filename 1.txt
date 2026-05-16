@@ -1,0 +1,263 @@
+好的，以下是 MFA 多因子认证的详细实现指令，遵循改动局部化、不破坏现有稳定功能、代码专业严谨的原则。
+
+---
+
+**给 AI 的实现指令：**
+
+```
+## 任务：登录过程集成 MFA 多因子认证（TOTP）
+
+当前系统登录仅验证密码和 SM2 签名（已有防重放中间件保护）。
+请集成 TOTP（基于时间的一次性密码）作为独立的第二信道认证因子，
+形成完整的双因子认证体系。
+
+### 核心设计
+- 用户登录后可在个人设置中绑定 TOTP
+- 绑定后登录需输入 6 位动态验证码
+- TOTP 种子用 SM4 加密存储在 MySQL users 表中
+- 提供 10 个一次性备用恢复码，用 SM3 哈希后存储
+- 未绑定 MFA 的用户登录流程完全不变
+
+### 硬性约束（全程遵守）
+1. 不修改现有密码验证逻辑（SM3 哈希比对）
+2. 不修改 SM2 签名验证逻辑
+3. 不修改 JWT 签发逻辑和令牌结构
+4. 不修改注册流程
+5. 不破坏未绑定 MFA 用户的登录体验（保持完全不变）
+6. 所有新增代码集中在：
+   - 新增 backend/services/mfaService.js
+   - 新增 backend/routes/mfa.js
+   - 修改 backend/routes/auth.js（仅登录接口，增加一个判断分支）
+   - 新增 frontend/src/pages/MfaSetup.js
+   - 新增 frontend/src/pages/MfaVerify.js
+   - 修改 frontend/src/App.js（增加路由）
+   - 修改 frontend/src/pages/Profile.js（增加绑定入口）
+
+---
+
+## 一、数据库改造
+
+### 1.1 users 表新增字段
+执行以下 SQL（保持幂等，使用 IF NOT EXISTS 或 try-catch）：
+```
+ALTER TABLE users ADD COLUMN totp_secret VARCHAR(500) DEFAULT NULL;
+ALTER TABLE users ADD COLUMN totp_enabled BOOLEAN DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN backup_codes_hashed TEXT DEFAULT NULL;
+```
+- `totp_secret`：SM4 加密后的 TOTP 种子
+- `totp_enabled`：是否已启用 MFA
+- `backup_codes_hashed`：JSON 数组，存储 10 个备用码的 SM3 哈希值
+
+### 1.2 userDao.js 增加对应方法
+在 `backend/dao/userDao.js` 中新增：
+- `updateTotpSecret(id, encryptedSecret)` — 更新 totp_secret
+- `enableTotp(id, backupCodesHashed)` — 设置 totp_enabled=true 并存储备用码
+- `disableTotp(id)` — 设置 totp_enabled=false，清除种子和备用码
+- `getTotpData(id)` — 返回 totp_secret, totp_enabled, backup_codes_hashed
+
+---
+
+## 二、创建 MFA 服务
+
+新建 `backend/services/mfaService.js`：
+
+### 2.1 依赖
+- `otplib`（npm install otplib）
+- `sm-crypto`（SM4 加密，已有依赖）
+- `cryptoUtils.js`（SM3 哈希，已有）
+
+### 2.2 导出方法
+
+**generateSecret(username)**
+1. 调用 `otplib.authenticator.generateSecret()`
+2. 生成 otpauth URL：`otpauth://totp/FinZkTrust:${username}?secret=${secret}&issuer=FinZkTrust`
+3. 返回 `{ secret, otpauthUrl }`
+
+**verifyToken(token, secret)**
+1. 调用 `otplib.authenticator.verify({ token, secret })`
+2. 返回 boolean
+
+**generateBackupCodes(count = 10)**
+1. 生成 count 个 8 位随机字母数字混合码
+2. 返回明文数组（仅创建时返回一次）
+
+**encryptSecret(secret, sm4Key)**
+1. 使用 SM4-CBC 加密种子，密钥从环境变量 SM4_MASTER_KEY 读取
+2. 生成随机 IV，返回 `iv:密文` 拼接字符串
+
+**decryptSecret(encryptedSecret, sm4Key)**
+1. 从拼接字符串分离 IV 和密文
+2. SM4-CBC 解密，返回明文种子
+
+**hashBackupCodes(codes)**
+1. 对每个备用码计算 SM3 哈希
+2. 返回哈希数组
+
+**verifyBackupCode(code, hashedCodes)**
+1. 对传入的 code 计算 SM3 哈希
+2. 在 hashedCodes 数组中查找匹配项
+3. 若匹配，返回匹配的索引；否则返回 -1
+
+**getSm4Key()**
+1. 从 `process.env.SM4_MASTER_KEY` 读取 SM4 密钥
+2. 如果未设置，使用默认测试密钥并打印警告
+
+---
+
+## 三、创建 MFA 路由
+
+新建 `backend/routes/mfa.js`：
+
+### 3.1 中间件要求
+所有接口需要 JWT 认证（使用已有的 `req.user`）
+
+### 接口列表
+
+**POST /api/v1/mfa/setup**
+- 认证：JWT 有效即可
+- 逻辑：
+  1. 获取当前用户信息（`userDao.findById(req.user.id)`）
+  2. 检查 `totp_enabled`，若已启用返回 `{ success: false, message: 'MFA 已启用' }`
+  3. 调用 `mfaService.generateSecret(user.username)` 生成种子
+  4. 用 `mfaService.encryptSecret` 加密种子
+  5. 调用 `userDao.updateTotpSecret(user.id, encryptedSecret)` 存入数据库
+  6. 返回 `{ success: true, otpauthUrl, secret }`（前端用 secret 展示二维码）
+
+**POST /api/v1/mfa/verify-and-enable**
+- 认证：JWT 有效
+- body：`{ token: string }`
+- 逻辑：
+  1. 获取用户的 `totp_secret`（加密的）
+  2. 用 `mfaService.decryptSecret` 解密
+  3. 调用 `mfaService.verifyToken(token, decryptedSecret)`
+  4. 若通过：
+     a. 生成 10 个备用码 `mfaService.generateBackupCodes(10)`
+     b. 对备用码做 SM3 哈希 `mfaService.hashBackupCodes(codes)`
+     c. 调用 `userDao.enableTotp(user.id, hashedCodes)` 启用 MFA
+     d. 返回 `{ success: true, backupCodes: [...] }`（明文备用码，仅此一次）
+  5. 若失败：返回 `{ success: false, message: '验证码错误' }`
+
+**POST /api/v1/mfa/verify**
+- 认证：JWT 有效
+- body：`{ token: string }`
+- 逻辑：
+  1. 获取用户的 TOTP 数据
+  2. 解密密种子
+  3. 先尝试 `mfaService.verifyToken(token, decryptedSecret)`
+  4. 若失败，尝试备用码验证：
+     a. 调用 `mfaService.verifyBackupCode(token, hashedCodes)`
+     b. 若匹配，从数组中移除该哈希，更新数据库，返回 `{ success: true, method: 'backup_code' }`
+  5. 若全部失败，返回 `{ success: false, message: '验证码无效' }`
+
+**GET /api/v1/mfa/status**
+- 返回当前用户 MFA 绑定状态：`{ enabled: true/false }`
+
+---
+
+## 四、修改登录流程（auth.js）
+
+修改 `backend/routes/auth.js` 的 POST /login 路由：
+
+### 当前流程
+```
+验证密码 → 签发 JWT → 返回 { token, user }
+```
+
+### 新流程
+```
+验证密码 → 检查 totp_enabled → 分支：
+  A) 未启用：签发 JWT → 返回 { token, user }
+  B) 已启用：签发临时令牌 tempToken（有效期 5 分钟，仅含 user.id）
+             → 返回 { requireMfa: true, tempToken }
+```
+
+### 实现要点
+1. 在密码验证通过、SM2 签名验证通过后，增加查询：
+   ```
+   const totpData = await userDao.getTotpData(user.id);
+   ```
+2. 如果 `totpData.totp_enabled === true`：
+   - 不签发正式 JWT
+   - 签发临时令牌：
+     ```
+     const tempToken = jwt.sign(
+       { userId: user.id, mfaPending: true },
+       process.env.JWT_SECRET,
+       { expiresIn: '5m' }
+     );
+     ```
+   - 返回 `{ success: true, requireMfa: true, tempToken }`
+3. 如果 `totpData.totp_enabled === false`：
+   - 保持现有逻辑，签发正式 JWT
+   - 返回 `{ success: true, token, refreshToken, user }`
+
+**重要：不能修改用户对象结构，不能影响未绑定 MFA 的用户的任何体验。**
+
+---
+
+## 五、前端改造
+
+### 5.1 新增 frontend/src/pages/MfaSetup.js
+- 路由：`/mfa/setup`
+- 页面布局：
+  - 显示二维码（使用 `qrcode.react` 或 Canvas 渲染 `otpauthUrl`）
+  - 显示种子文本（供手动输入）
+  - 6 位验证码输入框
+  - "验证并启用"按钮
+- 流程：
+  1. 进入页面，调用 `POST /api/v1/mfa/setup` 获取 `otpauthUrl` 和 `secret`
+  2. 渲染二维码
+  3. 用户输入验证码
+  4. 调用 `POST /api/v1/mfa/verify-and-enable`
+  5. 成功后展示备用码列表，提供"复制全部"和"下载 TXT"按钮
+  6. 提示妥善保管备用码
+
+### 5.2 新增 frontend/src/pages/MfaVerify.js
+- 路由：`/mfa/verify`
+- 页面布局：
+  - 6 位验证码输入框
+  - "验证"按钮
+  - "使用备用码登录"折叠区域
+- 流程：
+  1. 从登录跳转时接收 `tempToken`
+  2. 用户输入验证码
+  3. 调用 `POST /api/v1/mfa/verify`（携带临时令牌和验证码）
+  4. 成功后，调用登录接口的第二步（或直接用返回的正式 JWT 进入系统）
+  5. 失败提示错误
+
+### 5.3 修改登录页面（Home.js）
+- 登录成功后检查响应：
+  - 若 `data.requireMfa === true`，存储 `tempToken`，跳转 `/mfa/verify`
+  - 否则正常进入系统
+
+### 5.4 修改 App.js
+- 增加路由：
+  ```
+  <Route path="/mfa/setup" element={user ? <MfaSetup user={user} /> : <Navigate to="/" />} />
+  <Route path="/mfa/verify" element={<MfaVerify onLoginSuccess={...} />} />
+  ```
+
+### 5.5 修改 Profile.js
+- 在个人设置区域增加"安全设置"板块
+- 显示 MFA 状态（已绑定/未绑定）
+- 未绑定时显示"绑定两步验证"按钮，跳转 `/mfa/setup`
+
+---
+
+## 六、验证标准
+
+1. 未绑定 MFA 的用户登录流程完全不变（密码 → JWT → 进入系统）
+2. 绑定 MFA 后登录：
+   - 密码正确后返回 `requireMfa: true`
+   - 输入正确 TOTP 验证码后获得正式 JWT
+   - 输入错误验证码被拒绝
+3. 验证码在 30 秒窗口内有效，±1 窗口容差
+4. 备用码只能使用一次，第二次使用被拒绝
+5. 二维码绑定流程完整可用（Google Authenticator 等 APP 可扫码）
+6. SM4 加密的种子在数据库中不可读
+7. 所有现有功能（信用证明、借款、还款、出资、赎回）不受影响
+```
+
+---
+
+这份指令覆盖了 MFA 的完整实现链路——从数据库改造、SM4 加密种子存储、TOTP 验证、备用恢复码，到前后端联动和无 MFA 用户的零影响兼容。改动范围精确控制在 `mfaService.js`、`mfa.js`、`auth.js` 的一个分支、前端三个页面，不触碰任何现有稳定代码。

@@ -1,0 +1,42 @@
+[
+  {
+    "id": 1,
+    "userId": 1,
+    "score": 640,
+    "change": 10,
+    "reason": "按时还款",
+    "timestamp": "2025-05-21T04:34:24.804Z"
+  },
+  {
+    "id": 2,
+    "userId": 1,
+    "score": 650,
+    "change": 10,
+    "reason": "按时还款",
+    "timestamp": "2025-05-21T04:39:37.775Z"
+  },
+  {
+    "id": 3,
+    "userId": 1,
+    "score": 660,
+    "change": 10,
+    "reason": "按时还款",
+    "timestamp": "2025-05-21T04:44:42.706Z"
+  },
+  {
+    "id": 4,
+    "userId": 1,
+    "score": 670,
+    "change": 10,
+    "reason": "按时还款",
+    "timestamp": "2025-05-21T04:46:13.779Z"
+  },
+  {
+    "id": 5,
+    "userId": 1,
+    "score": 680,
+    "change": 10,
+    "reason": "按时还款",
+    "timestamp": "2025-05-21T04:52:20.810Z"
+  }
+]

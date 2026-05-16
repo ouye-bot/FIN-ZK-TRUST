@@ -1,0 +1,268 @@
+{
+  "timestamp": "2026-05-11T14:21:45.000Z",
+  "overallStatus": "success",
+  "modules": {
+    "apiStress": {
+      "status": "success"
+    },
+    "crypto": {
+      "status": "success"
+    },
+    "zkp": {
+      "status": "success"
+    },
+    "userInfo": {
+      "status": "success"
+    },
+    "securityChain": {
+      "status": "success"
+    }
+  },
+  "results": {
+    "module1": {
+      "status": "success",
+      "durationMs": "31306.04",
+      "baseline": {
+        "低负载": {
+          "total": 100,
+          "success": 100,
+          "status429": 0,
+          "errors": 0,
+          "successRate": "100.00",
+          "stats": {
+            "avg": 13.416760999999997,
+            "min": 5.379500000000007,
+            "max": 37.497299999999996,
+            "p50": 12.988099999999974,
+            "p90": 24.28879999999998,
+            "p95": 29.704199999999958,
+            "p99": 37.497299999999996
+          }
+        },
+        "中负载": {
+          "total": 450,
+          "success": 450,
+          "status429": 0,
+          "errors": 0,
+          "successRate": "100.00",
+          "stats": {
+            "avg": 22.02323977777777,
+            "min": 6.921999999999912,
+            "max": 58.04699999999997,
+            "p50": 22.131000000000085,
+            "p90": 30.559300000000007,
+            "p95": 33.13459999999998,
+            "p99": 52.0437
+          }
+        },
+        "高负载": {
+          "total": 400,
+          "success": 392,
+          "status429": 0,
+          "errors": 8,
+          "successRate": "98.00",
+          "stats": {
+            "avg": 52.12206024999997,
+            "min": 13.339099999999917,
+            "max": 97.96049999999991,
+            "p50": 44.85130000000004,
+            "p90": 84.58090000000016,
+            "p95": 90.6241,
+            "p99": 96.96250000000009
+          }
+        }
+      },
+      "capacity": {
+        "durationSec": "30.02",
+        "totalRequests": 13310,
+        "qps": 443.42,
+        "success": 13310,
+        "status429": 0,
+        "errors": 0,
+        "successRate": "100.00",
+        "stats": {
+          "avg": 17.507276123215675,
+          "min": 9.716700000000856,
+          "max": 30.520700000000033,
+          "p50": 17.273400000000038,
+          "p90": 21.308800000000247,
+          "p95": 22.634900000000926,
+          "p99": 25.720400000000154
+        }
+      }
+    },
+    "module2": {
+      "status": "success",
+      "sm2KeyGen": {
+        "iterations": 6000,
+        "totalMs": "45129.43",
+        "avgMs": "7.522",
+        "opsPerSec": 133,
+        "memoryUsedKB": 13441.81
+      },
+      "sm2Sign": {
+        "iterations": 10000,
+        "totalMs": "26.01",
+        "avgMs": "0.0026",
+        "opsPerSec": 384509
+      },
+      "sm3Hash": {
+        "1KB": {
+          "iterations": 10000,
+          "totalMs": "40.07",
+          "avgMs": "0.0040",
+          "throughputMBs": 243.69
+        },
+        "10KB": {
+          "iterations": 5000,
+          "totalMs": "38.82",
+          "avgMs": "0.0078",
+          "throughputMBs": 1257.75
+        }
+      },
+      "sm4EncDec": {
+        "1KB": {
+          "iterations": 1000,
+          "totalMs": "82.89",
+          "avgMs": "0.083",
+          "throughputMBs": 11.78
+        },
+        "10KB": {
+          "iterations": 500,
+          "totalMs": "206.03",
+          "avgMs": "0.412",
+          "throughputMBs": 23.7
+        }
+      },
+      "durationMs": "45580.94"
+    },
+    "module3": {
+      "proofGen": {
+        "iterations": 10,
+        "successCount": 10,
+        "avgMs": "167.98",
+        "p50Ms": "104.86",
+        "p90Ms": "750.39",
+        "maxMs": "750.39"
+      },
+      "proofVerify": {
+        "iterations": 10,
+        "successCount": 10,
+        "avgMs": "11.282",
+        "p50Ms": "10.800",
+        "p90Ms": "14.775",
+        "maxMs": "14.775"
+      },
+      "durationMs": "2553.63",
+      "status": "success",
+      "sampleProof": {
+        "proof": {
+          "pi_a": [
+            "21501672391119828249164961371322452849517734150842656144095387363798998234079",
+            "3202670096553435148459912257771864133384251449885587762574615787796421203638",
+            "1"
+          ],
+          "pi_b": [
+            [
+              "6266749156578148790920891328254526720898968532850599899231140849869505569877",
+              "4423572426496635539338283865636775157735753748874289271505143808165926714472"
+            ],
+            [
+              "11637446154797212423972692676019761129417094526273633397728991338820898109696",
+              "836538065851921872237944827555814701418832006267701354031355207698958899201"
+            ],
+            [
+              "1",
+              "0"
+            ]
+          ],
+          "pi_c": [
+            "12953062832038800845266628672922407434686413760968908732209062742022140876107",
+            "12314391817361658382679369154725874662889559308868790894211939393414233380399",
+            "1"
+          ],
+          "protocol": "groth16",
+          "curve": "bn128"
+        },
+        "publicSignals": [
+          "1"
+        ]
+      }
+    },
+    "coldStart": {
+      "latencyMs": "8.91",
+      "status": "measured"
+    },
+    "module5": {
+      "status": "success",
+      "results": [
+        {
+          "concurrency": 10,
+          "avgMs": "11.98",
+          "p95Ms": "13.23",
+          "successRate": "100.0"
+        },
+        {
+          "concurrency": 50,
+          "avgMs": "45.24",
+          "p95Ms": "57.53",
+          "successRate": "100.0"
+        },
+        {
+          "concurrency": 100,
+          "avgMs": "73.38",
+          "p95Ms": "91.41",
+          "successRate": "100.0"
+        },
+        {
+          "concurrency": 150,
+          "avgMs": "97.51",
+          "p95Ms": "109.92",
+          "successRate": "100.0"
+        },
+        {
+          "concurrency": 200,
+          "avgMs": "137.86",
+          "p95Ms": "161.82",
+          "successRate": "100.0"
+        }
+      ]
+    },
+    "module6": {
+      "status": "success",
+      "results": [
+        {
+          "concurrency": 10,
+          "avgMs": "22.35",
+          "p95Ms": "25.04",
+          "successRate": "100.0"
+        },
+        {
+          "concurrency": 50,
+          "avgMs": "39.66",
+          "p95Ms": "65.24",
+          "successRate": "100.0"
+        },
+        {
+          "concurrency": 100,
+          "avgMs": "50.78",
+          "p95Ms": "74.44",
+          "successRate": "100.0"
+        },
+        {
+          "concurrency": 150,
+          "avgMs": "81.92",
+          "p95Ms": "110.73",
+          "successRate": "100.0"
+        },
+        {
+          "concurrency": 200,
+          "avgMs": "98.18",
+          "p95Ms": "127.28",
+          "successRate": "92.5"
+        }
+      ]
+    }
+  },
+  "duration": "82505.83"
+}

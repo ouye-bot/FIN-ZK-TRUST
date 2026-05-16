@@ -1,0 +1,27 @@
+[
+  {
+    "test": "用户登录",
+    "status": "成功",
+    "message": "用户登录成功"
+  },
+  {
+    "test": "资金池金额一致性",
+    "status": "成功",
+    "message": "资金池金额一致性正确"
+  },
+  {
+    "test": "交易哈希上链存证",
+    "status": "失败",
+    "message": "Request failed with status code 400"
+  },
+  {
+    "test": "用户数据隔离",
+    "status": "成功",
+    "message": "用户数据隔离正常"
+  },
+  {
+    "test": "断电/重启后数据不丢失",
+    "status": "成功",
+    "message": "断电/重启后数据不丢失"
+  }
+]

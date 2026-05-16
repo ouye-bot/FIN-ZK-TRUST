@@ -1,0 +1,47 @@
+[
+  {
+    "test": "单次签名",
+    "time": "47.61",
+    "status": "成功",
+    "message": "签名时间: 47.61ms"
+  },
+  {
+    "test": "单次验证",
+    "time": "33.52",
+    "status": "成功",
+    "message": "验证时间: 33.52ms"
+  },
+  {
+    "test": "批量签名",
+    "batchSize": 100,
+    "time": "3027.55",
+    "avgTime": "30.28",
+    "status": "成功",
+    "message": "签名100次: 3027.55ms, 平均: 30.28ms"
+  },
+  {
+    "test": "批量验证",
+    "batchSize": 100,
+    "time": "2920.68",
+    "avgTime": "29.21",
+    "status": "成功",
+    "message": "验证100次: 2920.68ms, 平均: 29.21ms"
+  },
+  {
+    "test": "并发性能",
+    "concurrencyLevel": 10,
+    "totalTime": "0.03",
+    "avgTime": "0.00",
+    "status": "成功",
+    "message": "10并发，总时间0.03ms，平均0.00ms"
+  },
+  {
+    "test": "缓存效果",
+    "iterations": 100,
+    "firstTime": "27.17",
+    "secondTime": "0.55",
+    "improvement": "97.98",
+    "status": "成功",
+    "message": "第一次: 27.17ms, 第二次: 0.55ms, 性能提升: 97.98%"
+  }
+]

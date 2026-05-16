@@ -1,0 +1,13 @@
+{
+  "name": "fin-zk-trust-circuits",
+  "version": "1.0.0",
+  "description": "Circuits for FinZkTrust - Zero knowledge proof generation",
+  "main": "compile.js",
+  "scripts": {
+    "compile": "node compile.js"
+  },
+  "dependencies": {
+    "circomlib": "^2.0.5",
+    "snarkjs": "^0.7.5"
+  }
+}

@@ -1,0 +1,55 @@
+[
+  {
+    "test": "SM3基本功能",
+    "data": "",
+    "hash": "1ab21d8355cfa17f8e61194831e81a8f22bec8c728fefb747ed035eb5082aa2b",
+    "hashLength": 64,
+    "status": "成功",
+    "message": "哈希计算成功"
+  },
+  {
+    "test": "SM3基本功能",
+    "data": "test",
+    "hash": "55e12e91650d2fec56ec74e1d3e4ddbfce2ef3a65890c2a19ecf88a307e76a23",
+    "hashLength": 64,
+    "status": "成功",
+    "message": "哈希计算成功"
+  },
+  {
+    "test": "SM3基本功能",
+    "data": "测试数据",
+    "hash": "56fbcdd63444d677b6a53127954f7d4c46066e9c9ba3a306fe1e04065790ffc7",
+    "hashLength": 64,
+    "status": "成功",
+    "message": "哈希计算成功"
+  },
+  {
+    "test": "SM3基本功能",
+    "data": "{\"userId\":1,\"amount\":1000,\"timestamp\":177523574925...",
+    "hash": "b8e6086be717ed2c34f8b43f248f0f925d3afdff6db2b2cfae767ac14aabd783",
+    "hashLength": 64,
+    "status": "成功",
+    "message": "哈希计算成功"
+  },
+  {
+    "test": "SM3数据完整性",
+    "originalHash": "6a50c9b645a5c1872f5221f3619aedd3ec6ae7c15c3fad23d330edd0a7064550",
+    "modifiedHash": "0ef71d58617d32c4401d3853a74af4c1aac6461ba8ec8c410403f423b7434979",
+    "hashesMatch": false,
+    "status": "成功",
+    "message": "数据完整性验证成功"
+  },
+  {
+    "test": "SM3抗碰撞性",
+    "testCount": 1000,
+    "collision": false,
+    "status": "成功",
+    "message": "抗碰撞性验证成功"
+  },
+  {
+    "test": "SM3性能",
+    "time": 2,
+    "status": "成功",
+    "message": "计算1000次哈希: 2ms"
+  }
+]

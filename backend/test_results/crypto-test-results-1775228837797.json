@@ -1,0 +1,46 @@
+[
+  {
+    "test": "SM3哈希算法",
+    "data": "测试数据1",
+    "hash": "823c60c7afc54785764df53d898da72c5dc1200ab1a1178e83d5dd13eabf9a78",
+    "status": "成功"
+  },
+  {
+    "test": "SM3哈希算法",
+    "data": "测试数据2",
+    "hash": "a8fc46358fa3e0a5e3207df8b6bf48b269056a3bda13472a4ae2fa1fcfa50270",
+    "status": "成功"
+  },
+  {
+    "test": "SM3哈希算法",
+    "data": "{\"userId\":1,\"amount\":1000,\"timestamp\":177522883645...",
+    "hash": "e887a7eaa292828f6d3dcf842927e60f4b7fab3240304abdb50115ff0a881767",
+    "status": "成功"
+  },
+  {
+    "test": "SM2密钥对生成",
+    "publicKey": "04846b2b38357b2ba4dbebd8337ce6f5c249551ee2f8bdea55...",
+    "privateKey": "7c63af4ed6a1aad9469b8a053fe5e417aca3a1a17b23703666...",
+    "status": "成功"
+  },
+  {
+    "test": "SM2签名和验证",
+    "message": "测试SM2签名",
+    "signature": "84d3b5ac1293efe5c1aed779bd679ee4686c59535d4170ec87...",
+    "isValid": true,
+    "status": "成功"
+  },
+  {
+    "test": "区块链SM3哈希存储",
+    "sm3Hash": "cb16a926f3fe8d16a51a0f526c4674de3eee260f494bf9c713cfd7055fb94a24",
+    "blockchainTxHash": "0x9a92b5ad18dcd303fa67dccf147e4a40cc2fa24e7c002a79f4657c2453b63040",
+    "status": "成功"
+  },
+  {
+    "test": "零知识证明",
+    "proofGenerated": true,
+    "creditScore": 750,
+    "threshold": 700,
+    "status": "成功"
+  }
+]

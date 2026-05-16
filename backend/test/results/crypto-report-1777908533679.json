@@ -1,0 +1,233 @@
+{
+  "timestamp": "2026-05-04T15:28:53.679Z",
+  "summary": {
+    "total": 27,
+    "passed": 25,
+    "failed": 2
+  },
+  "modules": {
+    "sm2": {
+      "name": "SM2 椭圆曲线密码",
+      "passed": 6,
+      "failed": 0
+    },
+    "sm3": {
+      "name": "SM3 哈希函数",
+      "passed": 4,
+      "failed": 0
+    },
+    "sm4": {
+      "name": "SM4 对称加密",
+      "passed": 3,
+      "failed": 1
+    },
+    "totp": {
+      "name": "TOTP 动态口令",
+      "passed": 2,
+      "failed": 1
+    },
+    "zkp": {
+      "name": "零知识证明 ZKP",
+      "passed": 4,
+      "failed": 0
+    },
+    "blockchain": {
+      "name": "区块链审计存证",
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0
+    },
+    "sss": {
+      "name": "Shamir 秘密共享",
+      "passed": 3,
+      "failed": 0
+    }
+  },
+  "results": [
+    {
+      "module": "sm2",
+      "name": "密钥对生成格式正确",
+      "passed": true,
+      "publicKeyLength": 130,
+      "privateKeyLength": 64
+    },
+    {
+      "module": "sm2",
+      "name": "签名与验签一致性",
+      "passed": true,
+      "signatureLength": 128
+    },
+    {
+      "module": "sm2",
+      "name": "错误公钥验签失败",
+      "passed": true,
+      "shouldBeFalse": true
+    },
+    {
+      "module": "sm2",
+      "name": "消息篡改后验签失败",
+      "passed": true,
+      "tamperedResult": false
+    },
+    {
+      "module": "sm2",
+      "name": "批量验证",
+      "passed": 10,
+      "total": 10
+    },
+    {
+      "module": "sm2",
+      "name": "签名缓存一致性",
+      "passed": true,
+      "firstResult": true,
+      "secondResult": true
+    },
+    {
+      "module": "sm3",
+      "name": "同数据同哈希",
+      "passed": true,
+      "hash1": "8b9996d5cc34897741fcbcde217fb720ebd2247f6d88ea4dccbec4011c1c4a98",
+      "hash2": "8b9996d5cc34897741fcbcde217fb720ebd2247f6d88ea4dccbec4011c1c4a98",
+      "hash3": "8b9996d5cc34897741fcbcde217fb720ebd2247f6d88ea4dccbec4011c1c4a98"
+    },
+    {
+      "module": "sm3",
+      "name": "异数据异哈希",
+      "passed": true,
+      "hashA": "26e1bcdff5740b5ca8f5de870df53434086367bf535302e641595f4ad52d4e06",
+      "hashB": "f53d17026ca2690f6750b9a6118414558473fa2a5ac26f0699983a8489916f03",
+      "hashC": "c23749959d1eeea63e05430ece710f1fabf0cdb43c1d322d312c5fda3cae73fe"
+    },
+    {
+      "module": "sm3",
+      "name": "雪崩效应",
+      "passed": true,
+      "differentChars": 59,
+      "totalChars": 64
+    },
+    {
+      "module": "sm3",
+      "name": "长度扩展攻击防护",
+      "passed": true,
+      "shortLength": 64,
+      "longLength": 64
+    },
+    {
+      "module": "sm4",
+      "name": "加解密循环",
+      "passed": true,
+      "originalLength": 1024,
+      "decryptedLength": 1024
+    },
+    {
+      "module": "sm4",
+      "name": "错误密钥解密",
+      "passed": false,
+      "note": "认证标签不匹配时返回原始密文"
+    },
+    {
+      "module": "sm4",
+      "name": "空数据加解密",
+      "passed": true,
+      "decryptedLength": 0
+    },
+    {
+      "module": "sm4",
+      "name": "长数据（10KB）加解密",
+      "passed": true,
+      "originalLength": 9752,
+      "decryptedLength": 9752
+    },
+    {
+      "module": "totp",
+      "name": "TOTP 正确验证",
+      "passed": false,
+      "error": "Cannot set properties of undefined (setting 'options')"
+    },
+    {
+      "module": "totp",
+      "name": "错误 TOTP 码拒绝",
+      "passed": true,
+      "wrongToken": "000000",
+      "verifyResult": false
+    },
+    {
+      "module": "totp",
+      "name": "种子随机性",
+      "passed": true,
+      "secret1Length": 32,
+      "secret2Length": 32
+    },
+    {
+      "module": "zkp",
+      "name": "ZKP 证明生成",
+      "passed": [
+        "6398757573536529222440979471976867888927470164423679482722611035873359568816",
+        "19127196563426480793347594844719783386143072176757708085173099448679543004556",
+        "1"
+      ],
+      "hasProof": true,
+      "hasPiA": true,
+      "hasPiB": true,
+      "hasPiC": true
+    },
+    {
+      "module": "zkp",
+      "name": "ZKP 正确验证",
+      "passed": true,
+      "verifyResult": true
+    },
+    {
+      "module": "zkp",
+      "name": "ZKP 错误证明验证失败",
+      "passed": true,
+      "tamperedResult": false
+    },
+    {
+      "module": "zkp",
+      "name": "ZKP 证明数据结构完整性",
+      "passed": true,
+      "publicSignalsLength": 1
+    },
+    {
+      "module": "blockchain",
+      "name": "区块链服务初始化",
+      "passed": true,
+      "isInitialized": true
+    },
+    {
+      "module": "blockchain",
+      "name": "审计哈希上链存证",
+      "passed": true,
+      "txHash": "N/A",
+      "success": true
+    },
+    {
+      "module": "blockchain",
+      "name": "区块链节点不可用时优雅降级",
+      "passed": true,
+      "note": "需手动验证"
+    },
+    {
+      "module": "sss",
+      "name": "分片与恢复",
+      "passed": true,
+      "originalLength": 32,
+      "recoveredLength": 32,
+      "sharesCount": 5
+    },
+    {
+      "module": "sss",
+      "name": "不足分片恢复失败",
+      "passed": true,
+      "recoveredValue": "3cbd2e89f9...",
+      "note": "2个分片不足以恢复3阈值秘密"
+    },
+    {
+      "module": "sss",
+      "name": "分片独立性",
+      "passed": true,
+      "firstShareY": "345b65020099d3cd29ef..."
+    }
+  ]
+}

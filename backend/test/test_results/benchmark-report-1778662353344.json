@@ -1,0 +1,304 @@
+{
+  "timestamp": "2026-05-13T08:48:11.598Z",
+  "overallStatus": "success",
+  "modules": {
+    "apiStress": {
+      "status": "success"
+    },
+    "crypto": {
+      "status": "success"
+    },
+    "zkp": {
+      "status": "success"
+    },
+    "userInfo": {
+      "status": "success"
+    },
+    "securityChain": {
+      "status": "success"
+    },
+    "databaseStress": {
+      "status": "success"
+    }
+  },
+  "results": {
+    "module1": {
+      "status": "success",
+      "durationMs": "32671.08",
+      "baseline": {
+        "低负载": {
+          "total": 100,
+          "success": 100,
+          "status429": 0,
+          "errors": 0,
+          "successRate": "100.00",
+          "stats": {
+            "avg": 21.414158999999998,
+            "min": 12.472099999999955,
+            "max": 31.167399999999986,
+            "p50": 22.602000000000004,
+            "p90": 27.216700000000003,
+            "p95": 29.535300000000007,
+            "p99": 31.167399999999986
+          }
+        },
+        "中负载": {
+          "total": 450,
+          "success": 450,
+          "status429": 0,
+          "errors": 0,
+          "successRate": "100.00",
+          "stats": {
+            "avg": 52.995247333333324,
+            "min": 20.239100000000008,
+            "max": 97.36750000000006,
+            "p50": 59.18100000000004,
+            "p90": 82.03230000000008,
+            "p95": 87.85710000000006,
+            "p99": 95.49469999999997
+          }
+        },
+        "高负载": {
+          "total": 400,
+          "success": 400,
+          "status429": 0,
+          "errors": 0,
+          "successRate": "100.00",
+          "stats": {
+            "avg": 115.39716549999991,
+            "min": 21.858200000000124,
+            "max": 230.90030000000002,
+            "p50": 136.93470000000025,
+            "p90": 191.04600000000005,
+            "p95": 199.9987000000001,
+            "p99": 215.60840000000007
+          }
+        }
+      },
+      "capacity": {
+        "durationSec": "30.02",
+        "totalRequests": 10030,
+        "qps": 334.16,
+        "success": 10030,
+        "status429": 0,
+        "errors": 0,
+        "successRate": "100.00",
+        "stats": {
+          "avg": 24.50700366899306,
+          "min": 13.182300000000396,
+          "max": 53.42230000000018,
+          "p50": 21.31460000000152,
+          "p90": 36.54770000000008,
+          "p95": 39.03500000000167,
+          "p99": 43.6887999999999
+        }
+      }
+    },
+    "coldStart": {
+      "latencyMs": "5.11",
+      "status": "measured"
+    },
+    "module2": {
+      "status": "success",
+      "sm2KeyGen": {
+        "iterations": 6000,
+        "totalMs": "95662.49",
+        "avgMs": "15.944",
+        "opsPerSec": 63,
+        "memoryUsedKB": 9537.66
+      },
+      "sm2Sign": {
+        "iterations": 10000,
+        "totalMs": "67.98",
+        "avgMs": "0.0068",
+        "opsPerSec": 147096
+      },
+      "sm3Hash": {
+        "1KB": {
+          "iterations": 10000,
+          "totalMs": "84.64",
+          "avgMs": "0.0085",
+          "throughputMBs": 115.38
+        },
+        "10KB": {
+          "iterations": 5000,
+          "totalMs": "70.24",
+          "avgMs": "0.0140",
+          "throughputMBs": 695.17
+        }
+      },
+      "sm4EncDec": {
+        "1KB": {
+          "iterations": 1000,
+          "totalMs": "147.34",
+          "avgMs": "0.147",
+          "throughputMBs": 6.63
+        },
+        "10KB": {
+          "iterations": 500,
+          "totalMs": "466.31",
+          "avgMs": "0.933",
+          "throughputMBs": 10.47
+        }
+      },
+      "durationMs": "96575.95"
+    },
+    "module3": {
+      "proofGen": {
+        "iterations": 10,
+        "successCount": 10,
+        "avgMs": "304.31",
+        "p50Ms": "202.05",
+        "p90Ms": "1288.47",
+        "maxMs": "1288.47"
+      },
+      "proofVerify": {
+        "iterations": 10,
+        "successCount": 10,
+        "avgMs": "19.488",
+        "p50Ms": "19.345",
+        "p90Ms": "27.580",
+        "maxMs": "27.580"
+      },
+      "durationMs": "3790.48",
+      "status": "success",
+      "sampleProof": {
+        "proof": {
+          "pi_a": [
+            "7464699797765042393740939206451840259753335997684375042594679736842295956837",
+            "1112267987211481150950143996146238655529254152571414105075838178949859230024",
+            "1"
+          ],
+          "pi_b": [
+            [
+              "16180396789218646543186807755821470491571731056290509558447100561509344656788",
+              "19359769007901182451099612059661803872631714644184081071426041164028666058497"
+            ],
+            [
+              "12753499547285430179823529091922211751835214905835458355749164651622244352054",
+              "18732245431773208098878937995947156382463532014980885429196783214969463284991"
+            ],
+            [
+              "1",
+              "0"
+            ]
+          ],
+          "pi_c": [
+            "18536322630372305830103373086017294571583654410258935582842584563052581956575",
+            "7655428547616873247202459774719341949474016468216307931439823911381465209271",
+            "1"
+          ],
+          "protocol": "groth16",
+          "curve": "bn128"
+        },
+        "publicSignals": [
+          "1"
+        ]
+      }
+    },
+    "module5": {
+      "status": "success",
+      "results": [
+        {
+          "concurrency": 10,
+          "avgMs": "28.34",
+          "p95Ms": "32.84",
+          "successRate": "0.0"
+        },
+        {
+          "concurrency": 50,
+          "avgMs": "64.38",
+          "p95Ms": "88.57",
+          "successRate": "0.0"
+        },
+        {
+          "concurrency": 100,
+          "avgMs": "105.21",
+          "p95Ms": "152.70",
+          "successRate": "0.0"
+        },
+        {
+          "concurrency": 150,
+          "avgMs": "110.07",
+          "p95Ms": "154.96",
+          "successRate": "0.0"
+        },
+        {
+          "concurrency": 200,
+          "avgMs": "150.19",
+          "p95Ms": "181.86",
+          "successRate": "0.0"
+        }
+      ]
+    },
+    "module6": {
+      "status": "success",
+      "results": [
+        {
+          "concurrency": 10,
+          "avgMs": "24.46",
+          "p95Ms": "27.12",
+          "successRate": "100.0"
+        },
+        {
+          "concurrency": 50,
+          "avgMs": "46.09",
+          "p95Ms": "64.10",
+          "successRate": "100.0"
+        },
+        {
+          "concurrency": 100,
+          "avgMs": "85.97",
+          "p95Ms": "121.10",
+          "successRate": "100.0"
+        },
+        {
+          "concurrency": 150,
+          "avgMs": "96.81",
+          "p95Ms": "136.27",
+          "successRate": "100.0"
+        },
+        {
+          "concurrency": 200,
+          "avgMs": "110.13",
+          "p95Ms": "150.76",
+          "successRate": "100.0"
+        }
+      ]
+    },
+    "module4": {
+      "concurrentQuery": {
+        "concurrency": 200,
+        "totalRequests": 200,
+        "success": 200,
+        "errors": 0,
+        "successRate": "100.0",
+        "durationMs": "64.89",
+        "stats": {
+          "avgMs": "40.43",
+          "p50Ms": "39.10",
+          "p95Ms": "58.51",
+          "p99Ms": "58.99",
+          "maxMs": "59.01"
+        },
+        "qps": "3082.34"
+      },
+      "recoveryTest": {
+        "concurrency": 100,
+        "totalRequests": 100,
+        "success": 100,
+        "errors": 0,
+        "successRate": "100.0",
+        "durationMs": "32.27",
+        "stats": {
+          "avgMs": "18.05",
+          "p50Ms": "19.03",
+          "p95Ms": "31.64",
+          "maxMs": "31.95"
+        }
+      },
+      "status": "success"
+    }
+  },
+  "duration": "261744.30"
+}

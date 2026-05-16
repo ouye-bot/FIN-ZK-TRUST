@@ -1,0 +1,11 @@
+node_modules/
+.env
+*.log
+dist/
+build/
+.coverage
+.cache/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo

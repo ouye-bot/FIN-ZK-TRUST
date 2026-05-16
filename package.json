@@ -1,0 +1,23 @@
+{
+  "scripts": {
+    "test": "node backend/test/run-all-tests.js",
+    "test-comprehensive": "node backend/test/comprehensive_test.js",
+    "test-performance": "node backend/test/performance_test.js",
+    "test-crypto": "node backend/test/crypto/crypto-test.js",
+    "test-sm2": "node backend/test/crypto/sm2-test.js",
+    "test-sm3": "node backend/test/crypto/sm3-test.js",
+    "test-zk": "node backend/test/crypto/zk-proof-test.js",
+    "test-sm2-performance": "node backend/test/performance/sm2-performance-test.js",
+    "test-functional": "node backend/test/functional/full-system-test.js",
+    "test-credit-proof": "node backend/test/functional/credit-proof-test.js",
+    "test-loan-business": "node backend/test/functional/loan-business-test.js",
+    "test-security": "node backend/test/security/comprehensive-security-test.js",
+    "test-security-mechanism": "node backend/test/security/security-mechanism-test.js",
+    "test-error-handling": "node backend/test/security/error-handling-test.js",
+    "test-data-consistency": "node backend/test/security/data-consistency-test.js",
+    "generate-test-data": "node backend/scripts/generate-sm2-test-data.js"
+  },
+  "dependencies": {
+    "axios": "^1.13.6"
+  }
+}

@@ -1,0 +1,22 @@
+[
+  {
+    "test": "用户登录",
+    "status": "成功",
+    "message": "用户登录成功"
+  },
+  {
+    "test": "信用证明生成",
+    "status": "失败",
+    "message": "Request failed with status code 400"
+  },
+  {
+    "test": "信用证明验证",
+    "status": "失败",
+    "message": "Request failed with status code 404"
+  },
+  {
+    "test": "信用证明过期",
+    "status": "失败",
+    "message": "Request failed with status code 400"
+  }
+]
