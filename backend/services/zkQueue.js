@@ -204,7 +204,7 @@ class ZKQueue extends EventEmitter {
 
   // 启动定时清理
   startCleanupInterval() {
-    setInterval(() => {
+    const cleanupTimer = setInterval(() => {
       const now = Date.now();
       let cleanedCount = 0;
 
@@ -228,6 +228,7 @@ class ZKQueue extends EventEmitter {
         logger.info('ZKQueue cleanup done', statusCount);
       }
     }, 60000); // 每 60 秒清理一次
+    cleanupTimer.unref();
   }
 
   getStats() {

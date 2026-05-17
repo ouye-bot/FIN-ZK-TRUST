@@ -4,7 +4,7 @@ const path = require('path');
 
 // Compile the circuit
 console.log('Compiling circuit...');
-execSync('circom credit.circom --r1cs --wasm --sym -o build', { stdio: 'inherit' });
+execSync('circom credit.circom -r build/credit.r1cs -w build/credit.wasm -s build/credit.sym', { stdio: 'inherit' });
 
 // Generate the verification key
 console.log('Generating verification key...');

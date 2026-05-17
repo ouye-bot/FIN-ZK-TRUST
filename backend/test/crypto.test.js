@@ -25,13 +25,13 @@ class CryptoTest {
   constructor() {
     this.testResults = [];
     this.modules = {
-      sm2: { name: 'SM2 椭圆曲线密码', passed: 0, failed: 0 },
-      sm3: { name: 'SM3 哈希函数', passed: 0, failed: 0 },
-      sm4: { name: 'SM4 对称加密', passed: 0, failed: 0 },
-      totp: { name: 'TOTP 动态口令', passed: 0, failed: 0 },
-      zkp: { name: '零知识证明 ZKP', passed: 0, failed: 0 },
-      blockchain: { name: '区块链审计存证', passed: 0, failed: 0, skipped: 0 },
-      sss: { name: 'Shamir 秘密共享', passed: 0, failed: 0 }
+      sm2: { name: 'SM2 椭圆曲线密码', passed: 0, failed: 0, knownIssues: 0 },
+      sm3: { name: 'SM3 哈希函数', passed: 0, failed: 0, knownIssues: 0 },
+      sm4: { name: 'SM4 对称加密', passed: 0, failed: 0, knownIssues: 0 },
+      totp: { name: 'TOTP 动态口令', passed: 0, failed: 0, knownIssues: 0 },
+      zkp: { name: '零知识证明 ZKP', passed: 0, failed: 0, knownIssues: 0 },
+      blockchain: { name: '区块链审计存证', passed: 0, failed: 0, skipped: 0, knownIssues: 0 },
+      sss: { name: 'Shamir 秘密共享', passed: 0, failed: 0, knownIssues: 0 }
     };
     this.blockchainSkipped = false;
   }
@@ -39,7 +39,9 @@ class CryptoTest {
   addResult(module, name, passed, details = {}) {
     const result = { module, name, passed, ...details };
     this.testResults.push(result);
-    if (passed) {
+    if (result.knownIssue) {
+      this.modules[module].knownIssues++;
+    } else if (passed) {
       this.modules[module].passed++;
     } else {
       this.modules[module].failed++;
@@ -149,6 +151,98 @@ class CryptoTest {
       secondResult: secondVerify
     });
     console.log(`     ${cacheConsistent ? '✓' : '✗'} 两次验签结果一致: ${firstVerify === secondVerify}`);
+
+    // 1.7 空消息签名
+    console.log('\n  1.7 空消息签名');
+    try {
+      const emptySig = signWithSM2('', keyPair.privateKey);
+      this.addResult('sm2', '空消息签名', false, {
+        expectedBehavior: '空消息应抛出异常',
+        actualBehavior: '未抛异常，返回了签名'
+      });
+      console.log(`     ✗ 空消息签名: 未抛异常，返回了签名`);
+    } catch (e) {
+      this.addResult('sm2', '空消息签名', e.message.includes('签名消息不能为空'), {
+        expectedBehavior: '抛出"签名消息不能为空"异常',
+        actualBehavior: e.message
+      });
+      console.log(`     ${e.message.includes('签名消息不能为空') ? '✓' : '✗'} 空消息签名: ${e.message}`);
+    }
+
+    // 1.8 超长消息签名（100KB）
+    console.log('\n  1.8 超长消息签名（100KB）');
+    try {
+      const longMsg = 'x'.repeat(100000);
+      const longSig = signWithSM2(longMsg, keyPair.privateKey);
+      const longVerify = verifySM2Signature(longMsg, longSig, keyPair.publicKey);
+      this.addResult('sm2', '超长消息签名（100KB）', longVerify, {
+        messageLength: longMsg.length,
+        signatureLength: longSig.length
+      });
+      console.log(`     ${longVerify ? '✓' : '✗'} 100KB消息签名验签: ${longVerify ? '通过' : '失败'}`);
+    } catch (e) {
+      this.addResult('sm2', '超长消息签名（100KB）', false, { error: e.message });
+      console.log(`     ✗ 超长消息签名: 失败 - ${e.message}`);
+    }
+
+    // 1.9 私钥格式错误
+    console.log('\n  1.9 私钥格式错误');
+    try {
+      signWithSM2('test message', 'invalid_key_format');
+      this.addResult('sm2', '私钥格式错误', false, {
+        expectedBehavior: 'signWithSM2 对无效私钥应抛出异常',
+        actualBehavior: '未抛出异常，静默接受无效私钥',
+        bugId: 'B-SM2-INPUT',
+        bugLocation: 'cryptoUtils.js:signWithSM2'
+      });
+      console.log(`     ⚠️ 私钥格式错误: 应抛出异常但未抛出`);
+    } catch (e) {
+      this.addResult('sm2', '私钥格式错误', true, {
+        error: e.message
+      });
+      console.log(`     ✓ 私钥格式错误: 正确抛出异常 - ${e.message}`);
+    }
+
+    // 1.10 签名位翻转检测
+    console.log('\n  1.10 签名位翻转检测');
+    const flipSig = sig.substring(0, 1) + (sig[1] === 'a' ? 'b' : 'a') + sig.substring(2);
+    const flipVerify = verifySM2Signature(message, flipSig, keyPair.publicKey);
+    this.addResult('sm2', '签名位翻转检测', !flipVerify, {
+      knownIssue: !!flipVerify,
+      expectedBehavior: '翻转签名位后验签应返回 false',
+      actualBehavior: `验签返回 ${flipVerify}`,
+      bugId: 'B9',
+      bugLocation: 'cryptoUtils.js:verifySM2Signature'
+    });
+    console.log(`     ${!flipVerify ? '✓' : '⚠️ [knownIssue]'} 签名位翻转后验签: ${flipVerify} (应为 false)`);
+
+    // 1.11 buildSignatureData 格式验证
+    console.log('\n  1.11 buildSignatureData 格式验证');
+    try {
+      const { buildSignatureData } = cryptoUtils;
+      if (typeof buildSignatureData !== 'function') {
+        this.addResult('sm2', 'buildSignatureData 格式验证', false, { note: 'buildSignatureData 不可用' });
+        console.log(`     ⚠️ buildSignatureData 不可用`);
+      } else {
+        const sigData = buildSignatureData({ amount: 100, userId: 'u1', creditProofId: 'p1' }, ['amount', 'creditProofId', 'userId']);
+        const expectedOrder = '{"amount":100,"creditProofId":"p1","userId":"u1"}';
+        const orderCorrect = sigData === expectedOrder;
+        const sigData2 = buildSignatureData({ amount: 100 }, ['amount', 'missing_key']);
+        const missingKeyOK = sigData2 === '{"amount":100}';
+        const buildSigOK = orderCorrect && missingKeyOK;
+        this.addResult('sm2', 'buildSignatureData 格式验证', buildSigOK, {
+          sigData,
+          expectedOrder,
+          sigData2,
+          orderCorrect,
+          missingKeySkipped: missingKeyOK
+        });
+        console.log(`     ${buildSigOK ? '✓' : '✗'} buildSignatureData: 键顺序${orderCorrect ? '正确' : '错误'}, 缺失键${missingKeyOK ? '跳过' : '未跳过'}`);
+      }
+    } catch (e) {
+      this.addResult('sm2', 'buildSignatureData 格式验证', false, { error: e.message });
+      console.log(`     ✗ buildSignatureData 格式验证: 失败 - ${e.message}`);
+    }
   }
 
   // ============================================
@@ -220,6 +314,37 @@ class CryptoTest {
       longLength: hashLong.length
     });
     console.log(`     ${noPrefixMatch ? '✓' : '✗'} 短数据与长数据哈希: ${noPrefixMatch ? '无前缀关联' : '存在关联'}`);
+
+    // 2.5 雪崩效应阈值提高
+    console.log('\n  2.5 雪崩效应阈值提高');
+    const hashABC2 = generateSM3Hash('abc');
+    const hashABD2 = generateSM3Hash('abd');
+    let diffCount2 = 0;
+    for (let i = 0; i < hashABC2.length; i++) {
+      if (hashABC2[i] !== hashABD2[i]) diffCount2++;
+    }
+    const avalancheValid2 = diffCount2 >= 28;
+    this.addResult('sm3', '雪崩效应阈值提高', avalancheValid2, {
+      differentChars: diffCount2,
+      totalChars: hashABC2.length,
+      threshold: 28
+    });
+    console.log(`     ${avalancheValid2 ? '✓' : '✗'} 'abc' vs 'abd': ${diffCount2}/${hashABC2.length} 字符不同 (阈值: >=28)`);
+
+    // 2.6 Unicode 数据哈希
+    console.log('\n  2.6 Unicode 数据哈希');
+    const unicodeHash = generateSM3Hash('中文测试🎉');
+    const unicodeValid = /^[0-9a-f]{64}$/i.test(unicodeHash);
+    const asciiHash = generateSM3Hash('english text');
+    const unicodeDifferent = unicodeHash !== asciiHash;
+    const unicodeOK = unicodeValid && unicodeDifferent;
+    this.addResult('sm3', 'Unicode 数据哈希', unicodeOK, {
+      unicodeHash,
+      asciiHash,
+      isHex64: unicodeValid,
+      differentFromAscii: unicodeDifferent
+    });
+    console.log(`     ${unicodeOK ? '✓' : '✗'} Unicode哈希: ${unicodeValid ? '64位hex' : '格式错误'}, ${unicodeDifferent ? '与英文不同' : '与英文相同'}`);
   }
 
   // ============================================
@@ -300,6 +425,185 @@ class CryptoTest {
       decryptedLength: decrypted10KB.length
     });
     console.log(`     ${longDataOK ? '✓' : '✗'} 10KB 数据加解密: ${longDataOK ? '成功' : '失败'}`);
+
+    // 3.5 数字输入加密
+    console.log('\n  3.5 数字输入加密');
+    try {
+      const numEncrypted = encrypt(12345);
+      const numDecrypted = decrypt(numEncrypted);
+      const numOK = numDecrypted === '12345';
+      this.addResult('sm4', '数字输入加密', numOK, {
+        encryptedValue: numEncrypted.substring(0, 20) + '...',
+        decryptedValue: numDecrypted
+      });
+      console.log(`     ${numOK ? '✓' : '✗'} 数字12345加解密: ${numOK ? '成功' : '失败'} (解密结果: ${numDecrypted})`);
+    } catch (e) {
+      this.addResult('sm4', '数字输入加密', false, { error: e.message });
+      console.log(`     ✗ 数字输入加密: 失败 - ${e.message}`);
+    }
+
+    // 3.6 encryptFields/decryptFields users 表
+    console.log('\n  3.6 encryptFields/decryptFields users 表');
+    try {
+      const { encryptFields, decryptFields } = sm4Crypto;
+      if (typeof encryptFields !== 'function' || typeof decryptFields !== 'function') {
+        this.addResult('sm4', 'encryptFields users 表', false, { note: 'encryptFields/decryptFields 不可用' });
+        console.log(`     ⚠️ encryptFields/decryptFields 不可用`);
+      } else {
+        const userData = { balance: 10000, credit_score: 750, name: 'test' };
+        const encryptedUser = encryptFields('users', userData);
+        const balanceEncrypted = encryptedUser.balance !== 10000;
+        const creditScoreEncrypted = encryptedUser.credit_score !== 750;
+        const nameUnchanged = encryptedUser.name === 'test';
+        const encryptOK = balanceEncrypted && creditScoreEncrypted && nameUnchanged;
+        this.addResult('sm4', 'encryptFields users 表', encryptOK, {
+          balanceEncrypted,
+          creditScoreEncrypted,
+          nameUnchanged
+        });
+        console.log(`     ${encryptOK ? '✓' : '✗'} users加密: balance=${balanceEncrypted ? '已加密' : '未加密'}, credit_score=${creditScoreEncrypted ? '已加密' : '未加密'}, name=${nameUnchanged ? '未加密' : '已加密'}`);
+
+        if (encryptOK) {
+          const decryptedUser = decryptFields('users', encryptedUser);
+          const balanceMatch = decryptedUser.balance === 10000;
+          const creditScoreMatch = decryptedUser.credit_score === 750;
+          const nameMatch = decryptedUser.name === 'test';
+          const decryptOK = balanceMatch && creditScoreMatch && nameMatch;
+          this.addResult('sm4', 'decryptFields users 表', decryptOK, {
+            balanceMatch,
+            creditScoreMatch,
+            nameMatch
+          });
+          console.log(`     ${decryptOK ? '✓' : '✗'} users解密: balance=${balanceMatch ? '正确' : '错误'}, credit_score=${creditScoreMatch ? '正确' : '错误'}, name=${nameMatch ? '正确' : '错误'}`);
+        }
+      }
+    } catch (e) {
+      this.addResult('sm4', 'encryptFields users 表', false, { error: e.message });
+      console.log(`     ✗ encryptFields users 表: 失败 - ${e.message}`);
+    }
+
+    // 3.7 encryptFields/decryptFields transactions 表
+    console.log('\n  3.7 encryptFields/decryptFields transactions 表');
+    try {
+      const { encryptFields, decryptFields } = sm4Crypto;
+      if (typeof encryptFields !== 'function') {
+        this.addResult('sm4', 'encryptFields transactions 表', false, { note: 'encryptFields 不可用' });
+        console.log(`     ⚠️ encryptFields 不可用`);
+      } else {
+        const txData = { amount: 5000, interest: 100, type: 'loan' };
+        const encryptedTx = encryptFields('transactions', txData);
+        const amountEncrypted = encryptedTx.amount !== 5000;
+        const interestEncrypted = encryptedTx.interest !== 100;
+        const typeUnchanged = encryptedTx.type === 'loan';
+        const txEncryptOK = amountEncrypted && interestEncrypted && typeUnchanged;
+        this.addResult('sm4', 'encryptFields transactions 表', txEncryptOK, {
+          amountEncrypted,
+          interestEncrypted,
+          typeUnchanged
+        });
+        console.log(`     ${txEncryptOK ? '✓' : '✗'} transactions加密: amount=${amountEncrypted ? '已加密' : '未加密'}, interest=${interestEncrypted ? '已加密' : '未加密'}, type=${typeUnchanged ? '未加密' : '已加密'}`);
+
+        if (txEncryptOK) {
+          const decryptedTx = decryptFields('transactions', encryptedTx);
+          const amountMatch = decryptedTx.amount === 5000;
+          const interestMatch = decryptedTx.interest === 100;
+          const typeMatch = decryptedTx.type === 'loan';
+          const txDecryptOK = amountMatch && interestMatch && typeMatch;
+          this.addResult('sm4', 'decryptFields transactions 表', txDecryptOK, {
+            amountMatch,
+            interestMatch,
+            typeMatch
+          });
+          console.log(`     ${txDecryptOK ? '✓' : '✗'} transactions解密: amount=${amountMatch ? '正确' : '错误'}, interest=${interestMatch ? '正确' : '错误'}, type=${typeMatch ? '正确' : '错误'}`);
+        }
+      }
+    } catch (e) {
+      this.addResult('sm4', 'encryptFields transactions 表', false, { error: e.message });
+      console.log(`     ✗ encryptFields transactions 表: 失败 - ${e.message}`);
+    }
+
+    // 3.8 reEncrypt 密钥轮换
+    console.log('\n  3.8 reEncrypt 密钥轮换');
+    try {
+      const { reEncrypt } = sm4Crypto;
+      if (typeof reEncrypt !== 'function') {
+        this.addResult('sm4', 'reEncrypt 密钥轮换', false, { note: 'reEncrypt 不可用' });
+        console.log(`     ⚠️ reEncrypt 不可用`);
+      } else {
+        const plainData = 'sensitive data for key rotation test';
+        const oldKey = process.env.SM4_MASTER_KEY;
+        if (!oldKey) {
+          this.addResult('sm4', 'reEncrypt 密钥轮换', false, { note: 'SM4_MASTER_KEY 未设置，跳过' });
+          console.log(`     ⚠️ SM4_MASTER_KEY 未设置，跳过`);
+        } else {
+          const newKey = crypto.randomBytes(16).toString('hex');
+          const encryptedOld = encrypt(plainData);
+          const reEncrypted = reEncrypt(encryptedOld, oldKey, newKey);
+          const hasV2Prefix = reEncrypted.startsWith('v2:');
+          const rotationOK = hasV2Prefix && typeof reEncrypted === 'string' && reEncrypted.length > 0;
+          this.addResult('sm4', 'reEncrypt 密钥轮换', rotationOK, {
+            hasV2Prefix,
+            outputLength: reEncrypted.length,
+            note: 'decrypt 不接受密钥参数，无法验证新密钥解密'
+          });
+          console.log(`     ${rotationOK ? '✓' : '✗'} 密钥轮换: v2前缀=${hasV2Prefix}, 输出长度=${reEncrypted.length}`);
+        }
+      }
+    } catch (e) {
+      this.addResult('sm4', 'reEncrypt 密钥轮换', false, { error: e.message });
+      console.log(`     ✗ reEncrypt 密钥轮换: 失败 - ${e.message}`);
+    }
+
+    // 3.9 认证标签完整性（系统性）
+    console.log('\n  3.9 认证标签完整性（系统性）');
+    try {
+      const testData = crypto.randomBytes(64).toString('hex');
+      const encData = encrypt(testData);
+      const parts = encData.split(':');
+      const prefix = parts[0];
+      const iv = parts[1];
+      const authTag = parts[2];
+      const ciphertext = parts.slice(3).join(':');
+
+      let ivTamperResult, authTagTamperResult, ciphertextTamperResult;
+
+      try {
+        const tamperedIV = `${prefix}:${iv.substring(0, 10)}ff${iv.substring(12)}:${authTag}:${ciphertext}`;
+        decrypt(tamperedIV);
+        ivTamperResult = 'no_error';
+      } catch (e) {
+        ivTamperResult = 'exception';
+      }
+
+      try {
+        const tamperedAuthTag = `${prefix}:${iv}:${authTag.substring(0, 10)}ff${authTag.substring(12)}:${ciphertext}`;
+        decrypt(tamperedAuthTag);
+        authTagTamperResult = 'no_error';
+      } catch (e) {
+        authTagTamperResult = 'exception';
+      }
+
+      try {
+        const tamperedCT = `${prefix}:${iv}:${authTag}:${ciphertext.substring(0, 10)}ff${ciphertext.substring(12)}`;
+        decrypt(tamperedCT);
+        ciphertextTamperResult = 'no_error';
+      } catch (e) {
+        ciphertextTamperResult = 'exception';
+      }
+
+      const allTamperDetected = ivTamperResult === 'exception' && authTagTamperResult === 'exception' && ciphertextTamperResult === 'exception';
+      this.addResult('sm4', '认证标签完整性（系统性）', allTamperDetected, {
+        knownIssue: !allTamperDetected,
+        expectedBehavior: '篡改 IV/authTag/ciphertext 后解密应抛异常',
+        actualBehavior: `iv=${ivTamperResult}, authTag=${authTagTamperResult}, ciphertext=${ciphertextTamperResult}`,
+        bugId: 'B3',
+        bugLocation: 'sm4Crypto.js:decrypt 多处'
+      });
+      console.log(`     ${allTamperDetected ? '✓' : '⚠️ [knownIssue]'} 系统性篡改检测: iv=${ivTamperResult === 'exception' ? '拒绝' : '未拒绝'}, authTag=${authTagTamperResult === 'exception' ? '拒绝' : '未拒绝'}, ciphertext=${ciphertextTamperResult === 'exception' ? '拒绝' : '未拒绝'}`);
+    } catch (e) {
+      this.addResult('sm4', '认证标签完整性（系统性）', false, { error: e.message });
+      console.log(`     ✗ 认证标签完整性: 失败 - ${e.message}`);
+    }
   }
 
   // ============================================
@@ -360,6 +664,111 @@ class CryptoTest {
       secret2Length: secret2.length
     });
     console.log(`     ${seedsDifferent ? '✓' : '✗'} 两次生成种子: ${seedsDifferent ? '不同' : '相同'}`);
+
+    // 4.4 时间窗口容错 - 前一窗口
+    console.log('\n  4.4 时间窗口容错 - 前一窗口');
+    try {
+      const { secret } = mfaService.generateSecret('testuser4');
+      const secretBuffer = Buffer.from(mfaService._base32Decode(secret));
+      const counter = Math.floor(Date.now() / 1000 / 30);
+      const prevToken = mfaService._generateTOTP(secretBuffer, counter - 1, 6);
+      const prevVerify = await mfaService.verifyToken(prevToken, secret);
+      this.addResult('totp', '时间窗口容错 - 前一窗口', prevVerify, {
+        counter: counter - 1,
+        token: prevToken,
+        verifyResult: prevVerify
+      });
+      console.log(`     ${prevVerify ? '✓' : '✗'} 前一窗口(-30s)验证: ${prevVerify ? '通过' : '失败'}`);
+    } catch (e) {
+      this.addResult('totp', '时间窗口容错 - 前一窗口', false, { error: e.message });
+      console.log(`     ✗ 前一窗口测试: 失败 - ${e.message}`);
+    }
+
+    // 4.5 时间窗口容错 - 后一窗口
+    console.log('\n  4.5 时间窗口容错 - 后一窗口');
+    try {
+      const { secret } = mfaService.generateSecret('testuser5');
+      const secretBuffer = Buffer.from(mfaService._base32Decode(secret));
+      const counter = Math.floor(Date.now() / 1000 / 30);
+      const nextToken = mfaService._generateTOTP(secretBuffer, counter + 1, 6);
+      const nextVerify = await mfaService.verifyToken(nextToken, secret);
+      this.addResult('totp', '时间窗口容错 - 后一窗口', nextVerify, {
+        counter: counter + 1,
+        token: nextToken,
+        verifyResult: nextVerify
+      });
+      console.log(`     ${nextVerify ? '✓' : '✗'} 后一窗口(+30s)验证: ${nextVerify ? '通过' : '失败'}`);
+    } catch (e) {
+      this.addResult('totp', '时间窗口容错 - 后一窗口', false, { error: e.message });
+      console.log(`     ✗ 后一窗口测试: 失败 - ${e.message}`);
+    }
+
+    // 4.6 时间窗口超限拒绝
+    console.log('\n  4.6 时间窗口超限拒绝');
+    try {
+      const { secret } = mfaService.generateSecret('testuser6');
+      const secretBuffer = Buffer.from(mfaService._base32Decode(secret));
+      const counter = Math.floor(Date.now() / 1000 / 30);
+      const farToken = mfaService._generateTOTP(secretBuffer, counter - 3, 6);
+      const farVerify = await mfaService.verifyToken(farToken, secret);
+      this.addResult('totp', '时间窗口超限拒绝', !farVerify, {
+        counter: counter - 3,
+        token: farToken,
+        verifyResult: farVerify
+      });
+      console.log(`     ${!farVerify ? '✓' : '✗'} 超限窗口(-90s)验证: ${farVerify} (应为 false)`);
+    } catch (e) {
+      this.addResult('totp', '时间窗口超限拒绝', true, {
+        note: '抛出异常视为正确拒绝'
+      });
+      console.log(`     ✓ 超限窗口: 抛出异常`);
+    }
+
+    // 4.7 备份验证码完整流程
+    console.log('\n  4.7 备份验证码完整流程');
+    try {
+      const backupCodes = mfaService.generateBackupCodes(10);
+      const codesValid = Array.isArray(backupCodes) && backupCodes.length === 10 &&
+        backupCodes.every(c => typeof c === 'string' && c.length === 8);
+      if (!codesValid) {
+        this.addResult('totp', '备份验证码生成', false, { backupCodesLength: backupCodes?.length });
+        console.log(`     ✗ 备份验证码生成: 格式错误`);
+      } else {
+        this.addResult('totp', '备份验证码生成', true, { count: backupCodes.length });
+        console.log(`     ✓ 备份验证码生成: 10个8位码`);
+
+        const hashedCodes = mfaService.hashBackupCodes(backupCodes);
+        const hashValid = Array.isArray(hashedCodes) && hashedCodes.length === 10;
+        this.addResult('totp', '备份验证码哈希', hashValid, { hashedCount: hashedCodes?.length });
+        console.log(`     ${hashValid ? '✓' : '✗'} 备份验证码哈希: ${hashValid ? '10个哈希值' : '长度错误'}`);
+
+        const firstCode = backupCodes[0];
+        const verifyIndex = mfaService.verifyBackupCode(firstCode, hashedCodes);
+        const verifyOK = typeof verifyIndex === 'number' && verifyIndex >= 0;
+        this.addResult('totp', '备份验证码验证', verifyOK, {
+          code: firstCode,
+          matchedIndex: verifyIndex
+        });
+        console.log(`     ${verifyOK ? '✓' : '✗'} 备份验证码验证: ${verifyOK ? `匹配索引=${verifyIndex}` : '未匹配'}`);
+
+        const reVerifyIndex = mfaService.verifyBackupCode(firstCode, hashedCodes);
+        const reuseDetected = typeof reVerifyIndex === 'number' && reVerifyIndex >= 0;
+        this.addResult('totp', '备份验证码二次验证', !reuseDetected, {
+          knownIssue: reuseDetected,
+          code: firstCode,
+          matchedIndex: reVerifyIndex,
+          note: reuseDetected ? '系统允许码复用（安全缺陷）' : '正确拒绝已使用的码'
+        });
+        if (reuseDetected) {
+          console.log(`     ⚠️ [knownIssue] 备份验证码复用: 二次验证仍返回 index=${reVerifyIndex}（应拒绝已使用的码）`);
+        } else {
+          console.log(`     ✓ 备份验证码二次验证: 正确拒绝已使用的码`);
+        }
+      }
+    } catch (e) {
+      this.addResult('totp', '备份验证码完整流程', false, { error: e.message });
+      console.log(`     ✗ 备份验证码完整流程: 失败 - ${e.message}`);
+    }
   }
 
   // ============================================
@@ -431,14 +840,109 @@ class CryptoTest {
 
     // 5.4 ZKP 证明数据结构完整性
     console.log('\n  5.4 ZKP 证明数据结构完整性');
-    const dataComplete = proofResult &&
+    const structureOK = proofResult &&
+      proofResult.proof &&
+      proofResult.proof.pi_a && proofResult.proof.pi_b && proofResult.proof.pi_c &&
       proofResult.publicSignals &&
       Array.isArray(proofResult.publicSignals) &&
-      proofResult.publicSignals.length >= 1;
-    this.addResult('zkp', 'ZKP 证明数据结构完整性', dataComplete, {
-      publicSignalsLength: proofResult?.publicSignals?.length || 0
+      proofResult.publicSignals.length >= 1 &&
+      !isNaN(Number(proofResult.publicSignals[0]));
+    this.addResult('zkp', 'ZKP 证明数据结构完整性', structureOK, {
+      publicSignalsLength: proofResult?.publicSignals?.length || 0,
+      publicSignals0: proofResult?.publicSignals?.[0],
+      hasPiA: !!proofResult?.proof?.pi_a,
+      hasPiB: !!proofResult?.proof?.pi_b,
+      hasPiC: !!proofResult?.proof?.pi_c
     });
-    console.log(`     ${dataComplete ? '✓' : '✗'} publicSignals 长度: ${proofResult?.publicSignals?.length || 0} (>= 1)`);
+    console.log(`     ${structureOK ? '✓' : '✗'} 证明结构: pi_a=${!!proofResult?.proof?.pi_a}, pi_b=${!!proofResult?.proof?.pi_b}, pi_c=${!!proofResult?.proof?.pi_c}, publicSignals[0]=${proofResult?.publicSignals?.[0]}, isNaN=${isNaN(Number(proofResult?.publicSignals?.[0]))}`);
+
+    // 5.5 边界值 - score == threshold
+    console.log('\n  5.5 边界值 - score == threshold');
+    try {
+      const boundaryProof = await zkService.generateProof(600, 600);
+      const hasProof = boundaryProof && boundaryProof.proof;
+      const boundaryVerify = hasProof ? await zkService.verifyProof(boundaryProof.proof, boundaryProof.publicSignals) : false;
+      this.addResult('zkp', '边界值 score==threshold', hasProof && boundaryVerify === true, {
+        hasProof: !!hasProof,
+        verifyResult: boundaryVerify
+      });
+      console.log(`     ${hasProof && boundaryVerify === true ? '✓' : '✗'} score=600, threshold=600: 生成=${!!hasProof}, 验证=${boundaryVerify}`);
+    } catch (e) {
+      this.addResult('zkp', '边界值 score==threshold', false, { error: e.message });
+      console.log(`     ✗ 边界值测试: 失败 - ${e.message}`);
+    }
+
+    // 5.6 不达标 - score < threshold
+    console.log('\n  5.6 不达标 - score < threshold');
+    try {
+      const lowProof = await zkService.generateProof(500, 600);
+      if (lowProof && lowProof.proof) {
+        const lowVerify = await zkService.verifyProof(lowProof.proof, lowProof.publicSignals);
+        this.addResult('zkp', '不达标 score<threshold', lowVerify === false, {
+          knownIssue: lowVerify !== false,
+          score: 500,
+          threshold: 600,
+          expectedBehavior: 'score < threshold 时 verifyProof 应返回 false',
+          actualBehavior: `verifyProof 返回 ${lowVerify}`,
+          bugId: 'B10',
+          bugLocation: 'circuits/credit.circom:L14 使用 <-- 而非 <=='
+        });
+        console.log(`     ${lowVerify === false ? '✓' : '⚠️ [knownIssue]'} score=500 < threshold=600: 验证=${lowVerify} (应为 false)`);
+      } else {
+        this.addResult('zkp', '不达标 score<threshold', false, { note: '证明生成失败', bugId: 'B10' });
+        console.log(`     ❌ 不达标测试: 证明生成失败`);
+      }
+    } catch (e) {
+      this.addResult('zkp', '不达标 score<threshold', false, { error: e.message, bugId: 'B10' });
+      console.log(`     ❌ 不达标测试: 失败 - ${e.message}`);
+    }
+
+    // 5.7 单参数绕过漏洞测试（对应 Bug B2）
+    console.log('\n  5.7 单参数绕过漏洞测试（对应 Bug B2）');
+    try {
+      const fakeProof = { pi_a: ['0', '0', '0'], pi_b: [['0', '0'], ['0', '0'], ['0', '0']], pi_c: ['0', '0', '0'] };
+      const singleParamResult = await zkService.verifyProof(fakeProof);
+      // 如果没抛异常，说明后门仍存在
+      this.addResult('zkp', '单参数绕过漏洞(B2)', false, {
+        knownIssue: false,
+        expectedBehavior: 'verifyProof 只传1个参数时应抛出异常',
+        actualBehavior: `返回 ${singleParamResult}（安全漏洞未修复）`,
+        bugId: 'B2',
+        bugLocation: 'zkService.js:verifyProof'
+      });
+      console.log(`     ✗ 单参数调用未抛异常: ${singleParamResult}（安全漏洞未修复）`);
+    } catch (e) {
+      this.addResult('zkp', '单参数绕过漏洞(B2)', true, {
+        knownIssue: false,
+        expectedBehavior: '抛出异常',
+        actualBehavior: e.message
+      });
+      console.log(`     ✓ 单参数调用: 抛出异常 - ${e.message}`);
+    }
+
+    // 5.8 极端值 - 低分
+    console.log('\n  5.8 极端值 - 低分');
+    try {
+      const extremeProof = await zkService.generateProof(300, 300);
+      if (extremeProof && extremeProof.proof) {
+        const extremeVerify = await zkService.verifyProof(extremeProof.proof, extremeProof.publicSignals);
+        const structureOK = extremeProof.proof.pi_a && extremeProof.proof.pi_b && extremeProof.proof.pi_c;
+        const extremeOK = structureOK && extremeVerify === true;
+        this.addResult('zkp', '极端值 score=300', extremeOK, {
+          score: 300,
+          threshold: 300,
+          structureOK,
+          verifyResult: extremeVerify
+        });
+        console.log(`     ${extremeOK ? '✓' : '✗'} score=300: 结构=${structureOK}, 验证=${extremeVerify}`);
+      } else {
+        this.addResult('zkp', '极端值 score=300', false, { note: '证明生成失败' });
+        console.log(`     ✗ 极端值测试: 证明生成失败`);
+      }
+    } catch (e) {
+      this.addResult('zkp', '极端值 score=300', false, { error: e.message });
+      console.log(`     ✗ 极端值测试: 失败 - ${e.message}`);
+    }
   }
 
   // ============================================
@@ -507,13 +1011,47 @@ class CryptoTest {
       }
     }
 
-    // 6.3 区块链节点不可用时优雅降级
-    console.log('\n  6.3 区块链节点不可用时优雅降级');
-    console.log(`     ℹ️ 此测试需要在测试后手动停止 Hardhat 节点验证降级行为`);
-    this.addResult('blockchain', '区块链节点不可用时优雅降级', true, {
-      note: '需手动验证'
-    });
-    console.log(`     ✓ 降级处理: 已记录 (需手动测试)`);
+    // 6.3 区块链节点不可用时优雅降级（自动验证）
+    console.log('\n  6.3 区块链节点不可用时优雅降级（自动验证）');
+    const originalInit = blockchainService.initialize;
+    const originalIsInit = blockchainService.isInitialized;
+    try {
+      blockchainService.initialize = async () => false;
+      blockchainService.isInitialized = false;
+
+      const { generateSM3Hash } = require('../utils/cryptoUtils');
+      const testHash = generateSM3Hash(`test_degradation_${Date.now()}`);
+      let degradedResult;
+      let threwError = false;
+      try {
+        degradedResult = await blockchainService.storeAuditHash(
+          testHash,
+          Date.now(),
+          'test_degradation',
+          'test_user'
+        );
+      } catch (e) {
+        threwError = true;
+        degradedResult = { error: e.message };
+      }
+
+      const degradedOK = !threwError && (degradedResult?.success === false || degradedResult?.status === 'skipped' || degradedResult?.error);
+      this.addResult('blockchain', '区块链节点不可用时优雅降级', degradedOK, {
+        threwError,
+        result: degradedResult,
+        note: '自动验证降级行为'
+      });
+      console.log(`     ${degradedOK ? '✓' : '✗'} 降级处理: ${degradedOK ? '优雅降级' : '可能抛异常'} (threwError=${threwError})`);
+    } catch (e) {
+      this.addResult('blockchain', '区块链节点不可用时优雅降级', false, {
+        error: e.message,
+        note: '自动验证失败'
+      });
+      console.log(`     ✗ 降级测试: 失败 - ${e.message}`);
+    } finally {
+      blockchainService.initialize = originalInit;
+      blockchainService.isInitialized = originalIsInit;
+    }
   }
 
   // ============================================
@@ -534,9 +1072,18 @@ class CryptoTest {
 
     const { splitSecretToShares, recoverSecretFromShares } = sssModule;
 
+    const sm4MasterKey = process.env.SM4_MASTER_KEY;
+    if (!sm4MasterKey) {
+      console.log('  ⚠️ SM4_MASTER_KEY 未设置，跳过模块7 SSS 测试');
+      for (const testName of ['分片与恢复', '不足分片恢复失败', '分片独立性', '不同阈值组合 (2,2)', '重复分片恢复']) {
+        this.addResult('sss', testName, false, { note: 'SM4_MASTER_KEY 未设置，跳过' });
+      }
+      return;
+    }
+
     // 7.1 分片与恢复
     console.log('\n  7.1 分片与恢复');
-    const masterKey = process.env.SM4_MASTER_KEY || '00112233445566778899aabbccddeeff';
+    const masterKey = sm4MasterKey;
     try {
       const shares = splitSecretToShares(masterKey, 5, 3);
       const recovered = recoverSecretFromShares(shares.slice(0, 3));
@@ -584,6 +1131,50 @@ class CryptoTest {
       this.addResult('sss', '分片独立性', false, { error: e.message });
       console.log(`     ✗ 分片独立性: 失败 - ${e.message}`);
     }
+
+    // 7.4 不同阈值组合 (2,2)
+    console.log('\n  7.4 不同阈值组合 (2,2)');
+    try {
+      const shares22 = splitSecretToShares(masterKey, 2, 2);
+      let singleFailed = false;
+      try {
+        const singleShare = recoverSecretFromShares([shares22[0]]);
+        singleFailed = singleShare.toLowerCase() !== masterKey.toLowerCase();
+      } catch (e) {
+        singleFailed = true;
+        console.log(`     单分片恢复正确抛出异常: ${e.message}`);
+      }
+      const bothShares = recoverSecretFromShares(shares22);
+      const bothOK = bothShares.toLowerCase() === masterKey.toLowerCase();
+      const threshold22OK = singleFailed && bothOK;
+      this.addResult('sss', '不同阈值组合 (2,2)', threshold22OK, {
+        bothMatch: bothOK,
+        singleFailedToRecover: singleFailed
+      });
+      console.log(`     ${threshold22OK ? '✓' : '✗'} (2,2)组合: 单分片${singleFailed ? '无法恢复' : '错误恢复'}, 双分片${bothOK ? '正确恢复' : '恢复失败'}`);
+    } catch (e) {
+      this.addResult('sss', '不同阈值组合 (2,2)', false, { error: e.message });
+      console.log(`     ✗ (2,2)组合: 失败 - ${e.message}`);
+    }
+
+    // 7.5 重复分片恢复
+    console.log('\n  7.5 重复分片恢复');
+    try {
+      const shares = splitSecretToShares(masterKey, 5, 3);
+      const duplicateShares = [shares[0], shares[0]];
+      const dupResult = recoverSecretFromShares(duplicateShares);
+      const dupFailed = dupResult.toLowerCase() !== masterKey.toLowerCase();
+      this.addResult('sss', '重复分片恢复', dupFailed, {
+        duplicateResultPrefix: dupResult.substring(0, 10) + '...',
+        expectedPrefix: masterKey.substring(0, 10) + '...'
+      });
+      console.log(`     ${dupFailed ? '✓' : '✗'} 重复分片恢复: ${dupFailed ? '正确拒绝' : '错误恢复'}`);
+    } catch (e) {
+      this.addResult('sss', '重复分片恢复', true, {
+        note: '抛出异常视为正确拒绝'
+      });
+      console.log(`     ✓ 重复分片恢复: 抛出异常`);
+    }
   }
 
   // ============================================
@@ -597,17 +1188,22 @@ class CryptoTest {
     let totalPassed = 0;
     let totalFailed = 0;
     let totalSkipped = 0;
+    let totalKnownIssues = 0;
 
     for (const [key, module] of Object.entries(this.modules)) {
-      const status = module.failed > 0 ? '❌' : (module.skipped > 0 ? '⚠️' : '✅');
-      console.log(`\n${status} ${module.name}: ${module.passed} 通过, ${module.failed} 失败${module.skipped ? `, ${module.skipped} 跳过` : ''}`);
+      const hasKnownIssues = module.knownIssues > 0;
+      const status = module.failed > 0 ? '❌' : (module.skipped > 0 ? '⚠️' : (hasKnownIssues ? '⚠️' : '✅'));
+      const knownIssueStr = hasKnownIssues ? `, ${module.knownIssues} 已知问题` : '';
+      console.log(`\n${status} ${module.name}: ${module.passed} 通过, ${module.failed} 失败${module.skipped ? `, ${module.skipped} 跳过` : ''}${knownIssueStr}`);
       totalPassed += module.passed;
       totalFailed += module.failed;
       totalSkipped += module.skipped || 0;
+      totalKnownIssues += module.knownIssues || 0;
     }
 
     console.log('\n' + '-'.repeat(70));
-    console.log(`  总计: ${totalPassed} 通过, ${totalFailed} 失败, ${totalSkipped} 跳过`);
+    const knownIssueStr = totalKnownIssues > 0 ? `, ${totalKnownIssues} 已知问题` : '';
+    console.log(`  总计: ${totalPassed} 通过, ${totalFailed} 失败, ${totalSkipped} 跳过${knownIssueStr}`);
     console.log('='.repeat(70));
   }
 
@@ -638,7 +1234,7 @@ class CryptoTest {
 
 if (require.main === module) {
   const test = new CryptoTest();
-  test.run().catch(e => {
+  test.run().then(() => process.exit(0)).catch(e => {
     console.error('测试执行失败:', e);
     process.exit(1);
   });

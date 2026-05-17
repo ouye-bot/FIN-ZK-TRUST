@@ -9,3 +9,10 @@ build/
 Thumbs.db
 *.swp
 *.swo
+
+# Test reports (generated at runtime)
+backend/test/results/
+backend/test/test_results/
+
+# Claude Code local settings
+.claude/settings.local.json

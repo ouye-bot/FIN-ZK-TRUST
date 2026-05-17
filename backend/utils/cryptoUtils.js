@@ -1,4 +1,5 @@
 const { sm2, sm3 } = require('sm-crypto');
+const crypto = require('crypto');
 const logger = require('./logger');
 
 // 通用LRU缓存基类
@@ -107,10 +108,33 @@ const hashCache = new HashCache(5000);
 const signatureCache = new SignatureCache(5000);
 
 // 定期记录缓存命中率
-setInterval(() => {
+const cacheLogInterval = setInterval(() => {
   const hitRate = signatureCache.getHitRate();
   logger.info('Signature cache hit rate:', { hitRate: `${hitRate.toFixed(2)}%`, size: signatureCache.size, totalCount: signatureCache.totalCount, hitCount: signatureCache.hitCount });
 }, 60000); // 每分钟记录一次
+cacheLogInterval.unref();
+
+// SM2 密钥格式校验
+const SM2_PRIVATE_KEY_PATTERN = /^[0-9a-fA-F]{64}$/;
+const SM2_PUBLIC_KEY_PATTERN = /^[0-9a-fA-F]{130}$/;
+
+function validateSM2PrivateKey(privateKey) {
+  if (!privateKey || typeof privateKey !== 'string') {
+    throw new Error('SM2 私钥不能为空');
+  }
+  if (!SM2_PRIVATE_KEY_PATTERN.test(privateKey)) {
+    throw new Error('SM2 私钥格式无效：必须为64位十六进制字符串');
+  }
+}
+
+function validateSM2PublicKey(publicKey) {
+  if (!publicKey || typeof publicKey !== 'string') {
+    throw new Error('SM2 公钥不能为空');
+  }
+  if (!SM2_PUBLIC_KEY_PATTERN.test(publicKey)) {
+    throw new Error('SM2 公钥格式无效：必须为130位十六进制字符串');
+  }
+}
 
 /**
  * 生成带盐的SM3哈希
@@ -118,7 +142,7 @@ setInterval(() => {
  * @returns {Object} - 包含哈希值和盐的对象
  */
 exports.generateSaltedSM3Hash = (password) => {
-  const salt = Math.random().toString(36).substring(2, 15);
+  const salt = crypto.randomBytes(16).toString('hex');
   const saltedPassword = password + salt;
   const hash = sm3(saltedPassword);
   return { hash, salt };
@@ -145,7 +169,15 @@ exports.verifySM3Hash = (password, storedHash, salt) => {
  * @returns {boolean} - 验证结果
  */
 exports.verifySM2Signature = (message, signature, publicKey) => {
-  const cacheKey = `sm2_${message}_${publicKey}`;
+  if (!message || typeof message !== 'string') {
+    throw new Error('验签消息不能为空');
+  }
+  if (!signature || typeof signature !== 'string') {
+    throw new Error('签名不能为空');
+  }
+  validateSM2PublicKey(publicKey);
+
+  const cacheKey = `sm2_verify::${message}::${signature}::${publicKey}`;
   const cachedResult = signatureCache.get(cacheKey);
   
   if (cachedResult !== null) {
@@ -154,11 +186,11 @@ exports.verifySM2Signature = (message, signature, publicKey) => {
   
   try {
     const result = sm2.doVerifySignature(message, signature, publicKey, { der: false });
-    logger.info('SM2 signature verification result:', { result, message, signature, publicKey });
+    logger.info('SM2 signature verification completed', { result });
     signatureCache.set(cacheKey, result);
     return result;
   } catch (error) {
-    logger.error('SM2 signature verification failed:', { error: error.message, message, signature, publicKey });
+    logger.error('SM2 signature verification failed:', { error: error.message });
     signatureCache.set(cacheKey, false);
     return false;
   }
@@ -207,7 +239,12 @@ exports.generateSM2KeyPair = () => {
  * @returns {string} - 签名
  */
 exports.signWithSM2 = (message, privateKey) => {
-  const cacheKey = `sm2_sign_${message}_${privateKey}`;
+  if (!message || typeof message !== 'string') {
+    throw new Error('签名消息不能为空');
+  }
+  validateSM2PrivateKey(privateKey);
+
+  const cacheKey = `sm2_sign::${message}`;
   const cachedSignature = signatureCache.get(cacheKey);
 
   if (cachedSignature !== null) {

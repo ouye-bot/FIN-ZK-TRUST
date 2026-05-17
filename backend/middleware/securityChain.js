@@ -54,7 +54,7 @@ const setupSecurityChain = (app) => {
           
           if (isBlacklisted) {
             console.log('[JWT] Token is blacklisted:', decoded.jti);
-            return;
+            return res.status(401).json({ success: false, message: 'Token 已被撤销' });
           }
         }
         
@@ -77,9 +77,9 @@ const setupSecurityChain = (app) => {
   app.use(authPermissionMiddleware);
 };
 
-setInterval(async () => {
+const blacklistCleanupInterval = setInterval(async () => {
   const now = Date.now();
-  
+
   for (const [jti, expiresAt] of blacklistCache.entries()) {
     if (now > expiresAt) {
       blacklistCache.delete(jti);
@@ -100,6 +100,7 @@ setInterval(async () => {
     }
   }
 }, 60000);
+blacklistCleanupInterval.unref();
 
 module.exports = {
   setupSecurityChain,

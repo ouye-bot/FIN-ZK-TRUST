@@ -1,7 +1,7 @@
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
-const { performance } = require('perf_hooks');
+const { performance, PerformanceObserver } = require('perf_hooks');
 const crypto = require('crypto');
 
 // 正确加载环境变量
@@ -49,6 +49,12 @@ async function collectGarbage() {
   }
 }
 
+function calcMean(arr) { return arr.reduce((a, b) => a + b, 0) / arr.length; }
+function calcStddev(arr) {
+  const m = calcMean(arr);
+  return Math.sqrt(arr.reduce((s, v) => s + (v - m) ** 2, 0) / arr.length);
+}
+
 // 测试配置
 const BASE_URL = 'http://localhost:3003/api/v1';
 const TEST_USERNAME = 'perfuser';
@@ -85,6 +91,7 @@ async function module1ApiStressTest() {
     if (loginRes.data.success) {
       token = loginRes.data.token;
       globalThis.__benchToken = token;
+      globalThis.__benchUserId = loginRes.data.user?.id || loginRes.data.userId;
       console.log('  ✓ 性能测试用户登录成功，Token已存入全局变量');
     } else {
       console.log('  ⚠ 登录失败，限流豁免将不生效');
@@ -417,178 +424,6 @@ async function module3ZkpPerformance() {
 }
 
 // ============================================
-// 模块6：借款流程性能测试（真实业务场景）
-// ============================================
-async function module6LoanBorrowWithProof() {
-  console.log('\n' + '='.repeat(70));
-  console.log('  模块6：借款流程性能测试（复用ZKP证明）');
-  console.log('='.repeat(70));
-
-  const moduleStart = performance.now();
-  const results = {};
-
-  let zkService;
-  try {
-    zkService = require('../services/zkService');
-  } catch (e) {
-    console.log('\n  ⚠️ ZKP服务不可用，跳过此模块');
-    return { status: 'skipped', reason: 'zkService not available' };
-  }
-
-  console.log('\n  6.1 前置准备：生成真实ZKP证明（仅一次）');
-  const proofStart = performance.now();
-  let pregeneratedProof = null;
-  try {
-    pregeneratedProof = await zkService.generateProof(750, 600);
-    const proofGenTime = performance.now() - proofStart;
-    console.log(`     ZKP证明生成耗时: ${proofGenTime.toFixed(2)}ms`);
-    results.proofGenTime = proofGenTime.toFixed(2);
-  } catch (e) {
-    console.log(`     ⚠️ ZKP证明生成失败: ${e.message}`);
-    return { status: 'skipped', reason: 'ZKP proof generation failed' };
-  }
-
-  console.log('\n  6.2 注册测试用户');
-  const testUsername = `perfborrow_${Date.now()}`;
-  const testPassword = 'PerfTest123!';
-  let token = null;
-  let userId = null;
-  let keyPair = null;
-
-  try {
-    const { generateSM2KeyPair, signWithSM2 } = require('../utils/cryptoUtils');
-    keyPair = generateSM2KeyPair();
-
-    const registerRes = await axios.post(`${BASE_URL}/auth/register`, {
-      username: testUsername,
-      password: testPassword,
-      creditScore: 750
-    });
-
-    const loginRes = await axios.post(`${BASE_URL}/auth/login`, {
-      username: testUsername,
-      password: testPassword
-    });
-
-    if (loginRes.data.success) {
-      token = loginRes.data.token;
-      userId = loginRes.data.user.id;
-      console.log(`     测试用户注册/登录成功: ${testUsername}`);
-    }
-  } catch (e) {
-    console.log(`     ⚠️ 用户准备失败: ${e.message}`);
-    return { status: 'skipped', reason: 'User preparation failed' };
-  }
-
-  if (!token || !userId) {
-    return { status: 'skipped', reason: 'No valid token' };
-  }
-
-  console.log('\n  6.3 提交ZKP证明到后端存储');
-  let proofId = null;
-  let verificationCode = null;
-  try {
-    const proofSubmitRes = await axios.post(
-      `${BASE_URL}/credit/generate-proof`,
-      {
-        userId: userId,
-        proof: pregeneratedProof.proof,
-        publicSignals: pregeneratedProof.publicSignals
-      },
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-
-    if (proofSubmitRes.data.success && proofSubmitRes.data.data?.proof) {
-      proofId = proofSubmitRes.data.data.proof.proofId;
-      verificationCode = proofSubmitRes.data.data.proof.verificationCode;
-      console.log(`     证明已存储: proofId=${proofId}, verificationCode=${verificationCode}`);
-    }
-  } catch (e) {
-    console.log(`     ⚠️ 证明提交失败（非关键，后端可验证）: ${e.message}`);
-  }
-
-  console.log('\n  6.4 200并发借款申请测试');
-  const borrowTimes = [];
-  let borrowSuccess = 0;
-  let borrowErrors = 0;
-
-  const borrowPromises = [];
-  for (let i = 0; i < 200; i++) {
-    const body = {
-      userId: userId,
-      amount: 100 + (i % 50),
-      term: 7,
-      creditProof: {
-        id: proofId || 'test-proof-id',
-        proof: pregeneratedProof.proof,
-        publicSignals: pregeneratedProof.publicSignals
-      },
-      verificationCode: verificationCode || '123456'
-    };
-
-    const timestamp = Date.now().toString();
-    const nonce = crypto.randomBytes(16).toString('hex');
-    const signData = timestamp + nonce + JSON.stringify(body);
-    const signature = signWithSM2(signData, keyPair.privateKey);
-
-    const start = performance.now();
-    borrowPromises.push(
-      axios.post(`${BASE_URL}/loan/borrow`, body, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'x-request-timestamp': timestamp,
-          'x-request-nonce': nonce,
-          'x-request-sign': signature
-        },
-        timeout: 30000
-      })
-        .then(res => {
-          const time = performance.now() - start;
-          borrowTimes.push({ time, status: res.status, index: i });
-          if (res.status === 200 || res.status === 201) borrowSuccess++;
-          else borrowErrors++;
-        })
-        .catch(e => {
-          const time = performance.now() - start;
-          borrowTimes.push({ time, status: e.response?.status || 0, index: i, error: e.message });
-          borrowErrors++;
-        })
-    );
-  }
-
-  await Promise.allSettled(borrowPromises);
-
-  const borrowStats = calcStats(borrowTimes.map(t => t.time));
-  const qps = (borrowTimes.length / (borrowStats.max / 1000)).toFixed(2);
-
-  console.log(`     总请求: ${borrowTimes.length}`);
-  console.log(`     成功: ${borrowSuccess}, 失败: ${borrowErrors}`);
-  console.log(`     延迟: avg=${borrowStats.avg.toFixed(2)}ms, p50=${borrowStats.p50.toFixed(2)}ms, p95=${borrowStats.p95.toFixed(2)}ms, max=${borrowStats.max.toFixed(2)}ms`);
-  console.log(`     有效QPS: ${qps}`);
-
-  results.borrowTest = {
-    concurrency: 200,
-    totalRequests: borrowTimes.length,
-    success: borrowSuccess,
-    errors: borrowErrors,
-    successRate: ((borrowSuccess / borrowTimes.length) * 100).toFixed(2),
-    stats: {
-      avgMs: borrowStats.avg.toFixed(2),
-      p50Ms: borrowStats.p50.toFixed(2),
-      p95Ms: borrowStats.p95.toFixed(2),
-      maxMs: borrowStats.max.toFixed(2)
-    },
-    qps: parseFloat(qps)
-  };
-
-  const moduleTime = performance.now() - moduleStart;
-  results.durationMs = moduleTime.toFixed(2);
-  results.status = 'success';
-
-  return results;
-}
-
-// ============================================
 // 冷启动延迟测试
 // ============================================
 async function measureColdStart() {
@@ -765,7 +600,11 @@ async function module5UserInfoConcurrency() {
     return { status: 'skipped', reason: 'token not available' };
   }
 
-  const userId = '1777750216914';
+  const userId = globalThis.__benchUserId;
+  if (!userId) {
+    console.log('  ⚠️ 未获取到用户ID，跳过此模块');
+    return { status: 'skipped', reason: 'userId not available' };
+  }
   const levels = [10, 50, 100, 150, 200];
   const results = [];
 
@@ -786,7 +625,7 @@ async function module5UserInfoConcurrency() {
         })
       );
     }
-    await Promise.all(promises);
+    await Promise.allSettled(promises);
     const stats = calcStats(times.map(t => t.time));
     const success = times.filter(t => t.status === 200).length;
     const successRate = ((success / concurrency) * 100).toFixed(1);
@@ -837,7 +676,7 @@ async function module6SecurityChainOverhead() {
         })
       );
     }
-    await Promise.all(promises);
+    await Promise.allSettled(promises);
     const stats = calcStats(times.map(t => t.time));
     const success = times.filter(t => t.status === 200).length;
     const successRate = ((success / concurrency) * 100).toFixed(1);
@@ -852,6 +691,545 @@ async function module6SecurityChainOverhead() {
   }
 
   return { status: 'success', results };
+}
+
+// ============================================
+// 模块7：密码学对比基准（国密 vs 国际标准）
+// ============================================
+async function module7CryptoComparisonBenchmark() {
+  console.log('\n' + '='.repeat(70));
+  console.log('  模块7：密码学对比基准（国密 vs 国际标准）');
+  console.log('='.repeat(70));
+
+  const moduleStart = performance.now();
+  const results = {};
+  const testData1KB = Buffer.alloc(1024, 'x').toString('utf8');
+
+  // 7.1 SM3 vs SHA-256 (1KB数据, 各10000次, 3轮)
+  console.log('\n  7.1 SM3 vs SHA-256 (1KB数据, 各10000次, 3轮)');
+  await collectGarbage();
+
+  const { generateSM3Hash } = require('../utils/cryptoUtils');
+
+  // 预热（JIT 编译，丢弃结果）
+  for (let i = 0; i < 1000; i++) generateSM3Hash(testData1KB);
+  for (let i = 0; i < 1000; i++) crypto.createHash('sha256').update(testData1KB).digest('hex');
+
+  const ROUNDS = 3;
+  const sm3Throughputs = [];
+  const sha256Throughputs = [];
+
+  for (let round = 0; round < ROUNDS; round++) {
+    await collectGarbage();
+
+    const sm3Start = performance.now();
+    for (let i = 0; i < 10000; i++) generateSM3Hash(testData1KB);
+    const sm3Time = performance.now() - sm3Start;
+    sm3Throughputs.push((10000 * 1024 / 1024 / 1024) / (sm3Time / 1000));
+
+    const sha256Start = performance.now();
+    for (let i = 0; i < 10000; i++) crypto.createHash('sha256').update(testData1KB).digest('hex');
+    const sha256Time = performance.now() - sha256Start;
+    sha256Throughputs.push((10000 * 1024 / 1024 / 1024) / (sha256Time / 1000));
+
+    console.log(`     轮次 ${round + 1}: SM3=${sm3Throughputs[round].toFixed(4)} GB/s, SHA-256=${sha256Throughputs[round].toFixed(4)} GB/s`);
+  }
+
+  const sm3Mean = calcMean(sm3Throughputs);
+  const sm3Std = calcStddev(sm3Throughputs);
+  const sha256Mean = calcMean(sha256Throughputs);
+  const sha256Std = calcStddev(sha256Throughputs);
+
+  results.sm3VsSha256 = {
+    sm3: { mean: parseFloat(sm3Mean.toFixed(4)), stddev: parseFloat(sm3Std.toFixed(4)), unit: 'GB/s' },
+    sha256: { mean: parseFloat(sha256Mean.toFixed(4)), stddev: parseFloat(sha256Std.toFixed(4)), unit: 'GB/s' },
+    ratio: `${(sm3Mean / sha256Mean * 100).toFixed(2)}%`
+  };
+
+  console.log(`     SM3: ${sm3Mean.toFixed(4)} ± ${sm3Std.toFixed(4)} GB/s`);
+  console.log(`     SHA-256: ${sha256Mean.toFixed(4)} ± ${sha256Std.toFixed(4)} GB/s`);
+  console.log(`     SM3/SHA-256 比率: ${(sm3Mean / sha256Mean * 100).toFixed(2)}%`);
+
+  // 7.2 SM4 vs AES-256-GCM (1KB数据, 各1000次, 3轮)
+  console.log('\n  7.2 SM4 vs AES-256-GCM (1KB数据, 各1000次, 3轮)');
+  await collectGarbage();
+
+  const { encrypt, decrypt } = require('../utils/sm4Crypto');
+
+  // 预热
+  for (let i = 0; i < 100; i++) { const e = encrypt(testData1KB); decrypt(e); }
+  {
+    const k = crypto.randomBytes(32);
+    const iv = crypto.randomBytes(12);
+    for (let i = 0; i < 100; i++) { const c = crypto.createCipheriv('aes-256-gcm', k, iv); c.update(testData1KB, 'utf8', 'hex'); c.final(); c.getAuthTag(); }
+  }
+
+  const aesKey = crypto.randomBytes(32);
+  const aesIv = crypto.randomBytes(12);
+  const aesAuthTagLength = 16;
+
+  const sm4Throughputs = [];
+  const aesThroughputs = [];
+
+  for (let round = 0; round < ROUNDS; round++) {
+    await collectGarbage();
+
+    const sm4EncStart = performance.now();
+    let sm4Encrypted;
+    for (let i = 0; i < 1000; i++) sm4Encrypted = encrypt(testData1KB);
+    const sm4EncTime = performance.now() - sm4EncStart;
+    sm4Throughputs.push((1000 * 1024 / 1024) / (sm4EncTime / 1000));
+
+    const aesEncStart = performance.now();
+    let aesEncrypted;
+    for (let i = 0; i < 1000; i++) {
+      const cipher = crypto.createCipheriv('aes-256-gcm', aesKey, aesIv);
+      aesEncrypted = cipher.update(testData1KB, 'utf8', 'hex');
+      cipher.final();
+      cipher.getAuthTag();
+    }
+    const aesEncTime = performance.now() - aesEncStart;
+    aesThroughputs.push((1000 * 1024 / 1024) / (aesEncTime / 1000));
+
+    console.log(`     轮次 ${round + 1}: SM4=${sm4Throughputs[round].toFixed(2)} MB/s, AES-256-GCM=${aesThroughputs[round].toFixed(2)} MB/s`);
+  }
+
+  const sm4Mean = calcMean(sm4Throughputs);
+  const sm4Std = calcStddev(sm4Throughputs);
+  const aesMean = calcMean(aesThroughputs);
+  const aesStd = calcStddev(aesThroughputs);
+
+  const encRatio = (sm4Mean / aesMean * 100).toFixed(2);
+
+  results.sm4VsAes = {
+    sm4: { mean: parseFloat(sm4Mean.toFixed(2)), stddev: parseFloat(sm4Std.toFixed(2)), unit: 'MB/s' },
+    aes256: { mean: parseFloat(aesMean.toFixed(2)), stddev: parseFloat(aesStd.toFixed(2)), unit: 'MB/s' },
+    ratio: `${encRatio}%`
+  };
+
+  console.log(`     SM4加密: ${sm4Mean.toFixed(2)} ± ${sm4Std.toFixed(2)} MB/s`);
+  console.log(`     AES-256-GCM: ${aesMean.toFixed(2)} ± ${aesStd.toFixed(2)} MB/s`);
+  console.log(`     SM4/AES-256 比率: ${encRatio}%`);
+
+  // 7.3 SM2 vs ECDSA P-256 (各签名5000次, 3轮)
+  console.log('\n  7.3 SM2 vs ECDSA P-256 (各签名5000次, 3轮)');
+  await collectGarbage();
+
+  const { generateSM2KeyPair, signWithSM2 } = require('../utils/cryptoUtils');
+  const sm2KeyPair = generateSM2KeyPair();
+  const signMessage = 'benchmark test message for signature comparison';
+
+  // 预热
+  for (let i = 0; i < 500; i++) signWithSM2(signMessage, sm2KeyPair.privateKey);
+  {
+    const ekp = crypto.generateKeyPairSync('ec', { namedCurve: 'P-256', privateKeyEncoding: { type: 'pkcs8', format: 'pem' }, publicKeyEncoding: { type: 'spki', format: 'pem' } });
+    for (let i = 0; i < 500; i++) { const s = crypto.createSign('SHA256'); s.update(signMessage); s.sign(ekp.privateKey, 'hex'); }
+  }
+
+  const sm2Ops = [];
+  const ecdsaOps = [];
+
+  for (let round = 0; round < ROUNDS; round++) {
+    await collectGarbage();
+
+    const sm2SignStart = performance.now();
+    for (let i = 0; i < 5000; i++) signWithSM2(signMessage, sm2KeyPair.privateKey);
+    const sm2SignTime = performance.now() - sm2SignStart;
+    sm2Ops.push(5000 / (sm2SignTime / 1000));
+
+    const ecdsaKeyPair = crypto.generateKeyPairSync('ec', {
+      namedCurve: 'P-256',
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+      publicKeyEncoding: { type: 'spki', format: 'pem' }
+    });
+
+    const ecdsaSignStart = performance.now();
+    for (let i = 0; i < 5000; i++) {
+      const sign = crypto.createSign('SHA256');
+      sign.update(signMessage);
+      sign.sign(ecdsaKeyPair.privateKey, 'hex');
+    }
+    const ecdsaSignTime = performance.now() - ecdsaSignStart;
+    ecdsaOps.push(5000 / (ecdsaSignTime / 1000));
+
+    console.log(`     轮次 ${round + 1}: SM2=${sm2Ops[round].toFixed(0)} ops/s, ECDSA P-256=${ecdsaOps[round].toFixed(0)} ops/s`);
+  }
+
+  const sm2Mean = calcMean(sm2Ops);
+  const sm2Std = calcStddev(sm2Ops);
+  const ecdsaMean = calcMean(ecdsaOps);
+  const ecdsaStd = calcStddev(ecdsaOps);
+
+  const signRatio = (sm2Mean / ecdsaMean * 100).toFixed(2);
+
+  results.sm2VsEcdsa = {
+    sm2: { mean: parseFloat(sm2Mean.toFixed(0)), stddev: parseFloat(sm2Std.toFixed(0)), unit: 'ops/s' },
+    ecdsaP256: { mean: parseFloat(ecdsaMean.toFixed(0)), stddev: parseFloat(ecdsaStd.toFixed(0)), unit: 'ops/s' },
+    ratio: `${signRatio}%`
+  };
+
+  console.log(`     SM2签名: ${sm2Mean.toFixed(0)} ± ${sm2Std.toFixed(0)} ops/s`);
+  console.log(`     ECDSA P-256: ${ecdsaMean.toFixed(0)} ± ${ecdsaStd.toFixed(0)} ops/s`);
+  console.log(`     SM2/ECDSA 比率: ${signRatio}%`);
+
+  const moduleTime = performance.now() - moduleStart;
+  results.durationMs = moduleTime.toFixed(2);
+  results.status = 'success';
+
+  return results;
+}
+
+// ============================================
+// 模块8：端到端业务流程性能
+// ============================================
+async function module8EndToEndBusinessPerformance() {
+  console.log('\n' + '='.repeat(70));
+  console.log('  模块8：端到端业务流程性能');
+  console.log('='.repeat(70));
+
+  const moduleStart = performance.now();
+  const results = {};
+
+  let zkService;
+  try {
+    zkService = require('../services/zkService');
+  } catch (e) {
+    console.log('\n  ⚠️ ZKP服务不可用，跳过此模块');
+    return { status: 'skipped', reason: 'zkService not available' };
+  }
+
+  // 8.1 借款流程耗时分解
+  console.log('\n  8.1 借款流程耗时分解');
+  const loanSteps = {};
+
+  const step1Start = performance.now();
+  const proofResult = await zkService.generateProof(750, 600);
+  loanSteps.zkpProofGen = (performance.now() - step1Start).toFixed(2);
+  console.log(`     ZKP证明生成: ${loanSteps.zkpProofGen}ms`);
+
+  const testUsername = `perf_e2e_${Date.now()}`;
+  const testPassword = 'PerfTest123!';
+  let token = null;
+  let userId = null;
+  let keyPair = null;
+
+  try {
+    const { generateSM2KeyPair, signWithSM2 } = require('../utils/cryptoUtils');
+    keyPair = generateSM2KeyPair();
+
+    const step2Start = performance.now();
+    await axios.post(`${BASE_URL}/auth/register`, {
+      username: testUsername,
+      password: testPassword,
+      sm2PublicKey: keyPair.publicKey,
+      creditScore: 750
+    });
+    const loginRes = await axios.post(`${BASE_URL}/auth/login`, {
+      username: testUsername,
+      password: testPassword
+    });
+    loanSteps.userSetup = (performance.now() - step2Start).toFixed(2);
+    console.log(`     用户注册/登录: ${loanSteps.userSetup}ms`);
+
+    if (loginRes.data.success) {
+      token = loginRes.data.token;
+      userId = loginRes.data.user.id;
+    }
+  } catch (e) {
+    console.log(`     ⚠️ 用户准备失败: ${e.message}`);
+    return { status: 'skipped', reason: 'User setup failed' };
+  }
+
+  if (!token || !userId) {
+    return { status: 'skipped', reason: 'No valid token' };
+  }
+
+  const step3Start = performance.now();
+  let proofId = null;
+  let verificationCode = null;
+  try {
+    const proofSubmitRes = await axios.post(
+      `${BASE_URL}/credit/generate-proof`,
+      { userId, proof: proofResult.proof, publicSignals: proofResult.publicSignals },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (proofSubmitRes.data.success && proofSubmitRes.data.data?.proof) {
+      proofId = proofSubmitRes.data.data.proof.proofId;
+      verificationCode = proofSubmitRes.data.data.proof.verificationCode;
+    }
+  } catch (e) {
+    console.log(`     ⚠️ 证明提交失败: ${e.message}`);
+  }
+  loanSteps.proofSubmission = (performance.now() - step3Start).toFixed(2);
+  console.log(`     证明提交: ${loanSteps.proofSubmission}ms`);
+
+  const step4Start = performance.now();
+  try {
+    const borrowBody = {
+      userId,
+      amount: 100,
+      term: 7,
+      creditProof: { id: proofId || 'test-proof-id', proof: proofResult.proof, publicSignals: proofResult.publicSignals },
+      verificationCode: verificationCode || '123456',
+      signature: '0'.repeat(64)
+    };
+    const timestamp = Date.now().toString();
+    const nonce = crypto.randomBytes(16).toString('hex');
+    const signData = timestamp + nonce + JSON.stringify(borrowBody);
+    const signature = signWithSM2(signData, keyPair.privateKey);
+
+    await axios.post(`${BASE_URL}/loan/borrow`, borrowBody, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'x-request-timestamp': timestamp,
+        'x-request-nonce': nonce,
+        'x-request-sign': signature
+      },
+      timeout: 30000
+    });
+  } catch (e) {
+    console.log(`     ⚠️ 借款提交失败: ${e.message}`);
+  }
+  loanSteps.loanSubmission = (performance.now() - step4Start).toFixed(2);
+  console.log(`     借款提交: ${loanSteps.loanSubmission}ms`);
+
+  const totalLoanTime = Object.values(loanSteps).reduce((sum, v) => sum + parseFloat(v), 0);
+  loanSteps.total = totalLoanTime.toFixed(2);
+
+  for (const [step, time] of Object.entries(loanSteps)) {
+    if (step !== 'total') {
+      loanSteps[`${step}Pct`] = ((parseFloat(time) / totalLoanTime) * 100).toFixed(1);
+    }
+  }
+
+  results.loanProcess = loanSteps;
+  console.log(`     借款流程总耗时: ${totalLoanTime.toFixed(2)}ms`);
+
+  // 8.2 还款流程耗时分解
+  console.log('\n  8.2 还款流程耗时分解');
+  const repaySteps = {};
+
+  const repayStep1Start = performance.now();
+  let loanId = null;
+  try {
+    const loansRes = await axios.get(`${BASE_URL}/loan/user/${userId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      timeout: 10000
+    });
+    if (loansRes.data.success && loansRes.data.data && loansRes.data.data.length > 0) {
+      loanId = loansRes.data.data[0].id;
+    }
+  } catch (e) {
+    console.log(`     ⚠️ 查询贷款失败: ${e.message}`);
+  }
+  repaySteps.queryLoans = (performance.now() - repayStep1Start).toFixed(2);
+  console.log(`     查询未还贷款: ${repaySteps.queryLoans}ms`);
+
+  const repayStep2Start = performance.now();
+  if (loanId) {
+    try {
+      const repayBody = { loanId, amount: 100 };
+      const timestamp = Date.now().toString();
+      const nonce = crypto.randomBytes(16).toString('hex');
+      const signData = timestamp + nonce + JSON.stringify(repayBody);
+      const signature = signWithSM2(signData, keyPair.privateKey);
+
+      await axios.post(`${BASE_URL}/loan/repay`, repayBody, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-request-timestamp': timestamp,
+          'x-request-nonce': nonce,
+          'x-request-sign': signature
+        },
+        timeout: 30000
+      });
+    } catch (e) {
+      console.log(`     ⚠️ 还款提交失败: ${e.message}`);
+    }
+  }
+  repaySteps.repaySubmission = (performance.now() - repayStep2Start).toFixed(2);
+  console.log(`     提交还款: ${repaySteps.repaySubmission}ms`);
+
+  const repayStep3Start = performance.now();
+  try {
+    const updatedLoansRes = await axios.get(`${BASE_URL}/loan/user/${userId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      timeout: 10000
+    });
+    repaySteps.loanStatusCheck = (performance.now() - repayStep3Start).toFixed(2);
+    console.log(`     贷款状态查询: ${repaySteps.loanStatusCheck}ms`);
+  } catch (e) {
+    repaySteps.loanStatusCheck = (performance.now() - repayStep3Start).toFixed(2);
+    console.log(`     ⚠️ 贷款状态查询失败: ${e.message}`);
+  }
+
+  const totalRepayTime = Object.values(repaySteps).reduce((sum, v) => sum + parseFloat(v), 0);
+  repaySteps.total = totalRepayTime.toFixed(2);
+
+  for (const [step, time] of Object.entries(repaySteps)) {
+    if (step !== 'total') {
+      repaySteps[`${step}Pct`] = ((parseFloat(time) / totalRepayTime) * 100).toFixed(1);
+    }
+  }
+
+  results.repayProcess = repaySteps;
+  console.log(`     还款流程总耗时: ${totalRepayTime.toFixed(2)}ms`);
+
+  const moduleTime = performance.now() - moduleStart;
+  results.durationMs = moduleTime.toFixed(2);
+  results.status = 'success';
+
+  return results;
+}
+
+// ============================================
+// 模块9：资源消耗监控
+// ============================================
+async function module9ResourceMonitoring() {
+  console.log('\n' + '='.repeat(70));
+  console.log('  模块9：资源消耗监控');
+  console.log('='.repeat(70));
+
+  const moduleStart = performance.now();
+  const results = {};
+
+  const token = globalThis.__benchToken;
+  if (!token) {
+    console.log('  ⚠️ 未获取到Token，跳过此模块');
+    return { status: 'skipped', reason: 'token not available' };
+  }
+
+  // 9.1 内存泄漏检测
+  console.log('\n  9.1 内存泄漏检测（1000次请求，每100次记录heapUsed）');
+  await collectGarbage();
+
+  const heapSnapshots = [];
+  const initialHeap = getHeapUsed();
+  heapSnapshots.push({ requests: 0, heapUsedMB: (initialHeap / 1024 / 1024).toFixed(2) });
+
+  for (let i = 0; i < 1000; i++) {
+    try {
+      await axios.get(`${BASE_URL}/pool`, {
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 10000
+      });
+    } catch (e) {
+      // ignore errors
+    }
+
+    if ((i + 1) % 100 === 0) {
+      await collectGarbage();
+      const heap = getHeapUsed();
+      heapSnapshots.push({
+        requests: i + 1,
+        heapUsedMB: (heap / 1024 / 1024).toFixed(2),
+        growthMB: ((heap - initialHeap) / 1024 / 1024).toFixed(2)
+      });
+      console.log(`     请求 ${i + 1}/1000: heapUsed=${(heap / 1024 / 1024).toFixed(2)}MB, 增长=${((heap - initialHeap) / 1024 / 1024).toFixed(2)}MB`);
+    }
+  }
+
+  const finalHeap = getHeapUsed();
+  const totalGrowthMB = (finalHeap - initialHeap) / 1024 / 1024;
+  const memoryLeakOK = totalGrowthMB < 50;
+
+  results.memoryLeak = {
+    initialHeapMB: parseFloat((initialHeap / 1024 / 1024).toFixed(2)),
+    finalHeapMB: parseFloat((finalHeap / 1024 / 1024).toFixed(2)),
+    totalGrowthMB: parseFloat(totalGrowthMB.toFixed(2)),
+    withinLimit: memoryLeakOK,
+    snapshots: heapSnapshots
+  };
+
+  console.log(`     初始堆: ${(initialHeap / 1024 / 1024).toFixed(2)}MB`);
+  console.log(`     最终堆: ${(finalHeap / 1024 / 1024).toFixed(2)}MB`);
+  console.log(`     总增长: ${totalGrowthMB.toFixed(2)}MB ${memoryLeakOK ? '(正常)' : '(可能泄漏)'}`);
+
+  // 9.2 GC 暂停影响
+  console.log('\n  9.2 GC 暂停影响（压测期间记录GC事件）');
+  await collectGarbage();
+
+  const requestLatencies = [];
+  const realGcEvents = [];
+  let gcObserver;
+  try {
+    gcObserver = new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) {
+        realGcEvents.push({ type: entry.kind, duration: entry.duration, startTime: entry.startTime });
+      }
+    });
+    gcObserver.observe({ entryTypes: ['gc'] });
+    console.log('     ✅ GC 事件监听已启动');
+  } catch (e) {
+    console.log('     ⚠️ GC 事件监听不可用:', e.message);
+  }
+
+  const gcStartTime = performance.now();
+  let gcRequestCount = 0;
+  let gcSuccessCount = 0;
+
+  if (global.gc) {
+    console.log('     ⚠️ 使用 --expose-gc 模式，可手动触发GC');
+  }
+
+  const gcPromises = [];
+  for (let i = 0; i < 50; i++) {
+    const start = performance.now();
+    gcPromises.push(
+      axios.get(`${BASE_URL}/pool`, {
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 10000
+      }).then(() => {
+        const elapsed = performance.now() - start;
+        requestLatencies.push(elapsed);
+        gcSuccessCount++;
+      }).catch(() => {
+        requestLatencies.push(performance.now() - start);
+      }).then(() => {
+        gcRequestCount++;
+      })
+    );
+  }
+
+  await Promise.allSettled(gcPromises);
+
+  if (gcObserver) {
+    gcObserver.disconnect();
+  }
+
+  const latencyStats = calcStats(requestLatencies);
+  const gcActualDuration = performance.now() - gcStartTime;
+
+  console.log(`     真实 GC 事件数: ${realGcEvents.length}`);
+  if (realGcEvents.length > 0) {
+    const gcDurationSum = realGcEvents.reduce((s, e) => s + e.duration, 0);
+    console.log(`     GC 总暂停时间: ${gcDurationSum.toFixed(2)}ms`);
+    console.log(`     GC 平均暂停: ${(gcDurationSum / realGcEvents.length).toFixed(2)}ms`);
+  }
+
+  results.gcImpact = {
+    requests: gcRequestCount,
+    successCount: gcSuccessCount,
+    durationMs: gcActualDuration.toFixed(2),
+    requestLatencies: {
+      avgMs: latencyStats.avg.toFixed(2),
+      p50Ms: latencyStats.p50.toFixed(2),
+      p95Ms: latencyStats.p95.toFixed(2),
+      p99Ms: latencyStats.p99.toFixed(2),
+      maxMs: latencyStats.max.toFixed(2)
+    },
+    gcEventCount: realGcEvents.length,
+    gcEvents: realGcEvents.slice(0, 10)
+  };
+
+  console.log(`     请求数: ${gcRequestCount}, 成功: ${gcSuccessCount}`);
+  console.log(`     延迟: avg=${latencyStats.avg.toFixed(2)}ms, p95=${latencyStats.p95.toFixed(2)}ms, p99=${latencyStats.p99.toFixed(2)}ms, max=${latencyStats.max.toFixed(2)}ms`);
+
+  const moduleTime = performance.now() - moduleStart;
+  results.durationMs = moduleTime.toFixed(2);
+  results.status = 'success';
+
+  return results;
 }
 
 // ============================================
@@ -936,6 +1314,42 @@ function printSummary(report) {
     }
   }
 
+  if (report.results.module7) {
+    console.log('\n【模块7：密码学对比基准】');
+    const m7 = report.results.module7;
+    if (m7.sm3VsSha256) {
+      console.log(`  SM3 vs SHA-256: ${m7.sm3VsSha256.ratio}`);
+    }
+    if (m7.sm4VsAes) {
+      console.log(`  SM4 vs AES-256-GCM: ${m7.sm4VsAes.ratio}`);
+    }
+    if (m7.sm2VsEcdsa) {
+      console.log(`  SM2 vs ECDSA P-256: ${m7.sm2VsEcdsa.ratio}`);
+    }
+  }
+
+  if (report.results.module8) {
+    console.log('\n【模块8：端到端业务流程】');
+    const m8 = report.results.module8;
+    if (m8.loanProcess) {
+      console.log(`  借款流程总耗时: ${m8.loanProcess.total}ms`);
+    }
+    if (m8.repayProcess) {
+      console.log(`  还款流程总耗时: ${m8.repayProcess.total}ms`);
+    }
+  }
+
+  if (report.results.module9) {
+    console.log('\n【模块9：资源消耗监控】');
+    const m9 = report.results.module9;
+    if (m9.memoryLeak) {
+      console.log(`  内存增长: ${m9.memoryLeak.totalGrowthMB}MB (限制50MB) ${m9.memoryLeak.withinLimit ? '✅' : '❌'}`);
+    }
+    if (m9.gcImpact) {
+      console.log(`  GC影响P99: ${m9.gcImpact.requestLatencies.p99Ms}ms`);
+    }
+  }
+
   console.log('\n' + '='.repeat(70));
 }
 
@@ -998,6 +1412,18 @@ async function runBenchmark() {
     testReport.results.module4 = await module4DatabasePoolStress();
     testReport.modules.databaseStress = { status: testReport.results.module4.status };
 
+    // ---- 模块7：密码学对比基准 ----
+    testReport.results.module7 = await module7CryptoComparisonBenchmark();
+    testReport.modules.cryptoComparison = { status: testReport.results.module7.status };
+
+    // ---- 模块8：端到端业务流程性能 ----
+    testReport.results.module8 = await module8EndToEndBusinessPerformance();
+    testReport.modules.e2eBusiness = { status: testReport.results.module8.status };
+
+    // ---- 模块9：资源消耗监控 ----
+    testReport.results.module9 = await module9ResourceMonitoring();
+    testReport.modules.resourceMonitor = { status: testReport.results.module9.status };
+
     testReport.overallStatus = 'success';
     testReport.duration = (performance.now() - globalStart).toFixed(2);
 
@@ -1005,6 +1431,7 @@ async function runBenchmark() {
     await saveReport(testReport);
 
     console.log('\n✅ 性能基准测试完成！');
+    process.exit(0);
 
   } catch (error) {
     console.error('\n❌ 测试过程中发生严重错误:', error.message);

@@ -184,15 +184,19 @@ exports.antiReplayMiddleware = async (req, res, next) => {
       logger.warning('Nonce数据库查询失败，降级到内存校验', { error: dbError.message });
     }
     
-    // 验证SM2签名
+    // 签名头缺失时跳过签名验证（由 sm2SignatureMiddleware 可选处理）
     if (!signature) {
-      const requestId = generateRequestId();
-      logger.warning('Missing signature headers', { path: req.path, method: req.method, requestId });
-      return res.status(401).json({
-        code: '401_MISSING_SIGN_FIELDS',
-        message: 'Missing required signature headers',
-        requestId
-      });
+      logger.info('No signature header, skipping signature verification', { path: req.path, method: req.method });
+      const expiryTime = Date.now() + 5 * 60 * 1000;
+      try {
+        await execute('INSERT INTO replay_nonces (nonce, expires_at) VALUES (?, ?)', [nonce, expiryTime]);
+      } catch (dbError) {
+        if (dbError.code === 'ER_DUP_ENTRY') {
+          return res.status(403).json({ code: '403_REPLAY_ATTACK', message: 'Duplicate request' });
+        }
+      }
+      nonceCache.set(nonce, expiryTime);
+      return next();
     }
     
     // 从JWT中获取用户信息
@@ -206,7 +210,7 @@ exports.antiReplayMiddleware = async (req, res, next) => {
         requestId
       });
     }
-    
+
     // 从数据库读取用户数据，获取SM2公钥
     const user = await userDao.findById(userId);
     
@@ -228,8 +232,7 @@ exports.antiReplayMiddleware = async (req, res, next) => {
       const requestBodyStr = JSON.stringify(req.body);
       signatureData = timestamp + nonce + requestBodyStr;
     }
-    
-    // 验证签名
+
     const isSignatureValid = verifySM2Signature(signatureData, signature, user.sm2_public_key);
     if (!isSignatureValid) {
       const requestId = generateRequestId();

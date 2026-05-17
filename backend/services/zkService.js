@@ -15,7 +15,7 @@ exports.generateProof = async (creditScore, threshold) => {
     }
     
     // 检查必要的文件是否存在
-    const wasmPath = path.join(__dirname, '../../circuits/credit.wasm');
+    const wasmPath = path.join(__dirname, '../../circuits/build/credit.wasm');
     const provingKeyPath = path.join(__dirname, '../../circuits/build/credit_final.zkey');
     
     if (!fs.existsSync(wasmPath)) {
@@ -26,14 +26,17 @@ exports.generateProof = async (creditScore, threshold) => {
       throw new Error('证明密钥文件未找到: credit_final.zkey');
     }
     
-    // 对敏感输入数据进行SM3哈希处理
-    const hashedCreditScore = parseInt(generateSM3Hash(creditScore.toString()).substring(0, 8), 16);
-    const hashedThreshold = parseInt(generateSM3Hash(threshold.toString()).substring(0, 8), 16);
-    
-    // 使用snarkjs生成证明
-    logger.info('生成零知识证明', { hashedCreditScore, hashedThreshold });
+    // 使用原始数值作为电路输入（修复：哈希破坏数值比较关系）
+    const circuitCreditScore = Number(creditScore);
+    const circuitThreshold = Number(threshold);
+
+    if (isNaN(circuitCreditScore) || isNaN(circuitThreshold)) {
+      throw new Error('creditScore 和 threshold 必须为有效数字');
+    }
+
+    logger.info('生成零知识证明', { creditScore: circuitCreditScore, threshold: circuitThreshold });
     const { proof, publicSignals } = await snarkjs.groth16.fullProve(
-      { creditScore: hashedCreditScore, threshold: hashedThreshold },
+      { creditScore: circuitCreditScore, threshold: circuitThreshold },
       wasmPath,
       provingKeyPath
     );
@@ -51,17 +54,11 @@ exports.generateProof = async (creditScore, threshold) => {
 
 // 验证零知识证明
 exports.verifyProof = async (proof, publicSignals) => {
+  // 验证输入参数（不吞掉，直接抛出）
+  if (!proof || !publicSignals) {
+    throw new Error('缺少必要参数: proof 和 publicSignals');
+  }
   try {
-    // 处理单个参数的情况（兼容旧的调用方式）
-    if (arguments.length === 1) {
-      // 模拟验证成功
-      return true;
-    }
-    
-    // 验证输入参数
-    if (!proof || !publicSignals) {
-      throw new Error('缺少必要参数: proof 和 publicSignals');
-    }
     
     // 验证publicSignals格式
     if (!Array.isArray(publicSignals)) {
@@ -88,9 +85,8 @@ exports.verifyProof = async (proof, publicSignals) => {
     }
     
     logger.info('验证零知识证明', { publicSignalsLength: publicSignals.length, proofKeys: Object.keys(proof), publicSignals: publicSignals, proof: proof });
-    
-    try {
-      // 确保publicSignals是数组且不为空
+
+    // 确保publicSignals是数组且不为空
       if (!Array.isArray(publicSignals) || publicSignals.length === 0) {
         throw new Error('publicSignals 必须是非空数组');
       }
@@ -164,7 +160,13 @@ exports.verifyProof = async (proof, publicSignals) => {
       );
       
       logger.info('零知识证明验证结果:', { verificationResult });
-      
+
+      // 检查 isValid 输出信号
+      if (verificationResult && publicSignals && publicSignals.length > 0 && publicSignals[0] !== '1') {
+        logger.info('ZKP 证明有效但 isValid=0，业务验证不通过', { publicSignals });
+        return false;
+      }
+
       // 如果验证成功，异步将结果记录到区块链（不阻塞）
       if (verificationResult) {
         try {
@@ -202,11 +204,7 @@ exports.verifyProof = async (proof, publicSignals) => {
       
       return verificationResult;
     } catch (snarkError) {
-      logger.error('SnarkJS验证错误:', { error: snarkError.message, stack: snarkError.stack, publicSignals: publicSignals, proof: proof, verificationKey: verificationKey });
+      logger.error('SnarkJS验证错误:', { error: snarkError.message, stack: snarkError.stack });
       throw snarkError;
     }
-  } catch (error) {
-    logger.error('验证零知识证明失败:', { error: error.message, stack: error.stack });
-    return false;
-  }
-}; 
+};

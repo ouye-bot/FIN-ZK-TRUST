@@ -170,6 +170,9 @@ class MfaService {
     }
     const codeHash = generateSM3Hash(code);
     const index = hashedCodes.findIndex(h => h === codeHash);
+    if (index !== -1) {
+      hashedCodes.splice(index, 1);
+    }
     return index;
   }
 }

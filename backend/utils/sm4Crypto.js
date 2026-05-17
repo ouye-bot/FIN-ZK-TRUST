@@ -39,7 +39,7 @@ function encrypt(plaintext) {
 
 function decrypt(ciphertext) {
   if (!ciphertext || typeof ciphertext !== 'string') {
-    return ciphertext;
+    throw new Error('SM4 解密失败：数据格式无效');
   }
 
   let hasVersion = false;
@@ -56,17 +56,17 @@ function decrypt(ciphertext) {
   }
 
   if (!dataPart.includes(':')) {
-    return ciphertext;
+    throw new Error('SM4 解密失败：数据格式无效');
   }
 
   const parts = dataPart.split(':');
   if (!hasVersion && parts.length !== 3) {
     logger.warning('SM4 解密失败，未知格式，返回原始值');
-    return ciphertext;
+    throw new Error('SM4 解密失败：未知格式');
   }
   if (hasVersion && parts.length !== 3) {
     logger.warning('SM4 解密失败，版本化格式错误，返回原始值');
-    return ciphertext;
+    throw new Error('SM4 解密失败：版本格式错误');
   }
 
   const [ivHex, authTagHex, encryptedHex] = parts;
@@ -76,7 +76,7 @@ function decrypt(ciphertext) {
   const expectedAuthTag = crypto.createHmac('sm3', key).update(ivHex + encryptedHex).digest('hex');
   if (authTagHex !== expectedAuthTag) {
     logger.warning('SM4 解密失败（认证标签不匹配），返回原始值');
-    return ciphertext;
+    throw new Error('SM4 解密失败：认证标签不匹配');
   }
 
   try {
@@ -86,7 +86,7 @@ function decrypt(ciphertext) {
     return decrypted;
   } catch (error) {
     logger.warning('SM4 解密失败，返回原始值', { error: error.message });
-    return ciphertext;
+    throw new Error('SM4 解密失败：解密过程异常');
   }
 }
 
@@ -200,25 +200,50 @@ function decryptFields(tableName, data) {
 
   if (tableName === 'users') {
     if (data.balance !== undefined && data.balance !== null) {
-      const decrypted = decrypt(data.balance);
-      data.balance = Number(decrypted);
+      try {
+        const decrypted = decrypt(data.balance);
+        data.balance = Number(decrypted);
+      } catch (decryptError) {
+        logger.warning(`字段 balance 解密失败: ${decryptError.message}`);
+        data.balance = data.balance;
+      }
     }
     if (data.credit_score !== undefined && data.credit_score !== null) {
-      const decrypted = decrypt(data.credit_score);
-      data.credit_score = Number(decrypted);
+      try {
+        const decrypted = decrypt(data.credit_score);
+        data.credit_score = Number(decrypted);
+      } catch (decryptError) {
+        logger.warning(`字段 credit_score 解密失败: ${decryptError.message}`);
+        data.credit_score = data.credit_score;
+      }
     }
   } else if (tableName === 'transactions') {
     if (data.amount !== undefined && data.amount !== null) {
-      const decrypted = decrypt(data.amount);
-      data.amount = Number(decrypted);
+      try {
+        const decrypted = decrypt(data.amount);
+        data.amount = Number(decrypted);
+      } catch (decryptError) {
+        logger.warning(`字段 amount 解密失败: ${decryptError.message}`);
+        data.amount = data.amount;
+      }
     }
     if (data.interest !== undefined && data.interest !== null) {
-      const decrypted = decrypt(data.interest);
-      data.interest = Number(decrypted);
+      try {
+        const decrypted = decrypt(data.interest);
+        data.interest = Number(decrypted);
+      } catch (decryptError) {
+        logger.warning(`字段 interest 解密失败: ${decryptError.message}`);
+        data.interest = data.interest;
+      }
     }
     if (data.total_amount !== undefined && data.total_amount !== null) {
-      const decrypted = decrypt(data.total_amount);
-      data.total_amount = Number(decrypted);
+      try {
+        const decrypted = decrypt(data.total_amount);
+        data.total_amount = Number(decrypted);
+      } catch (decryptError) {
+        logger.warning(`字段 total_amount 解密失败: ${decryptError.message}`);
+        data.total_amount = data.total_amount;
+      }
     }
   }
   return data;

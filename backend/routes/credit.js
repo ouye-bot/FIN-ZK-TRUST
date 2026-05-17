@@ -367,7 +367,7 @@ router.get('/score/:userId', async (req, res) => {
     });
     
     // 确保评分在合理范围内
-    score = Math.max(300, Math.min(900, score));
+    score = Math.max(CREDIT_RULES.MIN_SCORE, Math.min(CREDIT_RULES.MAX_SCORE, score));
     
     // 更新用户信用评分
     await userDao.updateCreditScore(parseInt(userId), score);

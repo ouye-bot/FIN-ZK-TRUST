@@ -278,7 +278,6 @@ router.post('/verify', async (req, res) => {
       const codeIndex = mfaService.verifyBackupCode(token, hashedCodes);
 
       if (codeIndex >= 0) {
-        hashedCodes.splice(codeIndex, 1);
         await userDao.updateBackupCodes(userId, hashedCodes);
 
         const fullUser = await userDao.findById(userId);

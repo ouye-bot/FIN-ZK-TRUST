@@ -48,7 +48,7 @@ const verifyChallenge = (challengeId, signature, publicKey) => {
   return { success: true, userId: challenge.userId, operationType: challenge.operationType };
 };
 
-setInterval(() => {
+const challengeCleanupInterval = setInterval(() => {
   const now = Date.now();
   for (const [id, data] of challengeStore.entries()) {
     if (now - data.createdAt > CHALLENGE_EXPIRY_MS) {
@@ -56,6 +56,7 @@ setInterval(() => {
     }
   }
 }, CHALLENGE_EXPIRY_MS);
+challengeCleanupInterval.unref();
 
 module.exports = {
   generateChallenge,
