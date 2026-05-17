@@ -2,6 +2,11 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
+// 确保 build 目录存在
+if (!fs.existsSync('build')) {
+  fs.mkdirSync('build');
+}
+
 // Compile the circuit
 console.log('Compiling circuit...');
 execSync('circom credit.circom -r build/credit.r1cs -w build/credit.wasm -s build/credit.sym', { stdio: 'inherit' });
@@ -18,4 +23,4 @@ execSync('snarkjs zkey export verificationkey build/credit_final.zkey build/veri
 console.log('Exporting solidity verifier...');
 execSync('snarkjs zkey export solidityverifier build/credit_final.zkey build/Verifier.sol', { stdio: 'inherit' });
 
-console.log('Compilation completed successfully!'); 
+console.log('Compilation completed successfully!');

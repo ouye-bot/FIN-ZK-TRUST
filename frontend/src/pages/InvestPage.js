@@ -20,6 +20,7 @@ import {
 } from '@mui/material';
 import { signWithSM2, getSM2KeyPair, saveSM2KeyPair, generateSM2KeyPair, generateSignatureData, generateSignatureDataStrict, getSM2KeyPairWithAesKey } from '../utils/sm2Utils';
 import { post, get } from '../utils/apiUtils';
+import { syncLogToBackend } from '../utils/logUtils';
 
 const InvestPage = ({ user, cryptoLogs, setCryptoLogs }) => {
   const aesKey = useAesKey();
@@ -38,6 +39,8 @@ const InvestPage = ({ user, cryptoLogs, setCryptoLogs }) => {
       // 最多保留50条日志
       return updatedLogs.slice(0, 50);
     });
+
+    syncLogToBackend(newLog);
   };
   const [amount, setAmount] = useState('');
   const [term, setTerm] = useState(30);
@@ -121,7 +124,7 @@ const InvestPage = ({ user, cryptoLogs, setCryptoLogs }) => {
 
     // 检查账户余额
     if (userData && parseFloat(amount) > userData.balance) {
-      setError(`账户余额不足，当前余额: ¥${userData.balance.toFixed(2)}`);
+      setError(`账户余额不足，当前余额: ¥${(Number(userData.balance) || 0).toFixed(2)}`);
       return;
     }
 

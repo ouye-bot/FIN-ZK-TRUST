@@ -1,5 +1,6 @@
 const { execute, transaction } = require('../config/database');
 const { decryptFields, encryptFields } = require('../utils/sm4Crypto');
+const kmsService = require('../services/kmsService');
 
 /**
  * 根据用户名查找用户
@@ -11,7 +12,7 @@ exports.findByUsername = async (username) => {
   const results = await execute(sql, [username]);
   const user = results.length > 0 ? results[0] : null;
   if (user) {
-    decryptFields('users', user);
+    await decryptFields('users', user, user.id);
   }
   return user;
 };
@@ -26,7 +27,7 @@ exports.findById = async (id) => {
   const results = await execute(sql, [id]);
   const user = results.length > 0 ? results[0] : null;
   if (user) {
-    decryptFields('users', user);
+    await decryptFields('users', user, id);
   }
   return user;
 };
@@ -41,11 +42,6 @@ exports.create = async (userData) => {
   const initialBalance = 0;
   const initialCreditScore = 600;
 
-  const balanceData = { balance: initialBalance };
-  const creditScoreData = { credit_score: initialCreditScore };
-  encryptFields('users', balanceData);
-  encryptFields('users', creditScoreData);
-
   const sql = `
     INSERT INTO users (username, password_hash, salt, sm2_public_key, balance, credit_score, role)
     VALUES (?, ?, ?, ?, ?, ?, 'user')
@@ -55,10 +51,22 @@ exports.create = async (userData) => {
     password_hash,
     salt || '',
     sm2_public_key,
-    balanceData.balance,
-    creditScoreData.credit_score
+    initialBalance,
+    initialCreditScore
   ]);
-  return await exports.findById(result.insertId);
+
+  const userId = result.insertId;
+
+  await kmsService.generateDEK(userId);
+
+  const balanceData = { balance: initialBalance };
+  const creditScoreData = { credit_score: initialCreditScore };
+  await encryptFields('users', balanceData, userId);
+  await encryptFields('users', creditScoreData, userId);
+  await execute('UPDATE users SET balance = ?, credit_score = ? WHERE id = ?',
+    [balanceData.balance, creditScoreData.credit_score, userId]);
+
+  return await exports.findById(userId);
 };
 
 /**
@@ -69,7 +77,7 @@ exports.create = async (userData) => {
  */
 exports.updateBalance = async (id, newBalance) => {
   const balanceData = { balance: Number(newBalance) };
-  encryptFields('users', balanceData);
+  await encryptFields('users', balanceData, id);
   const sql = 'UPDATE users SET balance = ? WHERE id = ?';
   await execute(sql, [balanceData.balance, id]);
   return await exports.findById(id);
@@ -83,7 +91,7 @@ exports.updateBalance = async (id, newBalance) => {
  */
 exports.updateCreditScore = async (id, newScore) => {
   const creditScoreData = { credit_score: Number(newScore) };
-  encryptFields('users', creditScoreData);
+  await encryptFields('users', creditScoreData, id);
   const sql = 'UPDATE users SET credit_score = ? WHERE id = ?';
   await execute(sql, [creditScoreData.credit_score, id]);
   return await exports.findById(id);

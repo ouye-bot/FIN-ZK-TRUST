@@ -48,7 +48,7 @@ router.post('/', validate(redeemSchema), async (req, res) => {
       { userId: String(userId), amount: parseInt(amount), creditProofId: creditProof.id },
       ['amount', 'creditProofId', 'userId']
     );
-    logger.info('[DEBUG] redeem signatureData:', signatureData);
+    logger.info('赎回签名数据构建完成', { userId });
     const isSignatureValid = verifySM2Signature(signatureData, signature, user.sm2_public_key);
     if (!isSignatureValid) {
       logger.warning('赎回失败：无效的SM2签名', { userId, signatureData });

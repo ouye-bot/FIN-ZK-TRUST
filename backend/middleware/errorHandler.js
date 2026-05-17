@@ -1,4 +1,29 @@
+const crypto = require('crypto');
 const logger = require('../utils/logger');
+
+/**
+ * 标准错误响应格式
+ */
+function createErrorResponse(code, message, details = null) {
+  const response = {
+    success: false,
+    code,
+    message,
+    requestId: crypto.randomUUID()
+  };
+  if (details && process.env.NODE_ENV === 'development') {
+    response.details = details;
+  }
+  return response;
+}
+
+/**
+ * 密码学操作错误统一处理
+ */
+function handleCryptoError(error, operation) {
+  logger.error(`${operation} 失败`, { error: error.message });
+  return createErrorResponse('CRYPTO_ERROR', `${operation} 失败`);
+}
 
 /**
  * 自定义错误类
@@ -46,6 +71,7 @@ class ErrorMonitor {
     this.errors = [];
     this.errorCounts = {};
     this.threshold = 10; // 每分钟错误阈值
+    this.maxErrors = 10000; // 最大错误记录数
   }
   
   /**
@@ -63,6 +89,11 @@ class ErrorMonitor {
       userId: req.user?.id,
       ip: req.ip
     };
+    
+    // 限制错误记录数量，防止内存泄漏
+    if (this.errors.length >= this.maxErrors) {
+      this.errors.splice(0, this.errors.length - this.maxErrors + 1);
+    }
     
     this.errors.push(errorData);
     
@@ -232,5 +263,7 @@ module.exports = {
   UnauthorizedError,
   ForbiddenError,
   NotFoundError,
-  getErrorStats
+  getErrorStats,
+  createErrorResponse,
+  handleCryptoError
 };

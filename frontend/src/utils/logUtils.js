@@ -1,6 +1,35 @@
 // 密码操作日志工具
 
 /**
+ * 同步日志到后端持久化存储（SM3 哈希链）
+ */
+export const syncLogToBackend = async (logData) => {
+  try {
+    const token = localStorage.getItem('token');
+    await fetch('/api/v1/crypto-log', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        userId: logData.userId,
+        operationType: logData.operationType,
+        description: logData.description,
+        data: {
+          status: logData.status,
+          detail: logData.detail,
+          correlationInfo: logData.correlationInfo
+        }
+      })
+    });
+  } catch (err) {
+    // 不阻塞前端 UI，静默失败
+    console.warn('Failed to sync crypto log to backend:', err.message);
+  }
+};
+
+/**
  * 添加密码操作日志
  * @param {string} operationType - 操作类型（如"SM2签名"、"SM3哈希"）
  * @param {string} description - 操作描述
@@ -12,7 +41,7 @@
  */
 export const addCryptoLog = (operationType, description, status, detail = '', correlationInfo = null, user, setCryptoLogs) => {
   if (!setCryptoLogs) return;
-  
+
   const now = new Date();
   const formattedTime = now.toLocaleTimeString('zh-CN', {
     hour12: false,
@@ -20,10 +49,10 @@ export const addCryptoLog = (operationType, description, status, detail = '', co
     minute: '2-digit',
     second: '2-digit'
   });
-  
+
   // 生成唯一ID
   const logId = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
-  
+
   const log = {
     id: logId,
     userId: user?.id || user?.username || 'anonymous',
@@ -35,7 +64,7 @@ export const addCryptoLog = (operationType, description, status, detail = '', co
     fullTimestamp: now.toISOString(),
     correlationInfo
   };
-  
+
   // 保持最多显示50条日志
   setCryptoLogs(prevLogs => {
     const newLogs = [...prevLogs, log];
@@ -44,6 +73,9 @@ export const addCryptoLog = (operationType, description, status, detail = '', co
     }
     return newLogs;
   });
+
+  // 同步到后端持久化
+  syncLogToBackend(log);
 };
 
 /**

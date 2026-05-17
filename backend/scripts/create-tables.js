@@ -142,6 +142,18 @@ const createTables = async () => {
     `);
     console.log('token_blacklist表创建成功');
     
+    // 创建user_keys表（Round 4：每用户独立 DEK）
+    await execute(`
+      CREATE TABLE IF NOT EXISTS user_keys (
+        user_id       BIGINT PRIMARY KEY,
+        encrypted_dek TEXT NOT NULL COMMENT 'DEK 被 Master Key 加密后的密文（SM4-CBC + HMAC-SM3 格式）',
+        created_at    BIGINT NOT NULL COMMENT '创建时间戳',
+        rotated_at    BIGINT DEFAULT NULL COMMENT '最近一次密钥轮换时间戳',
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log('user_keys表创建成功');
+    
     console.log('所有表创建完成');
   } catch (error) {
     console.error('创建表时出错:', error);

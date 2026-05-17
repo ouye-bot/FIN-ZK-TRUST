@@ -7,15 +7,25 @@ const fs = require('fs');
 const userDao = require('../dao/userDao');
 const transactionDao = require('../dao/transactionDao');
 const proofDao = require('../dao/proofDao');
+const { execute } = require('../config/database');
 const logger = require('../utils/logger');
 
+// 查询用户是否有逾期借款
+async function checkUserHasOverdue(userId) {
+  const rows = await execute(
+    "SELECT COUNT(*) AS cnt FROM transactions WHERE user_id = ? AND type = 'loan' AND status = 'overdue'",
+    [userId]
+  );
+  return rows[0].cnt > 0;
+}
+
 // 获取电路文件路径
-const wasmPath = path.join(__dirname, '../../circuits/credit.wasm');
+const wasmPath = path.join(__dirname, '../../circuits/build/credit.wasm');
 const zkeyPath = path.join(__dirname, '../../circuits/build/credit_final.zkey');
 
 // POST /zk/generate-proof
 router.post('/generate-proof', async (req, res) => {
-  const { creditScore, threshold } = req.body;
+  const { creditScore, threshold, userId } = req.body;
   if (typeof creditScore !== 'number' || typeof threshold !== 'number') {
     return res.status(400).json({ success: false, message: 'Invalid input' });
   }
@@ -28,8 +38,16 @@ router.post('/generate-proof', async (req, res) => {
       return res.status(500).json({ success: false, message: '证明密钥文件未找到: credit_final.zkey' });
     }
 
+    // 查询用户逾期状态
+    let hasNoOverdue = 1;
+    if (userId) {
+      const hasOverdue = await checkUserHasOverdue(parseInt(userId));
+      hasNoOverdue = hasOverdue ? 0 : 1;
+      logger.info('ZKP生成-用户逾期状态', { userId, hasNoOverdue });
+    }
+
     const taskId = zkQueue.addTask(
-      { creditScore, threshold },
+      { creditScore, threshold, hasNoOverdue },
       wasmPath,
       zkeyPath
     );

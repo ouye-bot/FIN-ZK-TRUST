@@ -3,9 +3,19 @@ const router = express.Router();
 const userDao = require('../dao/userDao');
 const proofDao = require('../dao/proofDao');
 const transactionDao = require('../dao/transactionDao');
+const { execute } = require('../config/database');
 const logger = require('../utils/logger');
 const { generateSM3Hash } = require('../utils/cryptoUtils');
 const { verifyProof } = require('../services/zkService');
+
+// 查询用户是否有逾期借款（系统自动判断，非用户自述）
+async function checkUserHasOverdue(userId) {
+  const rows = await execute(
+    "SELECT COUNT(*) AS cnt FROM transactions WHERE user_id = ? AND type = 'loan' AND status = 'overdue'",
+    [userId]
+  );
+  return rows[0].cnt > 0;
+}
 
 const CREDIT_RULES = {
   MIN_SCORE: 300,
@@ -56,21 +66,36 @@ const getInterestRate = (creditScore) => {
   return 13.8;
 };
 
+// 查询用户逾期状态（供前端生成 ZKP 前调用）
+router.get('/overdue-status/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const hasOverdue = await checkUserHasOverdue(parseInt(userId));
+    res.json({
+      success: true,
+      data: { hasOverdue, hasNoOverdue: !hasOverdue }
+    });
+  } catch (error) {
+    logger.error('查询逾期状态失败', { error: error.message, userId: req.params.userId });
+    res.status(500).json({ success: false, message: '查询逾期状态失败' });
+  }
+});
+
 // 生成信用证明
 // 前端为主通道（端侧生成ZKP），后端只验证和存储
 // 后端异步队列 /api/v1/zk/generate-proof 为降级备份
 router.post('/generate-proof', async (req, res) => {
   try {
-    console.log('[DEBUG] generate-proof called, body:', JSON.stringify(req.body));
-
     const { userId, proof, publicSignals, signature } = req.body;
 
     logger.info('生成信用证明请求', { userId, hasProof: !!proof, hasPublicSignals: !!publicSignals });
 
+    // 系统自动查询用户逾期状态（不信任前端传值）
+    const serverHasNoOverdue = !(await checkUserHasOverdue(parseInt(userId)));
+    logger.info('用户逾期状态（系统查询）', { userId, hasNoOverdue: serverHasNoOverdue });
+
     // 验证用户存在
-    console.log('[DEBUG] about to call userDao.findById with:', parseInt(userId));
     const user = await userDao.findById(parseInt(userId));
-    console.log('[DEBUG] user found:', user ? user.id : 'null', 'credit_score:', user?.credit_score);
 
     if (!user) {
       return res.json({
@@ -81,11 +106,8 @@ router.post('/generate-proof', async (req, res) => {
 
     // 如果前端提供了 proof 和 publicSignals，进行端侧ZKP验证
     if (proof && publicSignals) {
-      console.log('[DEBUG] 收到端侧生成的零知识证明，开始验证...');
-
       try {
         const isProofValid = await verifyProof(proof, publicSignals);
-        console.log('[DEBUG] 端侧ZKP验证结果:', isProofValid);
 
         if (!isProofValid) {
           logger.warning('端侧零知识证明验证失败', { userId });
@@ -96,37 +118,36 @@ router.post('/generate-proof', async (req, res) => {
         }
 
         logger.info('端侧零知识证明验证通过', { userId });
+
+        // 服务端独立校验逾期状态（不信任 ZKP 中的 hasNoOverdue 输入）
+        if (!serverHasNoOverdue) {
+          logger.warning('用户有逾期记录，拒绝生成信用证明', { userId });
+          return res.status(400).json({
+            success: false,
+            message: '您当前有逾期借款记录，无法生成信用证明'
+          });
+        }
       } catch (verifyError) {
-        console.error('[DEBUG] ZKP验证异常:', verifyError.message);
         logger.error('ZKP验证异常', { error: verifyError.message, userId });
         return res.status(400).json({
           success: false,
           message: '零知识证明验证失败: ' + verifyError.message
         });
       }
-    } else {
-      console.log('[DEBUG] 未收到前端proof，使用后端异步队列生成（降级模式）');
     }
 
-    // 使用真实的信用评分
+    // 创建包含真实信用评分的数据
     const creditScore = user.credit_score || 600;
-    console.log('[DEBUG] using creditScore:', creditScore);
+    const proofData = JSON.stringify({ creditScore, verified: true, timestamp: Date.now() });
 
-    // 生成信用证明（使用真实数据）
+    const sm3Hash = generateSM3Hash(proofData);
+
     const proofId = `proof_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const verificationCode = `code_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const expiresAtDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     const expiresAt = expiresAtDate.toISOString().slice(0, 19).replace('T', ' ');
 
-    // 创建包含真实信用评分的数据
-    const proofData = JSON.stringify({ creditScore, verified: true, timestamp: Date.now() });
-    console.log('[DEBUG] proofData generated:', proofData);
-
-    const sm3Hash = generateSM3Hash(proofData);
-    console.log('[DEBUG] sm3Hash generated:', sm3Hash);
-
     // 保存信用证明到数据库
-    console.log('[DEBUG] calling proofDao.create with:', { user_id: user.id, proof_id: proofId, verification_code: verificationCode });
     const savedProof = await proofDao.create({
       user_id: user.id,
       proof_id: proofId,
@@ -135,11 +156,7 @@ router.post('/generate-proof', async (req, res) => {
       proof_data: proofData,
       expires_at: expiresAt
     });
-    console.log('[DEBUG] proofDao.create returned:', savedProof);
-
     logger.info('信用证明生成成功', { userId, proofId, expiresAt: expiresAtDate.toISOString() });
-
-    console.log('[DEBUG] about to send success response');
 
     // 构建 ZKP 标准嵌套结构
     const proofResult = {
@@ -162,8 +179,6 @@ router.post('/generate-proof', async (req, res) => {
         }
       });
     } catch (err) {
-      console.error('[DEBUG] res.json failed:', err.message);
-      console.error('[DEBUG] Stack:', err.stack);
       logger.error('发送响应失败', { error: err.message, stack: err.stack });
       if (!res.headersSent) {
         res.status(500).json({
@@ -174,8 +189,6 @@ router.post('/generate-proof', async (req, res) => {
       }
     }
   } catch (error) {
-    console.error('[DEBUG] Error in generate-proof:', error.message);
-    console.error('[DEBUG] Stack:', error.stack);
     logger.error('生成信用证明失败', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
@@ -192,18 +205,10 @@ router.post('/verify-proof', async (req, res) => {
     const proofId = req.body.proof?.proofId || req.body.proofId;
     const verificationCode = req.body.verificationCode || req.body.proof?.verificationCode;
 
-    console.log('[DEBUG] verify-proof called, proofId:', proofId, 'verificationCode:', verificationCode);
-
     logger.info('验证信用证明请求', { proofId, verificationCode });
 
     // 从数据库获取信用证明
-    console.log('[DEBUG] about to query proof with proofId:', proofId);
     const proof = await proofDao.findByProofId(proofId);
-    console.log('[DEBUG] proof query result:', proof ? 'found' : 'null');
-    if (proof) {
-      console.log('[DEBUG] proof.verification_code:', proof.verification_code);
-      console.log('[DEBUG] proof.expires_at:', proof.expires_at);
-    }
 
     if (!proof) {
       return res.json({
@@ -213,25 +218,17 @@ router.post('/verify-proof', async (req, res) => {
     }
 
     // 检查是否过期
-    console.log('[DEBUG] checking expiry...');
     if (new Date(proof.expires_at) < new Date()) {
-      console.log('[DEBUG] proof is expired');
       return res.json({
         success: false,
         message: '信用证明已过期'
       });
     }
-    console.log('[DEBUG] expiry check passed');
 
     // 验证证明
-    console.log('[DEBUG] comparing verification codes');
-    console.log('[DEBUG] received code:', verificationCode);
-    console.log('[DEBUG] stored code:', proof.verification_code);
 
     const isValid = proof.verification_code === verificationCode;
-    console.log('[DEBUG] verification result:', isValid);
 
-    console.log('[DEBUG] about to send response');
     if (isValid) {
       logger.info('信用证明验证成功', { proofId });
       res.json({
@@ -250,8 +247,6 @@ router.post('/verify-proof', async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('[DEBUG] Error in verify-proof:', error.message);
-    console.error('[DEBUG] Stack:', error.stack);
     logger.error('验证信用证明失败', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,

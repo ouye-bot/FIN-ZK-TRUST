@@ -225,7 +225,8 @@ async function module2CryptoBenchmark() {
   const results = {};
 
   const { generateSM2KeyPair, signWithSM2, generateSM3Hash } = require('../utils/cryptoUtils');
-  const { encrypt, decrypt } = require('../utils/sm4Crypto');
+  const kmsService = require('../services/kmsService');
+  const testDek = crypto.randomBytes(16).toString('hex');
 
   console.log('\n  预生成SM2密钥对...');
   const testKeyPair = generateSM2KeyPair();
@@ -313,8 +314,8 @@ async function module2CryptoBenchmark() {
 
     const sm4StartTime = performance.now();
     for (let i = 0; i < iterations; i++) {
-      const encrypted = encrypt(data);
-      decrypt(encrypted);
+      const encrypted = kmsService.encryptWithDEK(testDek, data);
+      kmsService.decryptWithDEK(testDek, encrypted);
     }
     const sm4Time = performance.now() - sm4StartTime;
     const sm4MB = (iterations * size / 1024 / 1024);
@@ -364,7 +365,7 @@ async function module3ZkpPerformance() {
   for (let i = 0; i < 10; i++) {
     const t1 = performance.now();
     try {
-      const proofResult = await zkService.generateProof(750, 600);
+      const proofResult = await zkService.generateProof(750, 600, true);
       const time = performance.now() - t1;
       genTimes.push(time);
       if (i === 0) sampleProof = proofResult;
@@ -754,10 +755,11 @@ async function module7CryptoComparisonBenchmark() {
   console.log('\n  7.2 SM4 vs AES-256-GCM (1KB数据, 各1000次, 3轮)');
   await collectGarbage();
 
-  const { encrypt, decrypt } = require('../utils/sm4Crypto');
+  const kmsService7 = require('../services/kmsService');
+  const testDek7 = crypto.randomBytes(16).toString('hex');
 
   // 预热
-  for (let i = 0; i < 100; i++) { const e = encrypt(testData1KB); decrypt(e); }
+  for (let i = 0; i < 100; i++) { const e = kmsService7.encryptWithDEK(testDek7, testData1KB); kmsService7.decryptWithDEK(testDek7, e); }
   {
     const k = crypto.randomBytes(32);
     const iv = crypto.randomBytes(12);
@@ -776,7 +778,7 @@ async function module7CryptoComparisonBenchmark() {
 
     const sm4EncStart = performance.now();
     let sm4Encrypted;
-    for (let i = 0; i < 1000; i++) sm4Encrypted = encrypt(testData1KB);
+    for (let i = 0; i < 1000; i++) sm4Encrypted = kmsService7.encryptWithDEK(testDek7, testData1KB);
     const sm4EncTime = performance.now() - sm4EncStart;
     sm4Throughputs.push((1000 * 1024 / 1024) / (sm4EncTime / 1000));
 
@@ -903,7 +905,7 @@ async function module8EndToEndBusinessPerformance() {
   const loanSteps = {};
 
   const step1Start = performance.now();
-  const proofResult = await zkService.generateProof(750, 600);
+  const proofResult = await zkService.generateProof(750, 600, true);
   loanSteps.zkpProofGen = (performance.now() - step1Start).toFixed(2);
   console.log(`     ZKP证明生成: ${loanSteps.zkpProofGen}ms`);
 

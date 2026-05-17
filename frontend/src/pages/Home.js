@@ -28,6 +28,7 @@ import ArrowRightIcon from '@mui/icons-material/ArrowRight';
 import { generateSM2KeyPair } from '../utils/cryptoUtils';
 import { encryptPrivateKey } from '../utils/secureKeyStore';
 import { post } from '../utils/apiUtils';
+import { syncLogToBackend } from '../utils/logUtils';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 
 function Home({ user, onLogin, error, cryptoLogs, setCryptoLogs }) {
@@ -59,6 +60,8 @@ function Home({ user, onLogin, error, cryptoLogs, setCryptoLogs }) {
       }
       return newLogs;
     });
+
+    syncLogToBackend(log);
   };
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(0);

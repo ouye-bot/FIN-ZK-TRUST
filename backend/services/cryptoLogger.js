@@ -5,7 +5,18 @@ const { sm3 } = require('sm-crypto');
 const LOG_FILE_PATH = path.join(__dirname, '..', 'data', 'crypto_logs.json');
 
 class CryptoLogger {
+  constructor() {
+    this._writeLock = Promise.resolve();
+  }
+
   async logOperation(userId, operationType, description, data = {}) {
+    // 串行化写入，防止并发损坏
+    return new Promise((resolve, reject) => {
+      this._writeLock = this._writeLock.then(() => this._doLog(userId, operationType, description, data)).then(resolve).catch(reject);
+    });
+  }
+
+  async _doLog(userId, operationType, description, data = {}) {
     try {
       // 确保 data 目录存在
       await fs.mkdir(path.dirname(LOG_FILE_PATH), { recursive: true });

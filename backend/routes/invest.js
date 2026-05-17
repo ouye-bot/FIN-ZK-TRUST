@@ -105,7 +105,7 @@ router.post('/', validate(investSchema), async (req, res) => {
       { userId: userId.toString(), amount: parseInt(amount), term, creditProofId: creditProof.id },
       ['amount', 'creditProofId', 'term', 'userId']
     );
-    logger.info('[DEBUG] invest signatureData:', signatureData);
+    logger.info('投资签名数据构建完成', { userId });
     const isSignatureValid = verifySM2Signature(signatureData, signature, user.sm2_public_key);
     if (!isSignatureValid) {
       logger.warning('投资失败：无效的SM2签名', { userId, signatureData });

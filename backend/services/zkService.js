@@ -7,11 +7,14 @@ const logger = require('../utils/logger');
 const blockchainService = require('./blockchainService');
 
 // 生成零知识证明
-exports.generateProof = async (creditScore, threshold) => {
+exports.generateProof = async (creditScore, threshold, hasNoOverdue) => {
   try {
     // 验证输入参数
-    if (creditScore === undefined || creditScore === null || !threshold) {
+    if (creditScore === undefined || creditScore === null || threshold === undefined || threshold === null) {
       throw new Error('缺少必要参数: creditScore 和 threshold');
+    }
+    if (hasNoOverdue === undefined || hasNoOverdue === null) {
+      throw new Error('缺少必要参数: hasNoOverdue');
     }
     
     // 检查必要的文件是否存在
@@ -26,17 +29,21 @@ exports.generateProof = async (creditScore, threshold) => {
       throw new Error('证明密钥文件未找到: credit_final.zkey');
     }
     
-    // 使用原始数值作为电路输入（修复：哈希破坏数值比较关系）
+    // 使用原始数值作为电路输入
     const circuitCreditScore = Number(creditScore);
     const circuitThreshold = Number(threshold);
+    const circuitHasNoOverdue = Number(hasNoOverdue) || 0;
 
     if (isNaN(circuitCreditScore) || isNaN(circuitThreshold)) {
       throw new Error('creditScore 和 threshold 必须为有效数字');
     }
+    if (circuitHasNoOverdue !== 0 && circuitHasNoOverdue !== 1) {
+      throw new Error('hasNoOverdue 必须为布尔值');
+    }
 
-    logger.info('生成零知识证明', { creditScore: circuitCreditScore, threshold: circuitThreshold });
+    logger.info('生成零知识证明', { creditScore: circuitCreditScore, threshold: circuitThreshold, hasNoOverdue: circuitHasNoOverdue });
     const { proof, publicSignals } = await snarkjs.groth16.fullProve(
-      { creditScore: circuitCreditScore, threshold: circuitThreshold },
+      { creditScore: circuitCreditScore, threshold: circuitThreshold, hasNoOverdue: circuitHasNoOverdue },
       wasmPath,
       provingKeyPath
     );
@@ -47,7 +54,6 @@ exports.generateProof = async (creditScore, threshold) => {
     return result;
   } catch (error) {
     logger.error('生成零知识证明失败:', { error: error.message, stack: error.stack });
-    // 如果生成失败，抛出错误而不是返回模拟数据
     throw error;
   }
 };
@@ -162,7 +168,9 @@ exports.verifyProof = async (proof, publicSignals) => {
       logger.info('零知识证明验证结果:', { verificationResult });
 
       // 检查 isValid 输出信号
-      if (verificationResult && publicSignals && publicSignals.length > 0 && publicSignals[0] !== '1') {
+      // snarkjs 的 publicSignals 顺序：先输出信号，后公共输入
+      // publicSignals[0] 是 isValid（输出），publicSignals[1] 是 threshold（公共输入）
+      if (verificationResult && publicSignals.length > 0 && publicSignals[0] !== '1') {
         logger.info('ZKP 证明有效但 isValid=0，业务验证不通过', { publicSignals });
         return false;
       }

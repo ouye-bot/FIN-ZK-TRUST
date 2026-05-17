@@ -101,22 +101,17 @@ const LARGE_LOAN_THRESHOLD = 5000;
 // 借款API
 router.post('/borrow', validate(borrowSchema), async (req, res) => {
   try {
-    console.log('[DEBUG] /loan/borrow called, body:', JSON.stringify(req.body));
-
     const { userId, amount, creditProof, verificationCode, signature, term = 30 } = req.body;
     logger.info('借款请求', { userId, amount, term });
 
     // 验证请求参数
     if (!userId || !amount || !creditProof || !verificationCode || !signature) {
-      console.log('[DEBUG] Missing required params:', { userId: !!userId, amount: !!amount, creditProof: !!creditProof, verificationCode: !!verificationCode, signature: !!signature });
       logger.warning('借款失败：缺少必要参数', { userId, amount, hasCreditProof: !!creditProof, hasVerificationCode: !!verificationCode, hasSignature: !!signature });
       return res.status(400).json({
         success: false,
         message: '缺少必要的参数'
       });
     }
-
-    console.log('[DEBUG] userId:', !!userId, 'amount:', !!amount, 'creditProof:', !!creditProof, 'verificationCode:', !!verificationCode, 'signature:', !!signature);
 
     // 验证借款期限
     const validTerms = [7, 14, 30, 60, 90];
@@ -143,15 +138,11 @@ router.post('/borrow', validate(borrowSchema), async (req, res) => {
       });
     }
 
-    console.log('[DEBUG] about to verify SM2 signature, publicKey:', user.sm2_public_key ? 'exists' : 'missing');
-
     const signatureData = buildSignatureData(
       { userId: String(userId), amount: parseInt(amount), creditProofId: creditProof.id },
       ['amount', 'creditProofId', 'userId']
     );
-    console.log('[DEBUG] borrow signatureData:', signatureData);
     const isSignatureValid = verifySM2Signature(signatureData, signature, user.sm2_public_key);
-    console.log('[DEBUG] SM2 signature valid:', isSignatureValid);
 
     if (!isSignatureValid) {
       logger.warning('借款失败：无效的SM2签名', { userId });
@@ -172,7 +163,6 @@ router.post('/borrow', validate(borrowSchema), async (req, res) => {
 
     // 验证信用证明和口令
     const matchingProof = await proofDao.findByProofId(creditProof.id);
-    console.log('[DEBUG] proof found:', !!matchingProof, 'expired:', matchingProof ? (new Date(matchingProof.expires_at) <= new Date()) : 'N/A', 'verification match:', matchingProof ? (matchingProof.verification_code === verificationCode) : 'N/A');
 
     if (!matchingProof || new Date(matchingProof.expires_at) <= new Date() || matchingProof.verification_code !== verificationCode) {
       logger.warning('借款失败：信用证明或验证口令无效', {
@@ -214,7 +204,6 @@ router.post('/borrow', validate(borrowSchema), async (req, res) => {
     }
 
     // 检查借款额度
-    console.log('[DEBUG] about to parse proof_data:', matchingProof.proof_data);
     const proofData = JSON.parse(matchingProof.proof_data);
     const loanLimit = getLoanLimit(proofData.creditScore);
 
@@ -275,11 +264,9 @@ router.post('/borrow', validate(borrowSchema), async (req, res) => {
     }
 
     // 验证零知识证明（如果提供）
-    console.log('[DEBUG] about to verify ZKP, has proof:', !!creditProof.proof, 'has publicSignals:', !!creditProof.publicSignals);
     if (creditProof.proof && creditProof.publicSignals) {
       try {
         const isProofValid = await verifyProof(creditProof.proof, creditProof.publicSignals);
-        console.log('[DEBUG] ZKP valid:', isProofValid);
         if (!isProofValid) {
           logger.error('零知识证明验证失败', { proofId: creditProof.id });
           return res.status(400).json({
@@ -305,14 +292,12 @@ router.post('/borrow', validate(borrowSchema), async (req, res) => {
     }
 
     // 智能风控评估
-    console.log('[DEBUG] about to assess loan risk');
     const riskAssessment = await assessLoanRisk(
       userId,
       parseInt(amount),
       term,
       creditProof
     );
-    console.log('[DEBUG] risk assessment result:', JSON.stringify(riskAssessment));
 
     if (!riskAssessment.success) {
       logger.warning('风险评估失败', {
@@ -338,9 +323,7 @@ router.post('/borrow', validate(borrowSchema), async (req, res) => {
     });
 
     // 调用资金池借款函数（使用事务）
-    console.log('[DEBUG] about to call borrowFromPool');
     const borrowResult = await poolService.borrowFromPool(userId, parseInt(amount), term);
-    console.log('[DEBUG] borrowFromPool succeeded');
 
     logger.info('借款成功', { userId, transactionId: borrowResult.transaction.id, amount });
 
@@ -371,15 +354,12 @@ router.post('/borrow', validate(borrowSchema), async (req, res) => {
       });
     });
 
-    console.log('[DEBUG] about to send success response');
     res.json({
       success: true,
       message: '借款成功',
       transaction: borrowResult.transaction
     });
   } catch (error) {
-    console.error('[DEBUG] Error in /loan/borrow:', error.message);
-    console.error('[DEBUG] Stack:', error.stack);
     logger.error('借款失败', { error: error.message, stack: error.stack, userId: req.body.userId });
     res.status(500).json({
       success: false,
@@ -451,7 +431,6 @@ router.post('/repay', validate(repaySchema), async (req, res) => {
       { userId: String(userId), transactionId, creditProofId: creditProof.id },
       ['creditProofId', 'transactionId', 'userId']
     );
-    console.log('[DEBUG] repay signatureData:', signatureData);
     const isSignatureValid = verifySM2Signature(signatureData, signature, user.sm2_public_key);
     if (!isSignatureValid) {
       logger.warning('还款失败：无效的SM2签名', { userId, transactionId, signatureData });

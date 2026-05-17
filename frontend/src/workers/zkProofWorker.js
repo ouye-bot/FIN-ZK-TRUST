@@ -1,14 +1,9 @@
 /* eslint-disable no-restricted-globals */
 import { groth16 } from 'snarkjs';
-import { sm3 } from 'sm-crypto';
 
 let wasmUrl = null;
 let zkeyUrl = null;
 let isInitialized = false;
-
-function generateSM3Hash(data) {
-  return sm3(String(data));
-}
 
 self.onmessage = async (e) => {
   const { type, wasmUrl: initWasmUrl, zkeyUrl: initZkeyUrl, input, requestId } = e.data;
@@ -40,21 +35,16 @@ self.onmessage = async (e) => {
       try {
         const creditScore = Number(input.creditScore);
         const threshold = Number(input.threshold);
+        const hasNoOverdue = input.hasNoOverdue ? 1 : 0;
 
         if (isNaN(creditScore) || isNaN(threshold)) {
           throw new Error('Invalid input: creditScore and threshold must be numbers');
         }
 
-        const hashedCreditScore = parseInt(
-          generateSM3Hash(creditScore.toString()).substring(0, 8), 16
-        );
-        const hashedThreshold = parseInt(
-          generateSM3Hash(threshold.toString()).substring(0, 8), 16
-        );
-
         const proofInput = {
-          creditScore: hashedCreditScore,
-          threshold: hashedThreshold
+          creditScore,
+          threshold,
+          hasNoOverdue
         };
 
         console.log('[Worker] Generating proof, input:', proofInput);

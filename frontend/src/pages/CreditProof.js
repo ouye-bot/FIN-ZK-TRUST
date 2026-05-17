@@ -20,6 +20,7 @@ import { signWithSM2, generateSM2KeyPair } from '../utils/cryptoUtils';
 import { getSM2KeyPair, saveSM2KeyPair, getSM2KeyPairWithAesKey } from '../utils/sm2Utils';
 import { CreditProofCache } from '../utils/cacheUtils';
 import { post, get } from '../utils/apiUtils';
+import { syncLogToBackend } from '../utils/logUtils';
 
 const CreditProof = ({ user, cryptoLogs, setCryptoLogs }) => {
   const navigate = useNavigate();
@@ -33,6 +34,7 @@ const CreditProof = ({ user, cryptoLogs, setCryptoLogs }) => {
   const [zkWorker, setZkWorker] = useState(null);
   const [zkWorkerReady, setZkWorkerReady] = useState(false);
   const [zkStatus, setZkStatus] = useState('');
+  const [hasNoOverdue, setHasNoOverdue] = useState(true); // 由系统自动判断
 
   // 页面加载时检查信用证明
   useEffect(() => {
@@ -42,6 +44,27 @@ const CreditProof = ({ user, cryptoLogs, setCryptoLogs }) => {
         setProof(storedProof);
         setVerificationCode(storedProof.verificationCode);
       }
+    }
+  }, [user]);
+
+  // 系统自动查询用户逾期状态
+  useEffect(() => {
+    if (user) {
+      const fetchOverdueStatus = async () => {
+        try {
+          const token = localStorage.getItem('token');
+          const response = await fetch(`/api/v1/credit/overdue-status/${user.id}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const data = await response.json();
+          if (data.success) {
+            setHasNoOverdue(data.data.hasNoOverdue);
+          }
+        } catch (err) {
+          console.error('查询逾期状态失败:', err);
+        }
+      };
+      fetchOverdueStatus();
     }
   }, [user]);
 
@@ -136,6 +159,8 @@ const CreditProof = ({ user, cryptoLogs, setCryptoLogs }) => {
         // 保持最多50条日志
         return updatedLogs.slice(-50);
       });
+
+      syncLogToBackend(newLog);
     }
   };
 
@@ -233,7 +258,7 @@ const CreditProof = ({ user, cryptoLogs, setCryptoLogs }) => {
 
         zkWorker.postMessage({
           type: 'GENERATE_PROOF',
-          input: { creditScore, threshold: 600 },
+          input: { creditScore, threshold: 600, hasNoOverdue: hasNoOverdue ? 1 : 0 },
           requestId
         });
       });
@@ -364,12 +389,20 @@ const CreditProof = ({ user, cryptoLogs, setCryptoLogs }) => {
                 <Typography variant="body1">
                   信用分数: {user.creditScore}
                 </Typography>
+                <Typography variant="body2" sx={{ color: hasNoOverdue ? '#10b981' : '#ef4444', mt: 1 }}>
+                  逾期状态: {hasNoOverdue ? '无逾期记录' : '有逾期记录'}
+                </Typography>
               </Box>
+              {!hasNoOverdue && (
+                <Alert severity="warning" sx={{ mb: 2 }}>
+                  您当前有逾期借款记录，无法生成信用证明
+                </Alert>
+              )}
               <Button
                 variant="contained"
                 color="primary"
                 onClick={handleGenerateProof}
-                disabled={loading || !zkWorkerReady}
+                disabled={loading || !zkWorkerReady || !hasNoOverdue}
                 fullWidth
               >
                 {loading ? <CircularProgress size={24} /> : (zkStatus || '生成信用证明')}

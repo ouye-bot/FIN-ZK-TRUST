@@ -2,11 +2,12 @@
  * 生成零知识证明
  * @param {number} creditScore - 信用分
  * @param {number} threshold - 阈值
+ * @param {number} userId - 用户ID（用于查询逾期状态）
  * @returns {Promise<Object>} - 包含证明和公开信号的对象
  */
-export const generateProof = async (creditScore, threshold) => {
+export const generateProof = async (creditScore, threshold, userId) => {
   const token = localStorage.getItem('token');
-  
+
   // Step 1: 提交证明生成任务
   const submitRes = await fetch('/api/v1/zk/generate-proof', {
     method: 'POST',
@@ -14,7 +15,7 @@ export const generateProof = async (creditScore, threshold) => {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`
     },
-    body: JSON.stringify({ creditScore, threshold })
+    body: JSON.stringify({ creditScore, threshold, userId })
   });
   const submitData = await submitRes.json();
   if (!submitData.success) throw new Error(submitData.message || '提交证明生成任务失败');

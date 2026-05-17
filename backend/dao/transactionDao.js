@@ -1,5 +1,5 @@
 const { execute } = require('../config/database');
-const { decryptFields, encryptFields } = require('../utils/sm4Crypto');
+const { decryptFields, encryptFields, encrypt } = require('../utils/sm4Crypto');
 
 /**
  * 创建交易
@@ -12,9 +12,9 @@ exports.create = async (transactionData) => {
   const amountData = { amount: Number(amount) };
   const interestData = { interest: Number(interest || 0) };
   const totalAmountData = { total_amount: Number(total_amount || 0) };
-  encryptFields('transactions', amountData);
-  encryptFields('transactions', interestData);
-  encryptFields('transactions', totalAmountData);
+  await encryptFields('transactions', amountData, user_id);
+  await encryptFields('transactions', interestData, user_id);
+  await encryptFields('transactions', totalAmountData, user_id);
 
   const sql = `
     INSERT INTO transactions (user_id, type, amount, interest, total_amount, status, tx_hash, due_date, term)
@@ -44,9 +44,8 @@ exports.findById = async (id) => {
   const results = await execute(sql, [id]);
   if (results.length > 0) {
     const transaction = {...results[0]};
-    decryptFields('transactions', transaction);
+    await decryptFields('transactions', transaction, results[0].user_id);
     transaction.timestamp = transaction.created_at;
-    // 确保数值字段正确转换
     transaction.amount = Number(transaction.amount);
     transaction.interest = Number(transaction.interest);
     transaction.total_amount = Number(transaction.total_amount);
@@ -90,17 +89,18 @@ exports.findByUserId = async (userId, options = {}) => {
   }
   
   const results = await execute(sql, params);
-  return results.map(row => {
+  const mapped = [];
+  for (const row of results) {
     const transaction = {...row};
-    decryptFields('transactions', transaction);
+    await decryptFields('transactions', transaction, row.user_id);
     transaction.timestamp = transaction.created_at;
-    // 确保数值字段正确转换
     transaction.amount = Number(transaction.amount);
     transaction.interest = Number(transaction.interest);
     transaction.total_amount = Number(transaction.total_amount);
     transaction.term = transaction.term !== null && transaction.term !== undefined ? Number(transaction.term) : null;
-    return transaction;
-  });
+    mapped.push(transaction);
+  }
+  return mapped;
 };
 
 /**
@@ -111,16 +111,18 @@ exports.findByUserId = async (userId, options = {}) => {
 exports.findByType = async (type) => {
   const sql = 'SELECT * FROM transactions WHERE type = ? ORDER BY created_at DESC';
   const results = await execute(sql, [type]);
-  return results.map(row => {
+  const mapped = [];
+  for (const row of results) {
     const transaction = {...row};
-    decryptFields('transactions', transaction);
+    await decryptFields('transactions', transaction, row.user_id);
     transaction.timestamp = transaction.created_at;
-    // 确保数值字段正确转换
+
     transaction.amount = Number(transaction.amount);
     transaction.interest = Number(transaction.interest);
     transaction.total_amount = Number(transaction.total_amount);
-    return transaction;
-  });
+    mapped.push(transaction);
+  }
+  return mapped;
 };
 
 /**
@@ -147,15 +149,22 @@ exports.update = async (id, updates) => {
     return await exports.findById(id);
   }
 
+  const existing = await execute('SELECT user_id FROM transactions WHERE id = ?', [id]);
+  if (existing.length === 0) {
+    throw new Error('交易不存在');
+  }
+  const userId = existing[0].user_id;
+
   const fields = [];
   const params = [];
 
   for (const [field, value] of Object.entries(updates)) {
-    fields.push(`${field} = ?`);
-    
     if (['amount', 'interest', 'total_amount', 'paid_amount'].includes(field)) {
-      params.push(Number(value));
+      const encrypted = await encrypt(String(Number(value)), userId, `transactions:${field}:${id}`);
+      fields.push(`${field} = ?`);
+      params.push(encrypted);
     } else {
+      fields.push(`${field} = ?`);
       params.push(value);
     }
   }
@@ -176,14 +185,15 @@ exports.update = async (id, updates) => {
 exports.findByStatus = async (status) => {
   const sql = 'SELECT * FROM transactions WHERE status = ? ORDER BY created_at DESC';
   const results = await execute(sql, [status]);
-  return results.map(row => {
+  const mapped = [];
+  for (const row of results) {
     const transaction = {...row};
-    decryptFields('transactions', transaction);
+    await decryptFields('transactions', transaction, row.user_id);
     transaction.timestamp = transaction.created_at;
-    // 确保数值字段正确转换
     transaction.amount = Number(transaction.amount);
     transaction.interest = Number(transaction.interest);
     transaction.total_amount = Number(transaction.total_amount);
-    return transaction;
-  });
+    mapped.push(transaction);
+  }
+  return mapped;
 };

@@ -160,15 +160,15 @@ class ZKQueue extends EventEmitter {
       logger.info('Processing ZK proof task', { taskId, retryCount: task.retryCount });
 
       // 执行 ZKP 证明生成
-      const { creditScore, threshold } = task.input;
+      const { creditScore, threshold, hasNoOverdue } = task.input;
 
-      // 对敏感输入数据进行 SM3 哈希处理（与 zkService 保持一致）
-      const hashedCreditScore = parseInt(generateSM3Hash(creditScore.toString()).substring(0, 8), 16);
-      const hashedThreshold = parseInt(generateSM3Hash(threshold.toString()).substring(0, 8), 16);
+      const circuitCreditScore = Number(creditScore);
+      const circuitThreshold = Number(threshold);
+      const circuitHasNoOverdue = hasNoOverdue ? 1 : 0;
 
       // 使用 snarkjs 生成证明
       const { proof, publicSignals } = await snarkjs.groth16.fullProve(
-        { creditScore: hashedCreditScore, threshold: hashedThreshold },
+        { creditScore: circuitCreditScore, threshold: circuitThreshold, hasNoOverdue: circuitHasNoOverdue },
         task.wasmPath,
         task.zkeyPath
       );

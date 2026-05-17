@@ -19,6 +19,7 @@ import {
 } from '@mui/material';
 import { signWithSM2, getSM2KeyPair, saveSM2KeyPair, generateSM2KeyPair, generateSignatureData, generateSignatureDataStrict, getSM2KeyPairWithAesKey } from '../utils/sm2Utils';
 import { post, get } from '../utils/apiUtils';
+import { syncLogToBackend } from '../utils/logUtils';
 
 const RedeemPage = ({ user, cryptoLogs, setCryptoLogs }) => {
   const aesKey = useAesKey();
@@ -37,6 +38,8 @@ const RedeemPage = ({ user, cryptoLogs, setCryptoLogs }) => {
       // 最多保留50条日志
       return updatedLogs.slice(0, 50);
     });
+
+    syncLogToBackend(newLog);
   };
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);

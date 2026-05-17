@@ -40,15 +40,6 @@ const createDatabase = async () => {
 // 执行数据库创建
 createDatabase();
 
-// 验证 SM4 密钥加载
-try {
-  const { getSM4Key } = require('../utils/sm4Crypto');
-  getSM4Key();
-  console.log('SM4 密钥加载成功');
-} catch (e) {
-  console.warn('SM4 密钥未配置');
-}
-
 // 创建连接池
 const pool = mysql.createPool(config);
 

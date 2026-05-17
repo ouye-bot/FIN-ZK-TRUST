@@ -940,7 +940,7 @@ async function module6ZkpSecurityTests() {
   // 6.2 篡改 publicSignals
   console.log('\n6.2 篡改 publicSignals');
   try {
-    const proofResult = await zkService.generateProof(750, 600);
+    const proofResult = await zkService.generateProof(750, 600, true);
     if (proofResult && proofResult.proof) {
       const tamperedSignals = [...proofResult.publicSignals];
       tamperedSignals[0] = tamperedSignals[0] + '1';
@@ -998,23 +998,31 @@ async function module7Sm4SilentFailureTests() {
   const results = [];
   let passedCount = 0;
 
-  let sm4Crypto;
+  let kmsService;
   try {
-    sm4Crypto = require('../utils/sm4Crypto');
+    kmsService = require('../services/kmsService');
   } catch (e) {
-    console.log('  ⚠️ sm4Crypto 模块不可用');
-    return { status: 'skipped', reason: 'sm4Crypto not available', testResults: [] };
+    console.log('  ⚠️ kmsService 模块不可用');
+    return { status: 'skipped', reason: 'kmsService not available', testResults: [] };
   }
 
-  const { encrypt, decrypt } = sm4Crypto;
+  const testDek = crypto.randomBytes(16).toString('hex');
   const testData = 'sensitive test data for SM4';
+
+  function dekEncrypt(data, aad = '') {
+    return kmsService.encryptWithDEK(testDek, data, aad);
+  }
+
+  function dekDecrypt(ciphertext, aad = '') {
+    return kmsService.decryptWithDEK(testDek, ciphertext, aad);
+  }
 
   // 7.1 篡改密文后解密行为（Bug B3 验证）
   console.log('\n7.1 篡改密文后解密行为（Bug B3 验证）');
   try {
-    const encrypted = encrypt(testData);
+    const encrypted = dekEncrypt(testData);
     const tampered = encrypted.substring(0, encrypted.length - 1) + (encrypted.endsWith('a') ? 'b' : 'a');
-    const result = decrypt(tampered);
+    const result = dekDecrypt(tampered);
     const returnedOriginal = result === testData;
     results.push({
       name: '篡改密文解密(B3)',
@@ -1042,9 +1050,9 @@ async function module7Sm4SilentFailureTests() {
   // 7.2 截断密文（Bug B3 验证）
   console.log('\n7.2 截断密文（Bug B3 验证）');
   try {
-    const encrypted = encrypt(testData);
+    const encrypted = dekEncrypt(testData);
     const truncated = encrypted.substring(0, Math.floor(encrypted.length / 2));
-    const result = decrypt(truncated);
+    const result = dekDecrypt(truncated);
     const returnedOriginal = result === testData;
     results.push({
       name: '截断密文(B3)',
@@ -1074,7 +1082,7 @@ async function module7Sm4SilentFailureTests() {
   const nonStringInputs = [12345, null, undefined];
   for (const input of nonStringInputs) {
     try {
-      const result = decrypt(input);
+      const result = dekDecrypt(input);
       results.push({
         name: `非字符串输入 ${typeof input}`,
         status: 'failed',

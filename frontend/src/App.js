@@ -18,6 +18,7 @@ import MyInvestPage from './pages/MyInvestPage';
 import MfaSetup from './pages/MfaSetup';
 import MfaVerify from './pages/MfaVerify';
 import { UserDataCache } from './utils/cacheUtils';
+import { syncLogToBackend } from './utils/logUtils';
 import { getDeviceKey } from './utils/deviceKeyManager';
 import { encryptPrivateKey, decryptPrivateKey, deriveKey } from './utils/secureKeyStore';
 import { getSM2KeyPair, saveSM2KeyPair, getSM2KeyPairWithAesKey, signWithSM2 } from './utils/sm2Utils';
@@ -481,25 +482,6 @@ function App() {
     }
   };
 
-  // 同步日志到后端
-  const syncLogToBackend = async (logData) => {
-    try {
-      await fetch('/api/v1/crypto-log', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user?.id || 'unknown',
-          operationType: logData.operationType,
-          description: logData.description,
-          data: { correlationInfo: logData.correlationInfo || {} }
-        })
-      });
-    } catch (err) {
-      // 不阻塞前端 UI，静默失败
-      console.warn('Failed to sync crypto log to backend:', err.message);
-    }
-  };
-
   // 添加密码操作日志
   const addCryptoLog = (logData) => {
     const newLog = {
@@ -509,15 +491,14 @@ function App() {
       fullTimestamp: new Date().toISOString(),
       ...logData
     };
-    
+
     setCryptoLogs(prevLogs => {
       const updatedLogs = [newLog, ...prevLogs];
       // 最多保留50条日志
       return updatedLogs.slice(0, 50);
     });
-    
-    // 同步到后端
-    syncLogToBackend(logData);
+
+    syncLogToBackend(newLog);
   };
 
   const logout = async () => {

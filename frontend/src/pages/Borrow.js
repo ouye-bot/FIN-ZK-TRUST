@@ -26,6 +26,7 @@ import {
 import { generateProof } from '../utils/zkUtils';
 import { signWithSM2, getSM2KeyPair, saveSM2KeyPair, generateSM2KeyPair, generateSignatureData, generateSignatureDataStrict, getSM2KeyPairWithAesKey } from '../utils/sm2Utils';
 import { post, get } from '../utils/apiUtils';
+import { syncLogToBackend } from '../utils/logUtils';
 
 // 信用评分规则
 const CREDIT_RULES = {
@@ -100,6 +101,9 @@ const Borrow = ({ user, cryptoLogs, setCryptoLogs }) => {
       // 最多保留50条日志
       return updatedLogs.slice(0, 50);
     });
+
+    // 同步到后端持久化
+    syncLogToBackend(newLog);
   };
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
@@ -268,7 +272,7 @@ const Borrow = ({ user, cryptoLogs, setCryptoLogs }) => {
         setLoading(false);
         return;
       }
-      const { proof, publicSignals } = await generateProof(creditScore, 600);
+      const { proof, publicSignals } = await generateProof(creditScore, 600, user.id);
       
       // 准备信用证明数据，包含零知识证明
       const creditProofWithZKP = {

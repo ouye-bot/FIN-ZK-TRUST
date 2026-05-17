@@ -4,8 +4,16 @@ const { verifySM2Signature } = require('../utils/cryptoUtils');
 const challengeStore = new Map();
 
 const CHALLENGE_EXPIRY_MS = 5 * 60 * 1000;
+const MAX_CHALLENGES = 1000;
 
 const generateChallenge = (userId, operationType) => {
+  if (challengeStore.size >= MAX_CHALLENGES) {
+    const oldest = challengeStore.entries().next().value;
+    if (oldest) {
+      challengeStore.delete(oldest[0]);
+    }
+  }
+
   const challengeId = crypto.randomUUID();
   const challengeCode = crypto.randomBytes(32).toString('hex');
 
