@@ -27,6 +27,7 @@ const cryptoLogRoutes = require('./routes/cryptoLog');
 const auditRoutes = require('./routes/audit');
 const mfaRoutes = require('./routes/mfa');
 const healthRoutes = require('./routes/health');
+const blockchainRoutes = require('./routes/blockchain');
 
 // 中间件
 const sm2SignatureMiddleware = require('./middleware/sm2SignatureMiddleware');
@@ -185,6 +186,7 @@ app.use('/api/v1/crypto-log', cryptoLogRoutes);
 app.use('/api/v1/audit', auditRoutes);
 app.use('/api/v1/mfa', mfaRoutes);
 app.use('/api/v1/health', healthRoutes);
+app.use('/api/v1/blockchain', blockchainRoutes);
 
 // 登出接口
 app.post('/api/v1/auth/logout', async (req, res) => {
