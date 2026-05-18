@@ -109,6 +109,8 @@ const createTables = async () => {
         sm3_hash VARCHAR(255) NOT NULL,
         proof_data TEXT NOT NULL,
         expires_at TIMESTAMP NOT NULL,
+        zk_proof TEXT DEFAULT NULL COMMENT 'snarkjs proof JSON (pi_a, pi_b, pi_c)',
+        public_signals TEXT DEFAULT NULL COMMENT 'publicSignals array JSON',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         INDEX idx_user_id (user_id),
         INDEX idx_proof_id (proof_id),
@@ -117,6 +119,11 @@ const createTables = async () => {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
     console.log('credit_proofs表创建成功');
+
+    // 为credit_proofs表添加ZKP持久化字段（幂等操作）
+    await addColumnIfNotExists('credit_proofs', 'zk_proof', "TEXT DEFAULT NULL COMMENT 'snarkjs proof JSON (pi_a, pi_b, pi_c)'");
+    await addColumnIfNotExists('credit_proofs', 'public_signals', "TEXT DEFAULT NULL COMMENT 'publicSignals array JSON'");
+    console.log('credit_proofs表ZKP持久化字段迁移完成');
     
     // 创建replay_nonces表
     await execute(`
