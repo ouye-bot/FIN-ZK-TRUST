@@ -154,7 +154,9 @@ router.post('/generate-proof', async (req, res) => {
       verification_code: verificationCode,
       sm3_hash: sm3Hash,
       proof_data: proofData,
-      expires_at: expiresAt
+      expires_at: expiresAt,
+      zk_proof: proof ? JSON.stringify(proof) : null,
+      public_signals: publicSignals ? JSON.stringify(publicSignals) : null
     });
     logger.info('信用证明生成成功', { userId, proofId, expiresAt: expiresAtDate.toISOString() });
 

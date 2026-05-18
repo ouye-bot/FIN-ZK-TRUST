@@ -18,8 +18,8 @@ exports.create = async (proofData) => {
     sm3_hash,
     proof_data,
     expires_at,
-    zk_proof || null,
-    public_signals || null
+    zk_proof ?? null,
+    public_signals ?? null
   ]);
   return await exports.findById(result.insertId);
 };
