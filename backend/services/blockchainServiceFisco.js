@@ -531,6 +531,74 @@ class BlockchainServiceFisco {
   }
 
   /**
+   * 按哈希查询链上记录
+   */
+  async getRecordByHash(sm3Hash) {
+    if (!this.isInitialized || !this.auditContractAddress) return null;
+    try {
+      const result = await this.contractCall('AuditStorage', 'getRecordByHash', [sm3Hash]);
+      if (!result || result === '') return null;
+      const parts = result.split(',');
+      return {
+        timestamp: parseInt(parts[0]) || 0,
+        submitter: parts[1] || '',
+        operationType: parts[2] || '',
+        userId: parts[3] || ''
+      };
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * 按索引查询链上记录
+   */
+  async getRecordByIndex(index) {
+    if (!this.isInitialized || !this.auditContractAddress) return null;
+    try {
+      const result = await this.contractCall('AuditStorage', 'getRecordByIndex', [String(index)]);
+      if (!result || result === '') return null;
+      const parts = result.split(',');
+      return {
+        hashValue: parts[0] || '',
+        timestamp: parseInt(parts[1]) || 0,
+        submitter: parts[2] || '',
+        operationType: parts[3] || '',
+        userId: parts[4] || ''
+      };
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * 获取区块链浏览器概览数据
+   */
+  async getExplorerData(limit = 20) {
+    if (!this.isInitialized || !this.auditContractAddress) {
+      return { totalRecords: 0, recentRecords: [], typeStats: {} };
+    }
+    try {
+      const totalRecords = await this.getTransactionCount();
+      const recentRecords = [];
+      const typeStats = {};
+      const start = Math.max(0, totalRecords - limit);
+      for (let i = start; i < totalRecords; i++) {
+        const record = await this.getRecordByIndex(i);
+        if (record) {
+          recentRecords.push({ index: i, ...record });
+          const type = record.operationType || 'unknown';
+          typeStats[type] = (typeStats[type] || 0) + 1;
+        }
+      }
+      return { totalRecords, recentRecords, typeStats };
+    } catch (error) {
+      logger.error('获取浏览器数据失败', { error: error.message });
+      return { totalRecords: 0, recentRecords: [], typeStats: {} };
+    }
+  }
+
+  /**
    * 获取服务状态
    */
   getStatus() {
