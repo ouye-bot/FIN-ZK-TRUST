@@ -8,6 +8,7 @@ import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import PoolIcon from '@mui/icons-material/Pool';
+import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import SecurityIcon from '@mui/icons-material/Security';
 import LogoutIcon from '@mui/icons-material/Logout';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
@@ -36,6 +37,7 @@ const Navbar = ({ user, onLogout, onToggleLogPanel }) => {
     { text: '赎回', icon: <SwapHorizIcon />, path: '/redeem' },
     { text: '我的投资', icon: <PoolIcon />, path: '/my-invest' },
     { text: '资金池', icon: <PoolIcon />, path: '/fund-pool' },
+    { text: '区块链', icon: <AccountBalanceIcon />, path: '/blockchain' },
   ];
 
   const handleNav = (path) => {

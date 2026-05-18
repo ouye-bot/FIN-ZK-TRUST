@@ -17,6 +17,7 @@ import RedeemPage from './pages/RedeemPage';
 import MyInvestPage from './pages/MyInvestPage';
 import MfaSetup from './pages/MfaSetup';
 import MfaVerify from './pages/MfaVerify';
+import BlockchainExplorer from './pages/BlockchainExplorer';
 import { UserDataCache } from './utils/cacheUtils';
 import { syncLogToBackend } from './utils/logUtils';
 import { getDeviceKey } from './utils/deviceKeyManager';
@@ -578,6 +579,9 @@ function App() {
             } />
             <Route path="/mfa/verify" element={
               user ? <Navigate to="/profile" replace /> : <MfaVerify />
+            } />
+            <Route path="/blockchain" element={
+              user ? <ErrorBoundary><BlockchainExplorer /></ErrorBoundary> : <Navigate to="/" />
             } />
             {/* 未匹配的路由重定向到登录页 */}
             <Route path="*" element={<Navigate to="/" replace />} />
