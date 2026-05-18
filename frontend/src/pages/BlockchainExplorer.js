@@ -15,6 +15,14 @@ import {
 
 const API_BASE = process.env.REACT_APP_API_URL || '';
 
+// 带认证的 fetch 封装
+async function authFetch(url, options = {}) {
+  const token = localStorage.getItem('token');
+  const headers = { ...options.headers };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return fetch(url, { ...options, headers });
+}
+
 function BlockchainExplorer() {
   const [explorerData, setExplorerData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -28,7 +36,7 @@ function BlockchainExplorer() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/v1/blockchain/explorer?limit=50`);
+      const res = await authFetch(`${API_BASE}/api/v1/blockchain/explorer?limit=50`);
       const data = await res.json();
       if (data.success) {
         setExplorerData(data.data);
@@ -49,7 +57,7 @@ function BlockchainExplorer() {
     setVerifyLoading(true);
     setVerifyResult(null);
     try {
-      const res = await fetch(`${API_BASE}/api/v1/blockchain/verify/${encodeURIComponent(verifyId)}`);
+      const res = await authFetch(`${API_BASE}/api/v1/blockchain/verify/${encodeURIComponent(verifyId)}`);
       const data = await res.json();
       setVerifyResult(data);
     } catch (e) {
