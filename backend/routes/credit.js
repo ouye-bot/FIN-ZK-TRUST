@@ -7,6 +7,8 @@ const { execute } = require('../config/database');
 const logger = require('../utils/logger');
 const { generateSM3Hash } = require('../utils/cryptoUtils');
 const { verifyProof } = require('../services/zkService');
+const path = require('path');
+const fs = require('fs');
 
 // 查询用户是否有逾期借款（系统自动判断，非用户自述）
 async function checkUserHasOverdue(userId) {
@@ -270,6 +272,21 @@ router.post('/verify-proof', async (req, res) => {
       message: '验证信用证明失败',
       error: error.message
     });
+  }
+});
+
+// 获取验证密钥（公开接口，供第三方独立验证 ZKP）
+router.get('/verification-key', async (req, res) => {
+  try {
+    const vkeyPath = path.join(__dirname, '../../circuits/build/verification_key.json');
+    if (!fs.existsSync(vkeyPath)) {
+      return res.status(404).json({ success: false, message: '验证密钥未找到' });
+    }
+    const vkey = JSON.parse(fs.readFileSync(vkeyPath, 'utf8'));
+    res.json({ success: true, data: vkey });
+  } catch (error) {
+    logger.error('获取验证密钥失败', { error: error.message });
+    res.status(500).json({ success: false, message: '获取验证密钥失败' });
   }
 });
 
