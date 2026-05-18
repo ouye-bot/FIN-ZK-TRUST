@@ -240,9 +240,15 @@ router.post('/verify-proof', async (req, res) => {
       };
 
       // 如果有存储的 ZKP proof，返回给第三方独立验证
-      if (proof.zk_proof && proof.public_signals) {
-        responseData.zkProof = JSON.parse(proof.zk_proof);
-        responseData.publicSignals = JSON.parse(proof.public_signals);
+      try {
+        if (proof.zk_proof && proof.public_signals) {
+          responseData.zkProof = JSON.parse(proof.zk_proof);
+          responseData.publicSignals = JSON.parse(proof.public_signals);
+        }
+      } catch (parseErr) {
+        logger.warn('ZKP data parse failed, returning proof without ZKP fields', {
+          proofId, error: parseErr.message
+        });
       }
 
       res.json({
