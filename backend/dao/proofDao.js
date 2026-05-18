@@ -6,10 +6,10 @@ const { execute } = require('../config/database');
  * @returns {Promise<Object>} - 创建的证明
  */
 exports.create = async (proofData) => {
-  const { user_id, proof_id, verification_code, sm3_hash, proof_data, expires_at } = proofData;
+  const { user_id, proof_id, verification_code, sm3_hash, proof_data, expires_at, zk_proof, public_signals } = proofData;
   const sql = `
-    INSERT INTO credit_proofs (user_id, proof_id, verification_code, sm3_hash, proof_data, expires_at)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO credit_proofs (user_id, proof_id, verification_code, sm3_hash, proof_data, expires_at, zk_proof, public_signals)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `;
   const result = await execute(sql, [
     user_id,
@@ -17,7 +17,9 @@ exports.create = async (proofData) => {
     verification_code,
     sm3_hash,
     proof_data,
-    expires_at
+    expires_at,
+    zk_proof || null,
+    public_signals || null
   ]);
   return await exports.findById(result.insertId);
 };
