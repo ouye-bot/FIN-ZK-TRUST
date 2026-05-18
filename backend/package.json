@@ -7,6 +7,7 @@
     "start": "node app.js",
     "dev": "nodemon app.js",
     "proxy-ssl": "local-ssl-proxy --source 8443 --target 3003",
+    "proxy-ssl:guomi": "echo '使用 WSL2 Tengine: wsl -- sudo /usr/local/tengine/sbin/nginx'",
     "test:performance": "node test/performance-test.js",
     "test:crypto": "node test/crypto.test.js"
   },
