@@ -1133,13 +1133,23 @@ class CryptoTest {
     // 5.13 证明持久化 - zk_proof 和 public_signals 存储验证
     console.log('\n  5.13 证明持久化 - zk_proof 和 public_signals 存储验证');
     try {
+      const { execute } = require('../config/database');
       const proofDao = require('../dao/proofDao');
       const testProofId = `test_persist_${Date.now()}`;
       const testProof = proofResult.proof;
       const testSignals = proofResult.publicSignals;
 
+      // 创建临时测试用户
+      const testUsername = `test_zkp_${Date.now()}`;
+      await execute(
+        "INSERT INTO users (username, password_hash, salt, sm2_public_key, credit_score) VALUES (?, 'test', 'test', 'test', 700)",
+        [testUsername]
+      );
+      const userRows = await execute("SELECT id FROM users WHERE username = ?", [testUsername]);
+      const testUserId = userRows[0].id;
+
       const saved = await proofDao.create({
-        user_id: 1,
+        user_id: testUserId,
         proof_id: testProofId,
         verification_code: `test_code_${Date.now()}`,
         sm3_hash: 'test_hash',
@@ -1179,6 +1189,7 @@ class CryptoTest {
       try {
         const { execute } = require('../config/database');
         await execute('DELETE FROM credit_proofs WHERE proof_id LIKE ?', ['test_persist_%']);
+        await execute("DELETE FROM users WHERE username LIKE ?", ['test_zkp_%']);
       } catch (_) {}
     }
 
