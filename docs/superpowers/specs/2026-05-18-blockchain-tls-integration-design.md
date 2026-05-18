@@ -192,17 +192,27 @@ server {
 
 ```bash
 # NTLS 连接测试（Tongsuo 客户端）
+# 重要：必须同时使用 -enable_ntls -ntls 两个标志，并指定 -cipher
 echo -e "GET /api/v1/pool HTTP/1.1\r\nHost: localhost\r\n\r\n" | \
-  /usr/local/tongsuo-static/bin/openssl s_client -connect localhost:443 \
-  -ntls -sign_cert sm2-sign.crt -sign_key sm2-sign.key \
+  /usr/local/tongsuo-static/bin/openssl s_client -connect localhost:8443 \
+  -enable_ntls -ntls -cipher ECC-SM2-SM4-CBC-SM3 \
+  -sign_cert sm2-sign.crt -sign_key sm2-sign.key \
   -enc_cert sm2-enc.crt -enc_key sm2-enc.key
 
 # 预期输出：
+# Protocol: NTLSv1.1
+# Cipher: ECC-SM2-SM4-CBC-SM3
 # Peer signing digest: SM3
 # Peer signature type: sm2sig_sm3
-# Protocol: NTLSv1.1
+# Verify return code: 0 (ok)
 # + 后端 JSON 响应
 ```
+
+**支持的 NTLS 密码套件：**
+- `ECC-SM2-SM4-CBC-SM3`
+- `ECC-SM2-SM4-GCM-SM3`
+- `ECDHE-SM2-SM4-CBC-SM3`
+- `ECDHE-SM2-SM4-GCM-SM3`
 
 ---
 
