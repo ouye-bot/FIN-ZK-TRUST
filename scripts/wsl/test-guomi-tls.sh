@@ -18,7 +18,7 @@ echo "[1/5] 检查 Tengine 状态..."
 if pgrep -x nginx > /dev/null; then
     echo "  ✓ Tengine 正在运行"
 else
-    echo "  ✗ Tengine 未运行，请先启动: sudo /usr/local/tengine/sbin/nginx"
+    echo "  ✗ Tengine 未运行，请先启动: sudo /usr/local/tengine-ntls/sbin/nginx"
     exit 1
 fi
 

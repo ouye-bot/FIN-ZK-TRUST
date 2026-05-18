@@ -9,7 +9,7 @@ TONGSUO_DIR="$HOME/tongsuo"
 TENGINE_DIR="$HOME/tengine"
 CERT_DIR="$HOME/sm2-certs"
 TONGSUO_PREFIX="/usr/local/tongsuo"
-TENGINE_PREFIX="/usr/local/tengine"
+TENGINE_PREFIX="/usr/local/tengine-ntls"
 
 echo "=========================================="
 echo "  国密 HTTPS 环境安装脚本"
@@ -41,6 +41,7 @@ fi
 cd "$TENGINE_DIR"
 ./configure \
     --prefix="$TENGINE_PREFIX" \
+    --add-module=modules/ngx_tongsuo_ntls \
     --with-http_ssl_module \
     --with-openssl="$TONGSUO_DIR" \
     --with-openssl-opt='enable-sm2 enable-sm3 enable-sm4 enable-ntls' \
