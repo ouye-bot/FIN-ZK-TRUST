@@ -1174,6 +1174,12 @@ class CryptoTest {
     } catch (e) {
       this.addResult('zkp', '证明持久化 zk_proof/public_signals', false, { error: e.message });
       console.log(`     ✗ 证明持久化: 失败 - ${e.message}`);
+    } finally {
+      // 清理测试数据
+      try {
+        const { execute } = require('../config/database');
+        await execute('DELETE FROM credit_proofs WHERE proof_id LIKE ?', ['test_persist_%']);
+      } catch (_) {}
     }
 
     // 5.14 存储后独立验证 - 用存储的 proof 数据独立验证
