@@ -492,8 +492,8 @@ class BlockchainServiceFisco {
       return { success: false, error: 'Service not initialized' };
     }
 
+    const sm3Hash = this.generateSM3Hash(transactionData);
     try {
-      const sm3Hash = this.generateSM3Hash(transactionData);
       const result = await this.contractCall('AuditStorage', 'getRecordByHash', [sm3Hash]);
 
       if (!result || result === '0' || result === '') {
