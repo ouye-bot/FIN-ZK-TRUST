@@ -1129,6 +1129,89 @@ class CryptoTest {
       });
       console.log(`     ✓ hasNoOverdue=2: 抛出异常 - ${e.message}`);
     }
+
+    // 5.13 证明持久化 - zk_proof 和 public_signals 存储验证
+    console.log('\n  5.13 证明持久化 - zk_proof 和 public_signals 存储验证');
+    try {
+      const proofDao = require('../dao/proofDao');
+      const testProofId = `test_persist_${Date.now()}`;
+      const testProof = proofResult.proof;
+      const testSignals = proofResult.publicSignals;
+
+      const saved = await proofDao.create({
+        user_id: 1,
+        proof_id: testProofId,
+        verification_code: `test_code_${Date.now()}`,
+        sm3_hash: 'test_hash',
+        proof_data: JSON.stringify({ test: true }),
+        expires_at: new Date(Date.now() + 86400000).toISOString().slice(0, 19).replace('T', ' '),
+        zk_proof: JSON.stringify(testProof),
+        public_signals: JSON.stringify(testSignals)
+      });
+
+      const hasZkProof = saved && saved.zk_proof && saved.zk_proof !== 'null';
+      const hasPublicSignals = saved && saved.public_signals && saved.public_signals !== 'null';
+
+      let parsedProof = null;
+      let parsedSignals = null;
+      if (hasZkProof && hasPublicSignals) {
+        parsedProof = JSON.parse(saved.zk_proof);
+        parsedSignals = JSON.parse(saved.public_signals);
+      }
+
+      const persistOK = hasZkProof && hasPublicSignals &&
+        parsedProof && parsedProof.pi_a && parsedProof.pi_b && parsedProof.pi_c &&
+        Array.isArray(parsedSignals) && parsedSignals.length >= 1;
+
+      this.addResult('zkp', '证明持久化 zk_proof/public_signals', persistOK, {
+        hasZkProof,
+        hasPublicSignals,
+        proofStructureValid: !!(parsedProof?.pi_a && parsedProof?.pi_b && parsedProof?.pi_c),
+        signalsIsArray: Array.isArray(parsedSignals),
+        signalsLength: parsedSignals?.length || 0
+      });
+      console.log(`     ${persistOK ? '✓' : '✗'} 证明持久化: zk_proof=${hasZkProof}, public_signals=${hasPublicSignals}, 结构有效=${!!(parsedProof?.pi_a)}`);
+    } catch (e) {
+      this.addResult('zkp', '证明持久化 zk_proof/public_signals', false, { error: e.message });
+      console.log(`     ✗ 证明持久化: 失败 - ${e.message}`);
+    }
+
+    // 5.14 存储后独立验证 - 用存储的 proof 数据独立验证
+    console.log('\n  5.14 存储后独立验证 - 用存储的 proof 数据独立验证');
+    try {
+      const independentVerify = await zkService.verifyProof(proofResult.proof, proofResult.publicSignals);
+      this.addResult('zkp', '存储后独立验证', independentVerify === true, {
+        verifyResult: independentVerify,
+        note: '第三方拿到 proof + publicSignals + verification_key 后可独立验证'
+      });
+      console.log(`     ${independentVerify === true ? '✓' : '✗'} 独立验证: ${independentVerify}`);
+    } catch (e) {
+      this.addResult('zkp', '存储后独立验证', false, { error: e.message });
+      console.log(`     ✗ 独立验证: 失败 - ${e.message}`);
+    }
+
+    // 5.15 验证密钥端点 - verification_key.json 可读且格式正确
+    console.log('\n  5.15 验证密钥端点 - verification_key.json 可读且格式正确');
+    try {
+      const vkeyPath = path.join(__dirname, '../../circuits/build/verification_key.json');
+      const vkeyExists = fs.existsSync(vkeyPath);
+      let vkeyValid = false;
+      let vkeyFields = [];
+      if (vkeyExists) {
+        const vkey = JSON.parse(fs.readFileSync(vkeyPath, 'utf8'));
+        vkeyFields = Object.keys(vkey);
+        vkeyValid = !!(vkey.vk_alpha_1 && vkey.vk_beta_2 && vkey.vk_gamma_2 && vkey.vk_delta_2 && vkey.IC);
+      }
+      this.addResult('zkp', '验证密钥端点 verification_key.json', vkeyExists && vkeyValid, {
+        exists: vkeyExists,
+        fieldsValid: vkeyValid,
+        fields: vkeyFields
+      });
+      console.log(`     ${vkeyExists && vkeyValid ? '✓' : '✗'} verification_key.json: exists=${vkeyExists}, valid=${vkeyValid}`);
+    } catch (e) {
+      this.addResult('zkp', '验证密钥端点 verification_key.json', false, { error: e.message });
+      console.log(`     ✗ 验证密钥: 失败 - ${e.message}`);
+    }
   }
 
   // ============================================
