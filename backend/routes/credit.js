@@ -233,13 +233,22 @@ router.post('/verify-proof', async (req, res) => {
 
     if (isValid) {
       logger.info('信用证明验证成功', { proofId });
+
+      const responseData = {
+        proofId,
+        expiresAt: proof.expires_at
+      };
+
+      // 如果有存储的 ZKP proof，返回给第三方独立验证
+      if (proof.zk_proof && proof.public_signals) {
+        responseData.zkProof = JSON.parse(proof.zk_proof);
+        responseData.publicSignals = JSON.parse(proof.public_signals);
+      }
+
       res.json({
         success: true,
         message: '信用证明验证成功',
-        data: {
-          proofId,
-          expiresAt: proof.expires_at
-        }
+        data: responseData
       });
     } else {
       logger.warn('信用证明验证失败', { proofId });
