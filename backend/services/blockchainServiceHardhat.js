@@ -33,6 +33,7 @@ class BlockchainService {
     this.contract = null; // TransactionHashStorage（兼容旧代码）
     this.auditContract = null; // AuditStorage 新合约
     this.zkpVerifierContract = null; // ZKPVerifier 新合约
+    this.verifierContract = null; // Verifier 合约（Groth16 验证器）
     this.contractAddress = null;
     this.auditContractAddress = null; // AuditStorage 合约地址
     this.isInitialized = false;
@@ -143,6 +144,7 @@ class BlockchainService {
       this.contract = await this.loadContract('TransactionHashStorage');
       this.auditContract = await this.loadContract('AuditStorage');
       this.zkpVerifierContract = await this.loadContract('ZKPVerifier');
+      this.verifierContract = await this.loadContract('Verifier');
 
       // 存储 AuditStorage 合约地址（供查询方法使用）
       if (this.auditContract) {
@@ -152,7 +154,8 @@ class BlockchainService {
       logger.info('所有合约加载完成', {
         TransactionHashStorage: !!this.contract,
         AuditStorage: !!this.auditContract,
-        ZKPVerifier: !!this.zkpVerifierContract
+        ZKPVerifier: !!this.zkpVerifierContract,
+        Verifier: !!this.verifierContract
       });
 
       return true;
@@ -233,8 +236,11 @@ class BlockchainService {
       userId
     });
 
+    // 转为 bytes32 格式（0x 前缀 + 64 位 hex）
+    const hashBytes32 = sm3Hash.startsWith('0x') ? sm3Hash : '0x' + sm3Hash;
+
     return this.auditContract.storeAuditHash(
-      sm3Hash,
+      hashBytes32,
       timestamp,
       transactionType,
       userId.toString()
@@ -475,12 +481,13 @@ class BlockchainService {
   async getRecordByHash(sm3Hash) {
     if (!this.isInitialized || !this.auditContractAddress) return null;
     try {
+      const hashBytes32 = sm3Hash.startsWith('0x') ? sm3Hash : '0x' + sm3Hash;
       const auditContract = new ethers.Contract(
         this.auditContractAddress,
-        ['function getRecordByHash(string) view returns (uint256, address, string, string)'],
+        ['function getRecordByHash(bytes32) view returns (uint256, address, string, string)'],
         this.wallet
       );
-      const result = await auditContract.getRecordByHash(sm3Hash);
+      const result = await auditContract.getRecordByHash(hashBytes32);
       return {
         timestamp: result[0].toNumber(),
         submitter: result[1],
@@ -500,12 +507,12 @@ class BlockchainService {
     try {
       const auditContract = new ethers.Contract(
         this.auditContractAddress,
-        ['function getRecordByIndex(uint256) view returns (string, uint256, address, string, string)'],
+        ['function getRecordByIndex(uint256) view returns (bytes32, uint256, address, string, string)'],
         this.wallet
       );
       const result = await auditContract.getRecordByIndex(index);
       return {
-        hashValue: result[0],
+        hashValue: result[0],  // bytes32 hex string
         timestamp: result[1].toNumber(),
         submitter: result[2],
         operationType: result[3],
@@ -549,6 +556,86 @@ class BlockchainService {
   }
 
   /**
+   * 链上验证 Groth16 ZKP 证明（通过 Verifier 合约）
+   * @param {Object} proof - Groth16 证明对象 { pi_a, pi_b, pi_c }
+   * @param {Array} publicSignals - 公共信号
+   * @param {string} userAddress - 用户地址
+   * @param {string} sm3Hash - SM3 哈希（bytes32）
+   * @returns {Promise<Object>} 验证结果
+   */
+  async verifyZKPOnChain(proof, publicSignals, userAddress, sm3Hash) {
+    try {
+      if (!this.isInitialized || !this.verifierContract) {
+        return { success: false, error: 'Verifier contract not available' };
+      }
+      if (!userAddress || !sm3Hash) {
+        return { success: false, error: '缺少必要参数 userAddress 或 sm3Hash' };
+      }
+
+      const pA = [proof.pi_a[0], proof.pi_a[1]];
+      const pB = [[proof.pi_b[0][1], proof.pi_b[0][0]], [proof.pi_b[1][1], proof.pi_b[1][0]]];
+      const pC = [proof.pi_c[0], proof.pi_c[1]];
+      const pubSignals = publicSignals.map(s => s.toString());
+      const sm3Bytes32 = sm3Hash.startsWith('0x') ? sm3Hash : '0x' + sm3Hash;
+
+      const tx = await this.verifierContract.verifyProof(userAddress, pA, pB, pC, pubSignals, sm3Bytes32);
+      const receipt = await tx.wait();
+      return { success: true, blockchainTxHash: receipt.transactionHash };
+    } catch (error) {
+      logger.error('Hardhat 链上 ZKP 验证失败', { error: error.message });
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * 更新 ZKP 链上验证状态
+   * @param {string} proofId - 证明ID
+   * @param {boolean} chainValid - 链上验证是否通过
+   * @returns {Promise<Object>} 上链结果
+   */
+  async updateZKPChainStatus(proofId, chainValid) {
+    try {
+      if (!this.isInitialized || !this.zkpVerifierContract) {
+        return { success: false, error: 'ZKPVerifier contract not available' };
+      }
+      const proofIdBytes32 = ethers.utils.formatBytes32String(proofId.toString().slice(0, 31));
+      const tx = await this.zkpVerifierContract.updateChainStatus(proofIdBytes32, chainValid);
+      const receipt = await tx.wait();
+      return { success: true, blockchainTxHash: receipt.transactionHash };
+    } catch (error) {
+      logger.error('Hardhat ZKP 链上状态更新失败', { error: error.message });
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * 查询 ZKP 验证结果
+   * @param {string} proofId - 证明ID
+   * @returns {Promise<Object|null>} 验证结果或 null
+   */
+  async getZKPResult(proofId) {
+    try {
+      if (!this.isInitialized || !this.zkpVerifierContract) {
+        return null;
+      }
+      const proofIdBytes32 = proofId.startsWith('0x') && proofId.length === 66
+        ? proofId
+        : '0x' + Buffer.from(proofId.toString().slice(0, 31)).toString('hex').padEnd(64, '0');
+      const result = await this.zkpVerifierContract.getProofResult(proofIdBytes32);
+      return {
+        isValid: result[0],
+        timestamp: result[1].toNumber(),
+        submitter: result[2],
+        proofHash: result[3],
+        chainVerified: result[4],
+        chainValid: result[5]
+      };
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
    * 获取服务状态
    * @returns {Object} 服务状态信息
    */
@@ -560,7 +647,8 @@ class BlockchainService {
       contracts: {
         TransactionHashStorage: !!this.contract,
         AuditStorage: !!this.auditContract,
-        ZKPVerifier: !!this.zkpVerifierContract
+        ZKPVerifier: !!this.zkpVerifierContract,
+        Verifier: !!this.verifierContract
       }
     };
   }
