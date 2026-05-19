@@ -376,7 +376,7 @@ class BlockchainServiceFisco {
    * 链上验证 Groth16 ZKP 证明
    * 将 proof 转换为 Verifier 合约所需的格式后调用 verifyProof
    */
-  async verifyZKPOnChain(proof, publicSignals) {
+  async verifyZKPOnChain(proof, publicSignals, userAddress, sm3Hash) {
     try {
       if (!this.isInitialized) {
         return { success: false, error: 'Service not initialized' };
@@ -386,9 +386,11 @@ class BlockchainServiceFisco {
       const pB = [[proof.pi_b[0][1], proof.pi_b[0][0]], [proof.pi_b[1][1], proof.pi_b[1][0]]];
       const pC = [proof.pi_c[0], proof.pi_c[1]];
       const pubSignals = publicSignals.map(s => s.toString());
+      const sm3Bytes32 = sm3Hash.startsWith('0x') ? sm3Hash : '0x' + sm3Hash;
 
-      const result = await this.contractCall('Verifier', 'verifyProof', [pA, pB, pC, pubSignals]);
-      return { success: true, isValid: result === 'true' || result === true };
+      const result = await this._sendRawTransaction('Verifier', 'verifyProof',
+        [userAddress, pA, pB, pC, pubSignals, sm3Bytes32]);
+      return { success: true, txHash: result.transactionHash };
     } catch (error) {
       logger.error('链上 ZKP 验证失败', { error: error.message });
       return { success: false, error: error.message };
@@ -604,6 +606,28 @@ class BlockchainServiceFisco {
   }
 
   /**
+   * 更新 ZKP 链上验证状态
+   */
+  async updateZKPChainStatus(proofId, chainValid) {
+    if (!this.isInitialized || !this.zkpVerifierContractAddress) {
+      logger.warning('FISCO BCOS 服务或 ZKPVerifier 未初始化，跳过链上状态更新', { proofId });
+      return { success: false, skipped: true };
+    }
+
+    const proofIdBytes32 = ethers.utils.formatBytes32String(proofId.toString().slice(0, 31));
+
+    return this.contractSend('ZKPVerifier', 'updateChainStatus', [proofIdBytes32, chainValid])
+      .then(result => {
+        logger.info('ZKP 链上验证状态更新成功', { proofId, chainValid, txHash: result.transactionHash });
+        return { success: true, txHash: result.transactionHash };
+      })
+      .catch(error => {
+        logger.error('ZKP 链上验证状态更新失败', { error: error.message, proofId });
+        return { success: false, error: error.message };
+      });
+  }
+
+  /**
    * 查询 ZKP 验证结果（从 ZKPVerifier 合约）
    */
   async getZKPResult(proofId) {
@@ -622,7 +646,9 @@ class BlockchainServiceFisco {
         isValid: parts[0] === 'true',
         timestamp: parseInt(parts[1]) || 0,
         submitter: parts[2] || '',
-        proofHash: parts.slice(3).join(',') || ''
+        proofHash: parts[3] || '',
+        chainVerified: parts[4] === 'true',
+        chainValid: parts[5] === 'true'
       };
     } catch (error) {
       logger.warn('查询 ZKP 验证结果失败', { error: error.message, proofId });
