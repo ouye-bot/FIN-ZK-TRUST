@@ -17,6 +17,9 @@ contract ZKPVerifier {
     mapping(bytes32 => ProofResult) public verifiedProofs;
 
     event ProofVerified(bytes32 indexed proofId, bool valid, uint256 timestamp);
+    event OperatorAuthorized(address indexed operator);
+    event OperatorRevoked(address indexed operator);
+    event ChainStatusUpdated(bytes32 indexed proofId, bool chainValid, uint256 timestamp);
 
     modifier onlyOwner() {
         require(msg.sender == owner, "Only owner");
@@ -33,11 +36,14 @@ contract ZKPVerifier {
     }
 
     function authorizeOperator(address op) external onlyOwner {
+        require(op != address(0), "Zero address");
         authorizedOperators[op] = true;
+        emit OperatorAuthorized(op);
     }
 
     function revokeOperator(address op) external onlyOwner {
         authorizedOperators[op] = false;
+        emit OperatorRevoked(op);
     }
 
     function recordProofResult(bytes32 proofId, bool valid, string memory proofHash) public onlyAuthorized returns (bool) {
@@ -47,10 +53,12 @@ contract ZKPVerifier {
         return true;
     }
 
+    // 允许重复写入：异步验证可能因网络问题需要重试
     function updateChainStatus(bytes32 proofId, bool chainValid) public onlyAuthorized returns (bool) {
         require(verifiedProofs[proofId].timestamp != 0, "Proof not found");
         verifiedProofs[proofId].chainVerified = true;
         verifiedProofs[proofId].chainValid = chainValid;
+        emit ChainStatusUpdated(proofId, chainValid, block.timestamp);
         return true;
     }
 
