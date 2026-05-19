@@ -382,6 +382,10 @@ class BlockchainServiceFisco {
         return { success: false, error: 'Service not initialized' };
       }
 
+      if (!userAddress || !sm3Hash) {
+        return { success: false, error: '缺少必要参数 userAddress 或 sm3Hash' };
+      }
+
       const pA = [proof.pi_a[0], proof.pi_a[1]];
       const pB = [[proof.pi_b[0][1], proof.pi_b[0][0]], [proof.pi_b[1][1], proof.pi_b[1][0]]];
       const pC = [proof.pi_c[0], proof.pi_c[1]];
@@ -390,7 +394,7 @@ class BlockchainServiceFisco {
 
       const result = await this._sendRawTransaction('Verifier', 'verifyProof',
         [userAddress, pA, pB, pC, pubSignals, sm3Bytes32]);
-      return { success: true, txHash: result.transactionHash };
+      return { success: true, blockchainTxHash: result.transactionHash };
     } catch (error) {
       logger.error('链上 ZKP 验证失败', { error: error.message });
       return { success: false, error: error.message };
@@ -618,8 +622,8 @@ class BlockchainServiceFisco {
 
     return this.contractSend('ZKPVerifier', 'updateChainStatus', [proofIdBytes32, chainValid])
       .then(result => {
-        logger.info('ZKP 链上验证状态更新成功', { proofId, chainValid, txHash: result.transactionHash });
-        return { success: true, txHash: result.transactionHash };
+        logger.info('ZKP 链上验证状态更新成功', { proofId, chainValid, blockchainTxHash: result.transactionHash });
+        return { success: true, blockchainTxHash: result.transactionHash };
       })
       .catch(error => {
         logger.error('ZKP 链上验证状态更新失败', { error: error.message, proofId });
@@ -646,9 +650,9 @@ class BlockchainServiceFisco {
         isValid: parts[0] === 'true',
         timestamp: parseInt(parts[1]) || 0,
         submitter: parts[2] || '',
-        proofHash: parts[3] || '',
-        chainVerified: parts[4] === 'true',
-        chainValid: parts[5] === 'true'
+        proofHash: parts.slice(3, parts.length - 2).join(',') || '',
+        chainVerified: parts[parts.length - 2] === 'true',
+        chainValid: parts[parts.length - 1] === 'true'
       };
     } catch (error) {
       logger.warn('查询 ZKP 验证结果失败', { error: error.message, proofId });
