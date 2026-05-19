@@ -203,6 +203,24 @@ exports.verifyProof = async (proof, publicSignals) => {
               error: err.message
             });
           });
+
+          const userAddress = '0x0000000000000000000000000000000000000000';
+          const sm3Hash = proofHash;
+
+          blockchainService.verifyZKPOnChain(proof, publicSignals, userAddress, sm3Hash)
+            .then(async (result) => {
+              if (result.success) {
+                logger.info('链上 ZKP 验证完成', { proofId, blockchainTxHash: result.blockchainTxHash });
+                await blockchainService.updateZKPChainStatus(proofId, true);
+              } else {
+                logger.warn('链上 ZKP 验证失败', { proofId, error: result.error });
+                await blockchainService.updateZKPChainStatus(proofId, false);
+              }
+            })
+            .catch(async (err) => {
+              logger.warn('链上 ZKP 验证调用异常（非阻塞）', { error: err.message });
+              await blockchainService.updateZKPChainStatus(proofId, false);
+            });
         } catch (zkError) {
           logger.error('处理ZKP上链存证失败', {
             error: zkError.message
