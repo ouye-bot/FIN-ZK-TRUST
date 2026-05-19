@@ -3,7 +3,7 @@ import {
   Box, Typography, Card, CardContent, Grid, Table, TableBody,
   TableCell, TableContainer, TableHead, TableRow, Paper, Chip,
   TextField, Button, Alert, CircularProgress, IconButton, Collapse,
-  Tooltip
+  Tooltip, Dialog, DialogTitle, DialogContent, DialogActions
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -31,6 +31,23 @@ function BlockchainExplorer() {
   const [verifyId, setVerifyId] = useState('');
   const [verifyResult, setVerifyResult] = useState(null);
   const [verifyLoading, setVerifyLoading] = useState(false);
+  const [zkpDetail, setZkpDetail] = useState(null);
+  const [zkpDetailOpen, setZkpDetailOpen] = useState(false);
+  const [zkpDetailLoading, setZkpDetailLoading] = useState(false);
+
+  const handleZkpDetail = async (proofId) => {
+    setZkpDetailOpen(true);
+    setZkpDetailLoading(true);
+    try {
+      const res = await authFetch(`/api/v1/blockchain/zkp-verify/${proofId}`);
+      const data = await res.json();
+      setZkpDetail(data.success ? data : null);
+    } catch (e) {
+      setZkpDetail(null);
+    } finally {
+      setZkpDetailLoading(false);
+    }
+  };
 
   const fetchExplorer = async () => {
     setLoading(true);
@@ -57,7 +74,30 @@ function BlockchainExplorer() {
     setVerifyLoading(true);
     setVerifyResult(null);
     try {
-      const res = await authFetch(`${API_BASE}/api/v1/blockchain/verify/${encodeURIComponent(verifyId)}`);
+      const res = await authFetch(`${API_BASE}/api/v1/blockchain/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hash: verifyId.trim() })
+      });
+      const data = await res.json();
+      setVerifyResult(data);
+    } catch (e) {
+      setVerifyResult({ success: false, message: e.message });
+    } finally {
+      setVerifyLoading(false);
+    }
+  };
+
+  const handleVerifyRecord = async (hashValue) => {
+    setVerifyId(hashValue);
+    setVerifyLoading(true);
+    setVerifyResult(null);
+    try {
+      const res = await authFetch(`${API_BASE}/api/v1/blockchain/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hash: hashValue })
+      });
       const data = await res.json();
       setVerifyResult(data);
     } catch (e) {
@@ -137,12 +177,15 @@ function BlockchainExplorer() {
 
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Typography variant="h6" gutterBottom>验证交易</Typography>
+          <Typography variant="h6" gutterBottom>链上存证验证</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            输入 SM3 哈希值，验证该存证是否存在于区块链上
+          </Typography>
           <Box sx={{ display: 'flex', gap: 1 }}>
             <TextField
               size="small"
               fullWidth
-              placeholder="输入交易ID"
+              placeholder="输入 SM3 哈希值（如 0xabc...）"
               value={verifyId}
               onChange={(e) => setVerifyId(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleVerify()}
@@ -152,9 +195,9 @@ function BlockchainExplorer() {
             </Button>
           </Box>
           {verifyResult && (
-            <Alert severity={verifyResult.data?.isValid ? 'success' : 'error'} sx={{ mt: 2 }}>
-              {verifyResult.data?.isValid
-                ? '✅ 交易验证通过 — 链上记录与本地数据一致'
+            <Alert severity={verifyResult.data?.verified ? 'success' : 'error'} sx={{ mt: 2 }}>
+              {verifyResult.data?.verified
+                ? `✅ 存证验证通过 — 链上记录存在，操作类型: ${verifyResult.data.operationType}，用户: ${verifyResult.data.userId}`
                 : '❌ 验证失败 — ' + (verifyResult.data?.reason || verifyResult.message || '未知原因')}
             </Alert>
           )}
@@ -213,6 +256,35 @@ function BlockchainExplorer() {
                         <Typography variant="body2">
                           <strong>上链时间:</strong> {formatTime(record.timestamp)}
                         </Typography>
+                        {record.operationType === 'zkp' && (
+                          <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                            {record.chainVerified ? (
+                              <Chip
+                                size="small"
+                                label={record.chainValid ? '链上验证通过' : '链上验证失败'}
+                                color={record.chainValid ? 'success' : 'error'}
+                                variant="outlined"
+                              />
+                            ) : (
+                              <Chip size="small" label="待验证" color="default" variant="outlined" />
+                            )}
+                            {record.proofId && (
+                              <Button size="small" onClick={() => handleZkpDetail(record.proofId)}>
+                                查看详情
+                              </Button>
+                            )}
+                          </Box>
+                        )}
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          startIcon={<VerifiedIcon />}
+                          sx={{ mt: 1 }}
+                          onClick={() => handleVerifyRecord(record.hashValue)}
+                          disabled={verifyLoading}
+                        >
+                          验证此存证
+                        </Button>
                       </Box>
                     </Collapse>
                   </TableCell>
@@ -229,6 +301,31 @@ function BlockchainExplorer() {
           </TableBody>
         </Table>
       </TableContainer>
+
+      <Dialog open={zkpDetailOpen} onClose={() => setZkpDetailOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>ZKP 链上验证详情</DialogTitle>
+        <DialogContent>
+          {zkpDetailLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : zkpDetail ? (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mt: 1 }}>
+              <Typography variant="body2"><strong>Proof ID:</strong> {zkpDetail.proofId || '-'}</Typography>
+              <Typography variant="body2"><strong>Proof Hash:</strong> {zkpDetail.proofHash || '-'}</Typography>
+              <Typography variant="body2"><strong>链下验证:</strong> {zkpDetail.isValid ? '有效' : '无效'}</Typography>
+              <Typography variant="body2"><strong>链上验证:</strong> {zkpDetail.chainVerified ? (zkpDetail.chainValid ? '通过' : '失败') : '待验证'}</Typography>
+              <Typography variant="body2"><strong>提交者:</strong> {zkpDetail.submitter || '-'}</Typography>
+              <Typography variant="body2"><strong>上链时间:</strong> {zkpDetail.timestamp ? new Date(zkpDetail.timestamp * 1000).toLocaleString() : '-'}</Typography>
+            </Box>
+          ) : (
+            <Typography color="text.secondary" sx={{ py: 2 }}>无验证数据</Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setZkpDetailOpen(false)}>关闭</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

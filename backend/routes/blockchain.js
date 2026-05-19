@@ -29,6 +29,24 @@ router.get('/explorer', requireBlockchain, async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit) || 20, 100);
     const data = await blockchainService.getExplorerData(limit);
+
+    // 对 ZKP 类型记录补充链上验证状态
+    if (data && data.recentRecords) {
+      for (const record of data.recentRecords) {
+        if (record.operationType === 'zkp' && record.proofId) {
+          try {
+            const zkpResult = await blockchainService.getZKPResult(record.proofId);
+            if (zkpResult) {
+              record.chainVerified = zkpResult.chainVerified || false;
+              record.chainValid = zkpResult.chainValid || false;
+            }
+          } catch (e) {
+            // 查询失败不影响主数据
+          }
+        }
+      }
+    }
+
     res.json({ success: true, data });
   } catch (error) {
     logger.error('区块链浏览器查询失败', { error: error.message });
@@ -99,7 +117,7 @@ router.get('/records/:hash', requireBlockchain, async (req, res) => {
 
 /**
  * GET /api/v1/blockchain/verify/:transactionId
- * 一键验证交易
+ * 一键验证交易（需要 transactionData）
  */
 router.get('/verify/:transactionId', requireBlockchain, async (req, res) => {
   try {
@@ -133,6 +151,40 @@ router.get('/verify/:transactionId', requireBlockchain, async (req, res) => {
 });
 
 /**
+ * POST /api/v1/blockchain/verify
+ * 按 SM3 哈希验证链上存证（无需重建原始数据）
+ * Body: { hash: "SM3哈希值" }
+ */
+router.post('/verify', requireBlockchain, async (req, res) => {
+  try {
+    const { hash } = req.body;
+    if (!hash || typeof hash !== 'string' || hash.length < 10) {
+      return res.status(400).json({ success: false, message: '请提供有效的 SM3 哈希值' });
+    }
+
+    const record = await blockchainService.getRecordByHash(hash);
+    if (!record) {
+      return res.json({ success: true, data: { verified: false, reason: '链上无此记录' } });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        verified: true,
+        hash,
+        timestamp: record.timestamp,
+        submitter: record.submitter,
+        operationType: record.operationType,
+        userId: record.userId
+      }
+    });
+  } catch (error) {
+    logger.error('哈希验证失败', { error: error.message });
+    res.status(500).json({ success: false, message: '验证失败' });
+  }
+});
+
+/**
  * GET /api/v1/blockchain/status
  * 区块链服务状态
  */
@@ -143,6 +195,24 @@ router.get('/status', requireBlockchain, async (req, res) => {
     res.json({ success: true, data: { ...status, totalRecords } });
   } catch (error) {
     res.status(500).json({ success: false, message: '获取状态失败' });
+  }
+});
+
+/**
+ * GET /api/v1/blockchain/zkp-verify/:proofId
+ * 查询 ZKP 验证结果
+ */
+router.get('/zkp-verify/:proofId', requireBlockchain, async (req, res) => {
+  try {
+    const { proofId } = req.params;
+    const result = await blockchainService.getZKPResult(proofId);
+    if (!result) {
+      return res.status(404).json({ success: false, message: 'ZKP 验证记录不存在' });
+    }
+    res.json({ success: true, ...result });
+  } catch (error) {
+    logger.error('ZKP 验证查询失败', { error: error.message });
+    res.status(500).json({ success: false, message: '查询失败' });
   }
 });
 
