@@ -14,6 +14,7 @@
  */
 
 const { ethers } = require('ethers');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
@@ -63,6 +64,47 @@ function rpcCall(method, params = []) {
     req.write(body);
     req.end();
   });
+}
+
+// FISCO BCOS 交易签名（从 deploy-fisco.js 移植）
+function toRlpHex(val) {
+  if (typeof val === 'number') {
+    if (val === 0) return '0x';
+    const h = val.toString(16);
+    return '0x' + (h.length % 2 ? '0' + h : h);
+  }
+  if (typeof val === 'string') {
+    if (val === '' || val === '0x') return '0x';
+    if (val.startsWith('0x')) {
+      const hex = val.slice(2);
+      if (hex === '' || hex === '0') return '0x';
+      return '0x' + (hex.length % 2 ? '0' + hex : hex);
+    }
+    return toRlpHex(parseInt(val, 10));
+  }
+  return val;
+}
+
+function signFiscoTx(privateKey, { randomid, blockLimit, to, data, value, gasPrice, gasLimit, chainId, groupId, extraData }) {
+  const fields = [
+    randomid,
+    toRlpHex(gasPrice),
+    toRlpHex(gasLimit),
+    blockLimit,
+    to || '0x',
+    toRlpHex(value),
+    data,
+    toRlpHex(chainId),
+    toRlpHex(groupId),
+    extraData || '0x'
+  ];
+  const signData = ethers.utils.RLP.encode(fields);
+  const hash = ethers.utils.keccak256(signData);
+  const signingKey = new ethers.utils.SigningKey(privateKey);
+  const sig = signingKey.signDigest(hash);
+  const v = sig.recoveryParam + 27;
+  const signedFields = [...fields, toRlpHex(v), sig.r, sig.s];
+  return ethers.utils.RLP.encode(signedFields);
 }
 
 // 通过 FISCO BCOS Console 执行写操作
@@ -125,11 +167,17 @@ class BlockchainServiceFisco {
     this.provider = null; // 仅用于 JSON-RPC 读操作
     this.auditContractAddress = null;
     this.zkpVerifierContractAddress = null;
+    this.verifierContractAddress = null;
     this.auditAbi = null;
     this.zkpVerifierAbi = null;
+    this.verifierAbi = null;
     this.isInitialized = false;
     this.auditHashSent = new Set();
     this.networkName = 'fisco-bcos';
+    this.privateKey = process.env.FISCO_BCOS_PRIVATE_KEY || '0x4c0883a69102937d6231471b5dbb6204fe512961708279f0ccfd5c3ef3e2e6c4';
+    if (!process.env.FISCO_BCOS_PRIVATE_KEY) {
+      logger.warning('FISCO_BCOS_PRIVATE_KEY 未设置，使用默认测试私钥（仅限开发环境）');
+    }
   }
 
   /**
@@ -177,11 +225,13 @@ class BlockchainServiceFisco {
       if (fiscoContracts) {
         this.auditContractAddress = fiscoContracts.AuditStorage;
         this.zkpVerifierContractAddress = fiscoContracts.ZKPVerifier;
+        this.verifierContractAddress = fiscoContracts.Verifier;
       }
 
       // 加载 ABI（用于编码 call 数据）
       const auditArtifactPath = path.join(__dirname, '../../contracts/artifacts/contracts/AuditStorage.sol/AuditStorage.json');
       const zkpArtifactPath = path.join(__dirname, '../../contracts/artifacts/contracts/ZKPVerifier.sol/ZKPVerifier.json');
+      const verifierArtifactPath = path.join(__dirname, '../../contracts/artifacts/contracts/Verifier.sol/Verifier.json');
 
       if (fs.existsSync(auditArtifactPath)) {
         const artifact = JSON.parse(fs.readFileSync(auditArtifactPath, 'utf8'));
@@ -193,9 +243,15 @@ class BlockchainServiceFisco {
         this.zkpVerifierAbi = artifact.abi;
       }
 
+      if (fs.existsSync(verifierArtifactPath)) {
+        const artifact = JSON.parse(fs.readFileSync(verifierArtifactPath, 'utf8'));
+        this.verifierAbi = artifact.abi;
+      }
+
       logger.info('FISCO BCOS 合约配置加载完成', {
         AuditStorage: this.auditContractAddress,
-        ZKPVerifier: this.zkpVerifierContractAddress
+        ZKPVerifier: this.zkpVerifierContractAddress,
+        Verifier: this.verifierContractAddress
       });
     } catch (error) {
       logger.error('加载 FISCO BCOS 合约配置失败', { error: error.message });
@@ -245,54 +301,154 @@ class BlockchainServiceFisco {
   getContractAddress(contractName) {
     const map = {
       'AuditStorage': this.auditContractAddress,
-      'ZKPVerifier': this.zkpVerifierContractAddress
+      'ZKPVerifier': this.zkpVerifierContractAddress,
+      'Verifier': this.verifierContractAddress
     };
     return map[contractName] || null;
   }
 
   /**
-   * 通过 Console 执行合约写操作
+   * 通过 sendRawTransaction 执行合约写操作（支持复杂 ABI 编码，如嵌套数组）
+   * 用于 Console 无法处理的参数类型（如 uint[2][2]）
    */
-  async contractSend(contractName, methodName, params = []) {
+  async _sendRawTransaction(contractName, methodName, params) {
+    const contractAddress = this.getContractAddress(contractName);
+    if (!contractAddress) throw new Error(`合约 ${contractName} 地址未配置`);
+
+    // 获取 ABI
+    const abiMap = {
+      'AuditStorage': this.auditAbi,
+      'ZKPVerifier': this.zkpVerifierAbi,
+      'Verifier': this.verifierAbi
+    };
+    const abi = abiMap[contractName];
+    if (!abi) throw new Error(`合约 ${contractName} ABI 未加载`);
+
+    // ethers ABI 编码（原生支持 uint[2][2] 等嵌套数组）
+    const iface = new ethers.utils.Interface(abi);
+    const data = iface.encodeFunctionData(methodName, params);
+
+    // 获取当前区块号用于 blockLimit
+    const blockNumber = await rpcCall('getBlockNumber', [FISCO_CONFIG.groupId]);
+    const blockLimit = '0x' + (parseInt(blockNumber) + 500).toString(16);
+    const randomid = '0x' + crypto.randomBytes(32).toString('hex');
+
+    // 签名
+    const signedTx = signFiscoTx(this.privateKey, {
+      randomid,
+      blockLimit,
+      to: contractAddress,
+      data,
+      value: 0,
+      gasPrice: 0,
+      gasLimit: 30000000,
+      chainId: FISCO_CONFIG.chainId,
+      groupId: FISCO_CONFIG.groupId,
+      extraData: '0x'
+    });
+
+    // 发送交易
+    const txHash = await rpcCall('sendRawTransaction', [FISCO_CONFIG.groupId, signedTx]);
+    logger.info('sendRawTransaction 发送成功', { contractName, methodName, txHash });
+
+    // 等待回执
+    let receipt = null;
+    for (let i = 0; i < 10; i++) {
+      await new Promise(r => setTimeout(r, 1000));
+      try {
+        receipt = await rpcCall('getTransactionReceipt', [FISCO_CONFIG.groupId, txHash]);
+        if (receipt) break;
+      } catch (e) { /* 继续轮询 */ }
+    }
+
+    if (!receipt) throw new Error('交易回执获取超时');
+    if (receipt.status !== '0x0') throw new Error(`交易执行失败, status: ${receipt.status}`);
+
+    return {
+      success: true,
+      transactionHash: txHash,
+      blockNumber: parseInt(receipt.blockNumber, 16),
+      network: 'fisco-bcos'
+    };
+  }
+
+  /**
+   * 链上验证 Groth16 ZKP 证明
+   * 将 proof 转换为 Verifier 合约所需的格式后调用 verifyProof
+   */
+  async verifyZKPOnChain(proof, publicSignals) {
     try {
-      const contractAddress = this.getContractAddress(contractName);
-      if (!contractAddress) throw new Error(`合约 ${contractName} 地址未配置`);
-
-      const paramStr = params.map(p => {
-        if (typeof p === 'string' && p.startsWith('0x') && p.length === 66) return `"${p}"`; // bytes32
-        if (typeof p === 'boolean') return p ? 'true' : 'false';
-        if (typeof p === 'number') return String(p);
-        return `"${p}"`;
-      }).join(' ');
-
-      const command = `call ${contractName} ${contractAddress} ${methodName} ${paramStr}`;
-      logger.info('执行 FISCO BCOS Console 写操作', { command });
-
-      const output = await consoleExec(FISCO_CONFIG.groupId, command);
-
-      // 解析交易哈希和区块号
-      const txHashMatch = output.match(/transaction hash:\s*(0x[0-9a-fA-F]+)/);
-      const blockMatch = output.match(/currentBlockNumber:\s*(\d+)/i) || output.match(/blockNumber:\s*(\d+)/i);
-      const txHash = txHashMatch ? txHashMatch[1] : null;
-
-      // 检查错误（排除正常输出中的关键词）
-      const hasError = output.includes('Undefined command') ||
-        output.includes('revert') ||
-        (output.includes('Error') && !output.includes('transaction executed successfully'));
-      if (hasError) {
-        const errorMsg = output.match(/(?:error|Error|revert|Undefined).*?(?:\n|$)/i);
-        throw new Error(errorMsg ? errorMsg[0].trim() : 'Transaction failed');
+      if (!this.isInitialized) {
+        return { success: false, error: 'Service not initialized' };
       }
 
-      return {
-        success: true,
-        transactionHash: txHash,
-        blockNumber: blockMatch ? parseInt(blockMatch[1]) : null,
-        network: 'fisco-bcos'
-      };
+      const pA = [proof.pi_a[0], proof.pi_a[1]];
+      const pB = [[proof.pi_b[0][1], proof.pi_b[0][0]], [proof.pi_b[1][1], proof.pi_b[1][0]]];
+      const pC = [proof.pi_c[0], proof.pi_c[1]];
+      const pubSignals = publicSignals.map(s => s.toString());
+
+      const result = await this.contractCall('Verifier', 'verifyProof', [pA, pB, pC, pubSignals]);
+      return { success: true, isValid: result === 'true' || result === true };
     } catch (error) {
-      logger.error(`合约写操作 ${contractName}.${methodName} 失败`, { error: error.message });
-      throw error;
+      logger.error('链上 ZKP 验证失败', { error: error.message });
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * 通过 Console 执行合约写操作（含重试机制）
+   */
+  async contractSend(contractName, methodName, params = [], retries = 2) {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const contractAddress = this.getContractAddress(contractName);
+        if (!contractAddress) throw new Error(`合约 ${contractName} 地址未配置`);
+
+        const paramStr = params.map(p => {
+          if (typeof p === 'string' && p.startsWith('0x') && p.length === 66) return `"${p}"`; // bytes32
+          if (typeof p === 'boolean') return p ? 'true' : 'false';
+          if (typeof p === 'number') return String(p);
+          return `"${p}"`;
+        }).join(' ');
+
+        const command = `call ${contractName} ${contractAddress} ${methodName} ${paramStr}`;
+        logger.info('执行 FISCO BCOS Console 写操作', { command });
+
+        const output = await consoleExec(FISCO_CONFIG.groupId, command);
+
+        // 解析交易哈希和区块号
+        const txHashMatch = output.match(/transaction hash:\s*(0x[0-9a-fA-F]+)/);
+        const blockMatch = output.match(/currentBlockNumber:\s*(\d+)/i) || output.match(/blockNumber:\s*(\d+)/i);
+        const txHash = txHashMatch ? txHashMatch[1] : null;
+
+        // 检查错误（排除正常输出中的关键词）
+        const hasError = output.includes('Undefined command') ||
+          output.includes('revert') ||
+          (output.includes('Error') && !output.includes('transaction executed successfully'));
+        if (hasError) {
+          const errorMsg = output.match(/(?:error|Error|revert|Undefined).*?(?:\n|$)/i);
+          throw new Error(errorMsg ? errorMsg[0].trim() : 'Transaction failed');
+        }
+
+        return {
+          success: true,
+          transactionHash: txHash,
+          blockNumber: blockMatch ? parseInt(blockMatch[1]) : null,
+          network: 'fisco-bcos'
+        };
+      } catch (error) {
+        if (attempt === retries) {
+          logger.error(`合约写操作 ${contractName}.${methodName} 失败`, { error: error.message });
+          throw error;
+        }
+        if (error.message.includes('timeout') || error.message.includes('ECONNREFUSED')) {
+          logger.warn(`交易失败，重试 ${attempt + 1}/${retries}`, { error: error.message });
+          await new Promise(r => setTimeout(r, 1000));
+        } else {
+          logger.error(`合约写操作 ${contractName}.${methodName} 失败`, { error: error.message });
+          throw error;
+        }
+      }
     }
   }
 
@@ -347,8 +503,11 @@ class BlockchainServiceFisco {
       userId
     });
 
+    // 转为 bytes32 格式（0x 前缀 + 64 位 hex）
+    const hashBytes32 = sm3Hash.startsWith('0x') ? sm3Hash : '0x' + sm3Hash;
+
     return this.contractSend('AuditStorage', 'storeAuditHash', [
-      sm3Hash, timestamp, transactionType, userId.toString()
+      hashBytes32, timestamp, transactionType, userId.toString()
     ])
       .then(result => {
         logger.info('审计哈希上链存证成功 (FISCO BCOS)', {
@@ -445,12 +604,39 @@ class BlockchainServiceFisco {
   }
 
   /**
+   * 查询 ZKP 验证结果（从 ZKPVerifier 合约）
+   */
+  async getZKPResult(proofId) {
+    if (!proofId) return null;
+    if (!this.isInitialized || !this.zkpVerifierContractAddress) {
+      return null;
+    }
+    try {
+      const proofIdBytes32 = proofId.startsWith('0x') && proofId.length === 66
+        ? proofId
+        : '0x' + Buffer.from(proofId.toString().slice(0, 31)).toString('hex').padEnd(64, '0');
+      const result = await this.contractCall('ZKPVerifier', 'getProofResult', [proofIdBytes32]);
+      if (!result || result === '') return null;
+      const parts = result.split(',');
+      return {
+        isValid: parts[0] === 'true',
+        timestamp: parseInt(parts[1]) || 0,
+        submitter: parts[2] || '',
+        proofHash: parts.slice(3).join(',') || ''
+      };
+    } catch (error) {
+      logger.warn('查询 ZKP 验证结果失败', { error: error.message, proofId });
+      return null;
+    }
+  }
+
+  /**
    * 存储交易哈希（向后兼容）
    */
-  async storeTransactionHash(transactionId, transactionData, transactionType, userId) {
+  storeTransactionHash(transactionId, transactionData, transactionType, userId) {
     if (!this.isInitialized) {
       logger.warning('FISCO BCOS 服务未初始化，跳过链上存证', { transactionId });
-      return { success: false, error: 'Service not initialized', skipped: true };
+      return Promise.resolve({ success: false, error: 'Service not initialized', skipped: true });
     }
 
     try {
@@ -494,7 +680,8 @@ class BlockchainServiceFisco {
 
     const sm3Hash = this.generateSM3Hash(transactionData);
     try {
-      const result = await this.contractCall('AuditStorage', 'getRecordByHash', [sm3Hash]);
+      const hashBytes32 = sm3Hash.startsWith('0x') ? sm3Hash : '0x' + sm3Hash;
+      const result = await this.contractCall('AuditStorage', 'getRecordByHash', [hashBytes32]);
 
       if (!result || result === '0' || result === '') {
         return { success: true, isValid: false, reason: '链上无此记录', storedHash: sm3Hash };
@@ -536,7 +723,8 @@ class BlockchainServiceFisco {
   async getRecordByHash(sm3Hash) {
     if (!this.isInitialized || !this.auditContractAddress) return null;
     try {
-      const result = await this.contractCall('AuditStorage', 'getRecordByHash', [sm3Hash]);
+      const hashBytes32 = sm3Hash.startsWith('0x') ? sm3Hash : '0x' + sm3Hash;
+      const result = await this.contractCall('AuditStorage', 'getRecordByHash', [hashBytes32]);
       if (!result || result === '') return null;
       const parts = result.split(',');
       return {
