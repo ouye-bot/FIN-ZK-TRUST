@@ -15,7 +15,9 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  Chip,
+  Tooltip,
 } from '@mui/material';
 import { signWithSM2, getSM2KeyPair, saveSM2KeyPair, generateSM2KeyPair, generateSignatureData, generateSignatureDataStrict, getSM2KeyPairWithAesKey } from '../utils/sm2Utils';
 import { post, get } from '../utils/apiUtils';
@@ -51,6 +53,7 @@ const RedeemPage = ({ user, cryptoLogs, setCryptoLogs }) => {
   const [userData, setUserData] = useState(null);
   const [investments, setInvestments] = useState([]);
   const [redeemableAmount, setRedeemableAmount] = useState(0);
+  const [liquidityInfo, setLiquidityInfo] = useState(null);
   const [showChallengeDialog, setShowChallengeDialog] = useState(false);
   const [challengeData, setChallengeData] = useState(null);
   const [pendingRedeemData, setPendingRedeemData] = useState(null);
@@ -147,17 +150,32 @@ const RedeemPage = ({ user, cryptoLogs, setCryptoLogs }) => {
       // 从资金池API获取可赎回金额
       const response = await get(`/api/v1/pool/my-invest/${user.id}`);
       const data = await response.json();
-      if (data.success) {
-        // 尝试从多种可能的字段中获取可赎回金额
-        const redeemableValue = data.data.maxRedeemAmount || 
-                              data.data.redeemableAmount || 
-                              data.data.availableAmount || 
-                              data.data.total || 
-                              data.data.amount || 0;
+      if (data.success && data.data) {
+        const redeemableValue = data.data.maxRedeemAmount || 0;
         setRedeemableAmount(redeemableValue);
+        // 存储流动性策略信息
+        if (data.data.liquidity) {
+          setLiquidityInfo(data.data.liquidity);
+        } else {
+          // API返回成功但无流动性数据，使用默认值
+          setLiquidityInfo({
+            ratio: 0,
+            tier: 'low',
+            earlyRedeemRatio: 0,
+            totalImmaturedActive: 0,
+            totalEligible: 0
+          });
+        }
       } else {
         // 如果没有出资记录，设置可赎回金额为0
         setRedeemableAmount(0);
+        setLiquidityInfo({
+          ratio: 0,
+          tier: 'low',
+          earlyRedeemRatio: 0,
+          totalImmaturedActive: 0,
+          totalEligible: 0
+        });
         if (data.message !== '用户没有出资记录') {
           setError('获取可赎回金额失败: ' + (data.message || '未知错误'));
         }
@@ -166,6 +184,13 @@ const RedeemPage = ({ user, cryptoLogs, setCryptoLogs }) => {
       console.error('获取可赎回金额失败:', err);
       setError('网络错误，无法获取可赎回金额');
       setRedeemableAmount(0);
+      setLiquidityInfo({
+        ratio: 0,
+        tier: 'low',
+        earlyRedeemRatio: 0,
+        totalImmaturedActive: 0,
+        totalEligible: 0
+      });
     }
   };
 
@@ -449,22 +474,61 @@ const RedeemPage = ({ user, cryptoLogs, setCryptoLogs }) => {
           <Card>
             <CardContent>
               <Typography variant="h6" gutterBottom>
-                赎回规则
+                流动性策略
               </Typography>
-              <Box component="ul" sx={{ pl: 2, mt: 0 }}>
-                <Typography component="li" variant="body2" color="text.secondary">
-                  优先赎回利息部分
+              {liquidityInfo ? (
+                <Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      池可用率：
+                    </Typography>
+                    <Typography variant="body1" fontWeight="bold"
+                      color={liquidityInfo.ratio >= 60 ? 'success.main' : liquidityInfo.ratio >= 40 ? 'warning.main' : 'error.main'}>
+                      {liquidityInfo.ratio}%
+                    </Typography>
+                    <Chip
+                      size="small"
+                      label={liquidityInfo.tier === 'high' ? '高档' : liquidityInfo.tier === 'medium' ? '中档' : '低档'}
+                      color={liquidityInfo.tier === 'high' ? 'success' : liquidityInfo.tier === 'medium' ? 'warning' : 'error'}
+                    />
+                  </Box>
+                  <Box sx={{ mt: 1, p: 1.5, backgroundColor: '#f5f5f5', borderRadius: 1 }}>
+                    <Typography variant="body2" fontWeight="medium" gutterBottom>
+                      当前赎回规则：
+                    </Typography>
+                    {liquidityInfo.tier === 'high' && (
+                      <Typography variant="body2" color="text.secondary">
+                        池可用率 ≥ 60%，所有投资（含未到期）均可全额赎回。
+                      </Typography>
+                    )}
+                    {liquidityInfo.tier === 'medium' && (
+                      <Typography variant="body2" color="text.secondary">
+                        池可用率 40%~60%，已到期投资全额可赎，未到期投资最多赎回 50%。
+                      </Typography>
+                    )}
+                    {liquidityInfo.tier === 'low' && (
+                      <Typography variant="body2" color="text.secondary">
+                        池可用率 &lt; 40%，仅已到期投资可赎回，未到期投资暂不可赎。
+                      </Typography>
+                    )}
+                  </Box>
+                  <Box component="ul" sx={{ pl: 2, mt: 1, mb: 0 }}>
+                    <Typography component="li" variant="body2" color="text.secondary">
+                      优先赎回利息部分
+                    </Typography>
+                    <Typography component="li" variant="body2" color="text.secondary">
+                      再赎回非当日本金
+                    </Typography>
+                    <Typography component="li" variant="body2" color="text.secondary">
+                      当日本金不计当日利息
+                    </Typography>
+                  </Box>
+                </Box>
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  加载中...
                 </Typography>
-                <Typography component="li" variant="body2" color="text.secondary">
-                  再赎回非当日本金
-                </Typography>
-                <Typography component="li" variant="body2" color="text.secondary">
-                  最后赎回当日本金
-                </Typography>
-                <Typography component="li" variant="body2" color="text.secondary">
-                  当日本金不计当日利息
-                </Typography>
-              </Box>
+              )}
             </CardContent>
           </Card>
         </Grid>
@@ -527,12 +591,43 @@ const RedeemPage = ({ user, cryptoLogs, setCryptoLogs }) => {
               ) : (
                 <Box sx={{ mt: 2 }}>
                   {investments.map((investment, index) => {
-                    // 判断是否可赎回：状态为active且不是当日出资
-                    const isRedeemable = investment.status === 'active';
+                    const isMatured = investment.maturityDate ? new Date(investment.maturityDate).getTime() <= Date.now() : true;
                     const isTodayInvestment = new Date(investment.timestamp).toDateString() === new Date().toDateString();
-                    
+                    const isActive = investment.status === 'active';
+
+                    // 根据流动性档位判断未到期投资的可赎状态
+                    let canEarlyRedeem = false;
+                    let earlyRedeemLabel = '';
+                    if (isActive && !isMatured && liquidityInfo) {
+                      if (liquidityInfo.tier === 'high') {
+                        canEarlyRedeem = true;
+                        earlyRedeemLabel = '高档-全额可提前赎';
+                      } else if (liquidityInfo.tier === 'medium') {
+                        canEarlyRedeem = true;
+                        earlyRedeemLabel = '中档-最多提前赎50%';
+                      }
+                    }
+
+                    const isRedeemable = isActive && (isMatured || canEarlyRedeem);
+                    const borderColor = isMatured && isActive ? '#4caf50' : canEarlyRedeem ? '#ff9800' : '#9e9e9e';
+
+                    let statusText, statusColor;
+                    if (!isActive) {
+                      statusText = investment.status;
+                      statusColor = 'text.secondary';
+                    } else if (isMatured) {
+                      statusText = '已到期-可赎回';
+                      statusColor = 'success.main';
+                    } else if (canEarlyRedeem) {
+                      statusText = earlyRedeemLabel;
+                      statusColor = 'warning.main';
+                    } else {
+                      statusText = '未到期-暂不可赎';
+                      statusColor = 'text.secondary';
+                    }
+
                     return (
-                    <Card key={index} sx={{ mb: 2, borderLeft: isRedeemable ? '4px solid #4caf50' : '4px solid #9e9e9e' }}>
+                    <Card key={index} sx={{ mb: 2, borderLeft: `4px solid ${borderColor}` }}>
                       <CardContent>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                           <Box>
@@ -551,11 +646,16 @@ const RedeemPage = ({ user, cryptoLogs, setCryptoLogs }) => {
                               </Typography>
                             )}
                           </Box>
-                          <Box>
-                            <Typography variant="body2" color={isRedeemable ? 'success.main' : 'text.secondary'}>
-                              状态：{isRedeemable ? '可赎回' : investment.status}
+                          <Box sx={{ textAlign: 'right' }}>
+                            <Typography variant="body2" color={statusColor} fontWeight="medium">
+                              {statusText}
                             </Typography>
-                            <Typography variant="body2" color="text.secondary">
+                            {canEarlyRedeem && !isMatured && (
+                              <Tooltip title={`池可用率 ${liquidityInfo.ratio}%，当前${liquidityInfo.tier === 'high' ? '高档允许全额提前赎回' : '中档允许50%提前赎回'}`}>
+                                <Chip size="small" label="可提前赎回" color="warning" sx={{ mt: 0.5 }} />
+                              </Tooltip>
+                            )}
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                               预期收益：¥{(Number(investment.expectedReturn) || 0).toFixed(2)}
                             </Typography>
                           </Box>
