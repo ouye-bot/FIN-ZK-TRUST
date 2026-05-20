@@ -69,34 +69,37 @@ exports.findById = async (id, connection) => {
  * @param {Object} options - 选项
  * @returns {Promise<Array>} - 交易列表
  */
-exports.findByUserId = async (userId, options = {}) => {
+exports.findByUserId = async (userId, options = {}, connection) => {
   const { limit, offset, type, status } = options;
+  const exec = connection
+    ? (sql, params) => connection.execute(sql, params).then(([rows]) => rows)
+    : execute;
   let sql = 'SELECT * FROM transactions WHERE user_id = ?';
   const params = [userId];
-  
+
   if (type) {
     sql += ' AND type = ?';
     params.push(type);
   }
-  
+
   if (status) {
     sql += ' AND status = ?';
     params.push(status);
   }
-  
+
   sql += ' ORDER BY created_at DESC';
-  
+
   if (limit) {
     sql += ' LIMIT ?';
     params.push(limit);
   }
-  
+
   if (offset) {
     sql += ' OFFSET ?';
     params.push(offset);
   }
-  
-  const results = await execute(sql, params);
+
+  const results = await exec(sql, params);
   const mapped = [];
   for (const row of results) {
     const transaction = {...row};
@@ -152,12 +155,16 @@ exports.updateStatus = async (id, status, tx_hash = null) => {
  * @param {Object} updates - 要更新的字段对象
  * @returns {Promise<Object>} - 更新后的交易
  */
-exports.update = async (id, updates) => {
+exports.update = async (id, updates, connection) => {
   if (!updates || Object.keys(updates).length === 0) {
-    return await exports.findById(id);
+    return await exports.findById(id, connection);
   }
 
-  const existing = await execute('SELECT user_id FROM transactions WHERE id = ?', [id]);
+  const exec = connection
+    ? (sql, params) => connection.execute(sql, params).then(([rows]) => rows)
+    : execute;
+
+  const existing = await exec('SELECT user_id FROM transactions WHERE id = ?', [id]);
   if (existing.length === 0) {
     throw new Error('交易不存在');
   }
@@ -181,9 +188,9 @@ exports.update = async (id, updates) => {
   params.push(id);
 
   const sql = `UPDATE transactions SET ${fields.join(', ')} WHERE id = ?`;
-  await execute(sql, params);
-  
-  return await exports.findById(id);
+  await exec(sql, params);
+
+  return await exports.findById(id, connection);
 };
 
 /**

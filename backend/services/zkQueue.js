@@ -1,22 +1,18 @@
-const crypto = require('crypto');
+const { execute } = require('../config/database');
 const logger = require('../utils/logger');
 
 class ZKQueue {
   constructor() {
-    this.tasks = new Map(); // taskId -> { status, result, error, createdAt }
-    this.TTL = 300000; // 300 seconds (5 minutes)
+    this.TTL = 300000;
     this.maxPendingTasks = 100;
-
-    // 启动定时清理任务
     this.startCleanupInterval();
   }
 
-  // 生成任务ID
-  generateTaskId() {
-    if (crypto.randomUUID) {
-      return crypto.randomUUID();
-    } else {
-      // 手动生成 UUID v4 以兼容低版本 Node.js
+  async generateTaskId() {
+    const { v4: uuidv4 } = require('uuid');
+    try {
+      return uuidv4();
+    } catch {
       return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
         const r = Math.random() * 16 | 0;
         const v = c === 'x' ? r : (r & 0x3 | 0x8);
@@ -25,124 +21,112 @@ class ZKQueue {
     }
   }
 
-  // 添加任务（仅记录状态，实际生成由 subprocess pool 负责）
-  addTask(input) {
-    const pendingCount = this.getPendingTaskCount();
+  async addTask(input) {
+    const pendingCount = await this.getPendingTaskCount();
     if (pendingCount >= this.maxPendingTasks) {
       logger.warning('ZK task queue is full, rejecting new task', { pendingCount, maxPendingTasks: this.maxPendingTasks });
       throw new Error('ZK task queue is full, max pending tasks: ' + this.maxPendingTasks);
     }
 
-    const taskId = this.generateTaskId();
-    const task = {
-      status: 'queued',
-      result: null,
-      error: null,
-      createdAt: Date.now()
-    };
+    const taskId = await this.generateTaskId();
+    const taskData = JSON.stringify(input);
 
-    this.tasks.set(taskId, task);
+    await execute(
+      'INSERT INTO zk_queue (task_id, task_data, status) VALUES (?, ?, ?)',
+      [taskId, taskData, 'pending']
+    );
+
     logger.info('Added new ZK proof task to queue', { taskId, input });
-
     return taskId;
   }
 
-  // 获取任务状态
-  getTaskStatus(taskId) {
-    const task = this.tasks.get(taskId);
-    if (!task) {
-      return null;
-    }
+  async getTaskStatus(taskId) {
+    const rows = await execute(
+      'SELECT status, result, error, created_at FROM zk_queue WHERE task_id = ?',
+      [taskId]
+    );
 
-    // 检查是否过期
-    if (Date.now() - task.createdAt > this.TTL) {
-      this.tasks.delete(taskId);
+    if (rows.length === 0) return null;
+
+    const task = rows[0];
+    const createdAt = new Date(task.created_at).getTime();
+    if (Date.now() - createdAt > this.TTL) {
+      await execute('DELETE FROM zk_queue WHERE task_id = ?', [taskId]);
       return null;
     }
 
     return {
       status: task.status,
-      result: task.result,
+      result: task.result ? JSON.parse(task.result) : null,
       error: task.error
     };
   }
 
-  // 更新任务状态（供外部调用）
-  updateTaskStatus(taskId, status, result, error) {
-    const task = this.tasks.get(taskId);
-    if (!task) {
+  async updateTaskStatus(taskId, status, result, error) {
+    try {
+      const resultStr = result ? JSON.stringify(result) : null;
+      await execute(
+        'UPDATE zk_queue SET status = ?, result = ?, error = ?, retry_count = retry_count + 1 WHERE task_id = ?',
+        [status, resultStr, error || null, taskId]
+      );
+      return true;
+    } catch (err) {
+      logger.error('更新 ZK 任务状态失败', { taskId, status, error: err.message });
       return false;
     }
-    task.status = status;
-    task.result = result;
-    task.error = error;
-    this.tasks.set(taskId, task);
-    return true;
   }
 
-  // 获取所有任务总数
-  getTotalTaskCount() {
-    return this.tasks.size;
+  async getTotalTaskCount() {
+    const rows = await execute('SELECT COUNT(*) as cnt FROM zk_queue');
+    return rows[0]?.cnt || 0;
   }
 
-  // 获取排队任务数（只统计 status === 'queued'）
-  getPendingTaskCount() {
-    let count = 0;
-    for (const task of this.tasks.values()) {
-      if (task.status === 'queued') {
-        count++;
-      }
-    }
-    return count;
+  async getPendingTaskCount() {
+    const rows = await execute("SELECT COUNT(*) as cnt FROM zk_queue WHERE status = 'pending'");
+    return rows[0]?.cnt || 0;
   }
 
-  // 获取队列长度（向后兼容别名）
-  getQueueLength() {
+  async getQueueLength() {
     return this.getPendingTaskCount();
   }
 
-  // 启动定时清理
   startCleanupInterval() {
-    const cleanupTimer = setInterval(() => {
-      const now = Date.now();
-      let cleanedCount = 0;
+    const cleanupTimer = setInterval(async () => {
+      try {
+        const cutoff = new Date(Date.now() - this.TTL).toISOString().slice(0, 19).replace('T', ' ');
+        const result = await execute(
+          'DELETE FROM zk_queue WHERE created_at < ?',
+          [cutoff]
+        );
 
-      for (const [taskId, task] of this.tasks.entries()) {
-        if (now - task.createdAt > this.TTL) {
-          this.tasks.delete(taskId);
-          cleanedCount++;
+        const stats = await this.getStats();
+        if (result.affectedRows > 0 || result.changedRows > 0) {
+          logger.info('ZKQueue cleanup done', stats);
         }
+      } catch (error) {
+        logger.error('ZKQueue cleanup failed', { error: error.message });
       }
-
-      // 统计各状态的任务数
-      let statusCount = { total: this.tasks.size, queued: 0, processing: 0, completed: 0, failed: 0 };
-      for (const task of this.tasks.values()) {
-        if (task.status === 'queued') statusCount.queued++;
-        else if (task.status === 'processing') statusCount.processing++;
-        else if (task.status === 'completed') statusCount.completed++;
-        else if (task.status === 'failed') statusCount.failed++;
-      }
-
-      if (cleanedCount > 0) {
-        logger.info('ZKQueue cleanup done', statusCount);
-      }
-    }, 60000); // 每 60 秒清理一次
+    }, 60000);
     cleanupTimer.unref();
   }
 
-  getStats() {
-    let stats = { queued: 0, processing: 0, completed: 0, failed: 0 };
-    for (const task of this.tasks.values()) {
-      if (task.status === 'queued') stats.queued++;
-      else if (task.status === 'processing') stats.processing++;
-      else if (task.status === 'completed') stats.completed++;
-      else if (task.status === 'failed') stats.failed++;
+  async getStats() {
+    try {
+      const rows = await execute(
+        `SELECT status, COUNT(*) as cnt FROM zk_queue GROUP BY status`
+      );
+      const stats = { pending: 0, processing: 0, completed: 0, failed: 0 };
+      for (const row of rows) {
+        if (row.status in stats) stats[row.status] = row.cnt;
+      }
+      return stats;
+    } catch (error) {
+      logger.error('获取 ZK 队列统计失败', { error: error.message });
+      return { pending: 0, processing: 0, completed: 0, failed: 0 };
     }
-    return stats;
   }
 }
 
-// 导出单例
 const zkQueueInstance = new ZKQueue();
 module.exports = zkQueueInstance;
 module.exports.ZKQueue = ZKQueue;

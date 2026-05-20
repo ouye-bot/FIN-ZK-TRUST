@@ -7,6 +7,20 @@ const { generateToken, generateRefreshToken, verifyRefreshToken } = require('../
 const { generateSaltedSM3Hash, verifySM3Hash, generatePBKDF2Hash, verifyPBKDF2Hash, isPBKDF2Hash } = require('../utils/cryptoUtils');
 const logger = require('../utils/logger');
 const { logCryptoOperation } = require('../utils/cryptoLogger');
+const blockchainService = require('../services/blockchainService');
+const blockchainQueueService = require('../services/blockchainQueueService');
+
+// 已使用的刷新令牌黑名单（防止重放）
+const usedRefreshTokens = new Set();
+const REFRESH_TOKEN_BLACKLIST_TTL = 10 * 60 * 1000; // 10 分钟
+// 定期清理过期的黑名单条目
+setInterval(() => {
+  // JWT 本身有过期，Set 只保留最近 10 分钟的量即可
+  if (usedRefreshTokens.size > 10000) {
+    usedRefreshTokens.clear();
+    logger.info('刷新令牌黑名单已清理');
+  }
+}, 60000).unref();
 
 /**
  * @swagger
@@ -81,14 +95,14 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    // 验证密码强度
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z]).{8,}$/;
+    // 验证密码强度（至少8位，包含大小写字母和数字）
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
     if (!passwordRegex.test(password)) {
       await logCryptoOperation('密码操作', username, '失败', '密码强度不足');
       logger.warning('注册失败：密码强度不足', { username });
       return res.status(400).json({
         success: false,
-        message: '密码强度不足，至少8位，包含大小写字母'
+        message: '密码强度不足，至少8位，包含大小写字母和数字'
       });
     }
 
@@ -127,6 +141,14 @@ router.post('/register', async (req, res) => {
 
     await logCryptoOperation('密码操作', username, '成功', '注册成功');
     logger.info('用户注册成功', { username, userId: newUser.id });
+
+    // 异步公钥链上锚定 - 加入重试队列
+    blockchainQueueService.enqueue('registerUserOnChain', {
+      userId: newUser.id, publicKey: sm2PublicKey
+    }).catch(err => {
+      logger.error('注册公钥入队失败', { userId: newUser.id, error: err.message });
+    });
+
     res.json({
       success: true,
       message: '注册成功，请登录',
@@ -280,10 +302,14 @@ router.post('/login', async (req, res) => {
     const token = generateToken(user);
     const refreshToken = generateRefreshToken(user);
 
-    // 签发 sessionKey 用于设备主密钥恢复
+    // 签发 sessionKey 用于设备主密钥恢复（使用派生密钥，不与 auth JWT 共享 secret）
+    const crypto = require('crypto');
+    const sessionSecret = crypto.createHash('sha256')
+      .update(process.env.JWT_SECRET + ':session-key-salt')
+      .digest('hex');
     const sessionKey = jwt.sign(
       { userId: user.id, purpose: 'key-session' },
-      process.env.JWT_SECRET,
+      sessionSecret,
       { expiresIn: '1h' }
     );
 
@@ -332,6 +358,18 @@ router.post('/refresh-token', async (req, res) => {
         message: '无效的刷新令牌'
       });
     }
+
+    // 检查刷新令牌是否已被使用（防止重放）
+    if (usedRefreshTokens.has(refreshToken)) {
+      logger.warning('刷新令牌已被使用，可能遭到重放', { userId: decoded.id });
+      return res.status(401).json({
+        success: false,
+        message: '刷新令牌已被使用'
+      });
+    }
+
+    // 将旧令牌加入黑名单
+    usedRefreshTokens.add(refreshToken);
 
     // 查找用户
     const user = await userDao.findById(decoded.id);

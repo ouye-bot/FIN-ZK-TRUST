@@ -165,10 +165,20 @@ exports.verifySM3Hash = (password, storedHash, salt) => {
 
 const PBKDF2_ITERATIONS = 100000;
 const PBKDF2_KEYLEN = 32;
-const PBKDF2_DIGEST = 'sm3';
+const PBKDF2_DIGEST_SM3 = 'sm3';
+const PBKDF2_DIGEST_FALLBACK = 'sha256';
+
+// 检测 Node.js 是否支持 sm3 digest
+let PBKDF2_DIGEST = PBKDF2_DIGEST_SM3;
+try {
+  crypto.pbkdf2Sync('test', 'salt', 1, 1, 'sm3');
+} catch (e) {
+  PBKDF2_DIGEST = PBKDF2_DIGEST_FALLBACK;
+  logger.warning('Node.js 不支持 PBKDF2 sm3 digest，已降级为 sha256');
+}
 
 /**
- * 使用 PBKDF2-SM3 生成密码哈希（国密合规慢速密钥派生）
+ * 使用 PBKDF2 生成密码哈希（优先 sm3，不可用时降级 sha256）
  * @param {string} password - 原始密码
  * @returns {string} - 格式: pbkdf2:iterations:salt:hash（均为 hex）
  */
@@ -179,7 +189,7 @@ exports.generatePBKDF2Hash = (password) => {
 };
 
 /**
- * 验证 PBKDF2-SM3 密码哈希
+ * 验证 PBKDF2 密码哈希（自动检测 digest）
  * @param {string} password - 原始密码
  * @param {string} storedHash - 存储的哈希（pbkdf2:iterations:salt:hash 格式）
  * @returns {boolean} - 验证结果
@@ -188,10 +198,25 @@ exports.verifyPBKDF2Hash = (password, storedHash) => {
   const parts = storedHash.split(':');
   if (parts.length !== 4 || parts[0] !== 'pbkdf2') return false;
   const [, iterations, salt, expectedHash] = parts;
-  const derived = crypto.pbkdf2Sync(password, salt, parseInt(iterations), PBKDF2_KEYLEN, PBKDF2_DIGEST);
-  const derivedHex = derived.toString('hex');
-  if (derivedHex.length !== expectedHash.length) return false;
-  return crypto.timingSafeEqual(Buffer.from(derivedHex, 'hex'), Buffer.from(expectedHash, 'hex'));
+
+  // 优先尝试当前配置的 digest
+  try {
+    const derived = crypto.pbkdf2Sync(password, salt, parseInt(iterations), PBKDF2_KEYLEN, PBKDF2_DIGEST);
+    const derivedHex = derived.toString('hex');
+    if (derivedHex.length !== expectedHash.length) return false;
+    if (crypto.timingSafeEqual(Buffer.from(derivedHex, 'hex'), Buffer.from(expectedHash, 'hex'))) return true;
+  } catch (e) { /* digest 不支持，继续 fallback */ }
+
+  // 如果主 digest 失败，尝试另一个
+  const altDigest = PBKDF2_DIGEST === PBKDF2_DIGEST_SM3 ? PBKDF2_DIGEST_FALLBACK : PBKDF2_DIGEST_SM3;
+  try {
+    const derived = crypto.pbkdf2Sync(password, salt, parseInt(iterations), PBKDF2_KEYLEN, altDigest);
+    const derivedHex = derived.toString('hex');
+    if (derivedHex.length !== expectedHash.length) return false;
+    return crypto.timingSafeEqual(Buffer.from(derivedHex, 'hex'), Buffer.from(expectedHash, 'hex'));
+  } catch (e) {
+    return false;
+  }
 };
 
 /**
@@ -286,17 +311,9 @@ exports.signWithSM2 = (message, privateKey) => {
   }
   validateSM2PrivateKey(privateKey);
 
-  const cacheKey = `sm2_sign::${message}::${crypto.createHash('sha256').update(privateKey).digest('hex').slice(0, 16)}`;
-  const cachedSignature = signatureCache.get(cacheKey);
-
-  if (cachedSignature !== null) {
-    return cachedSignature;
-  }
-
+  // 签名不缓存——每次签名必须使用新 nonce，缓存会破坏 nonce 新鲜度
   try {
     const signature = sm2.doSignature(message, privateKey, { der: false });
-    logger.info('SM2 signature generated successfully');
-    signatureCache.set(cacheKey, signature);
     return signature;
   } catch (error) {
     logger.error('SM2 signature generation failed:', { error: error.message });

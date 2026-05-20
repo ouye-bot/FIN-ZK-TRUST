@@ -79,6 +79,7 @@ const createTables = async () => {
     await addColumnIfNotExists('fund_pool', 'platform_capital', "DECIMAL(15,2) NOT NULL DEFAULT 0 COMMENT '平台自有资金'");
     await addColumnIfNotExists('fund_pool', 'user_capital', "DECIMAL(15,2) NOT NULL DEFAULT 0 COMMENT '用户出资总额'");
     await addColumnIfNotExists('fund_pool', 'loaned_amount', "DECIMAL(15,2) NOT NULL DEFAULT 0 COMMENT '已借出本金总额'");
+    await addColumnIfNotExists('fund_pool', 'user_interest_earned', "DECIMAL(20,2) NOT NULL DEFAULT 0.00 COMMENT '用户应得利息累计'");
     console.log('fund_pool表新字段迁移完成');
 
     // 初始化新字段数据（幂等：仅当新字段为默认值时执行）
@@ -95,8 +96,11 @@ const createTables = async () => {
       console.log('fund_pool表新字段数据初始化跳过:', e.message);
     }
 
-    // 为transactions表添加term字段（幂等操作）
+    // 为transactions表添加term和due_date字段（幂等操作）
     await addColumnIfNotExists('transactions', 'term', "INT DEFAULT NULL COMMENT '投资期限(天)'");
+    await addColumnIfNotExists('transactions', 'due_date', "TIMESTAMP NULL DEFAULT NULL COMMENT '到期日期'");
+    await addColumnIfNotExists('transactions', 'borrow_user_ratio', "DECIMAL(5,4) DEFAULT NULL COMMENT '借款时用户池出资比例'");
+    await addColumnIfNotExists('transactions', 'borrow_platform_ratio', "DECIMAL(5,4) DEFAULT NULL COMMENT '借款时系统池出资比例'");
     console.log('transactions表字段检查完成');
 
     // 创建credit_proofs表
@@ -177,6 +181,46 @@ const createTables = async () => {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
     console.log('credit_history表创建成功');
+
+    // 创建blockchain_queue表（区块链写入重试队列）
+    await execute(`
+      CREATE TABLE IF NOT EXISTS blockchain_queue (
+        id INT PRIMARY KEY AUTO_INCREMENT,
+        operation_type VARCHAR(50) NOT NULL COMMENT '操作类型: storeAuditHash/storeTransactionHash/registerUserOnChain/verifyZKPOnChain',
+        payload TEXT NOT NULL COMMENT '操作参数 JSON',
+        status VARCHAR(20) NOT NULL DEFAULT 'pending' COMMENT '状态: pending/processing/completed/failed',
+        retry_count INT NOT NULL DEFAULT 0,
+        max_retries INT NOT NULL DEFAULT 3,
+        last_error TEXT DEFAULT NULL,
+        next_retry_at TIMESTAMP NULL DEFAULT NULL,
+        completed_at TIMESTAMP NULL DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_status (status),
+        INDEX idx_next_retry (next_retry_at),
+        INDEX idx_created_at (created_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log('blockchain_queue表创建成功');
+
+    // 创建zk_queue表（ZKP任务持久化队列）
+    await execute(`
+      CREATE TABLE IF NOT EXISTS zk_queue (
+        id INT PRIMARY KEY AUTO_INCREMENT,
+        task_id VARCHAR(64) UNIQUE NOT NULL COMMENT '任务UUID',
+        task_data TEXT NOT NULL COMMENT '任务参数 JSON',
+        status VARCHAR(20) NOT NULL DEFAULT 'pending' COMMENT '状态: pending/processing/completed/failed',
+        result TEXT DEFAULT NULL COMMENT '结果 JSON',
+        error TEXT DEFAULT NULL COMMENT '错误信息',
+        retry_count INT NOT NULL DEFAULT 0,
+        max_retries INT NOT NULL DEFAULT 3,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_status (status),
+        INDEX idx_task_id (task_id),
+        INDEX idx_created_at (created_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log('zk_queue表创建成功');
 
     console.log('所有表创建完成');
   } catch (error) {

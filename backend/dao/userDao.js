@@ -75,11 +75,14 @@ exports.create = async (userData) => {
  * @param {number} newBalance - 新余额
  * @returns {Promise<Object>} - 更新后的用户
  */
-exports.updateBalance = async (id, newBalance) => {
+exports.updateBalance = async (id, newBalance, connection) => {
+  const exec = connection
+    ? (sql, params) => connection.execute(sql, params).then(([rows]) => rows)
+    : execute;
   const balanceData = { balance: Number(newBalance) };
-  await encryptFields('users', balanceData, id);
+  await encryptFields('users', balanceData, id, connection);
   const sql = 'UPDATE users SET balance = ? WHERE id = ?';
-  await execute(sql, [balanceData.balance, id]);
+  await exec(sql, [balanceData.balance, id]);
   return await exports.findById(id);
 };
 
@@ -95,6 +98,28 @@ exports.updateCreditScore = async (id, newScore) => {
   const sql = 'UPDATE users SET credit_score = ? WHERE id = ?';
   await execute(sql, [creditScoreData.credit_score, id]);
   return await exports.findById(id);
+};
+
+/**
+ * 通用更新用户字段
+ * @param {number} id - 用户ID
+ * @param {Object} fields - 要更新的字段 { field: value }
+ * @returns {Promise<void>}
+ */
+exports.update = async (id, fields) => {
+  if (!fields || Object.keys(fields).length === 0) return;
+  const allowedFields = ['role', 'totp_enabled', 'totp_secret', 'backup_codes_hashed', 'sm2_public_key'];
+  const setClauses = [];
+  const params = [];
+  for (const [key, value] of Object.entries(fields)) {
+    if (!allowedFields.includes(key)) {
+      throw new Error(`不允许更新的字段: ${key}`);
+    }
+    setClauses.push(`${key} = ?`);
+    params.push(value);
+  }
+  params.push(id);
+  await execute(`UPDATE users SET ${setClauses.join(', ')} WHERE id = ?`, params);
 };
 
 /**

@@ -46,7 +46,7 @@ router.post('/generate-proof', async (req, res) => {
       logger.info('ZKP生成-用户逾期状态', { userId, hasNoOverdue });
     }
 
-    const taskId = zkQueue.addTask({ creditScore, threshold, hasNoOverdue });
+    const taskId = await zkQueue.addTask({ creditScore, threshold, hasNoOverdue });
 
     const workerTaskId = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
 
@@ -54,10 +54,10 @@ router.post('/generate-proof', async (req, res) => {
       id: workerTaskId,
       type: 'generate',
       args: [creditScore, threshold, hasNoOverdue]
-    }).then(result => {
-      zkQueue.updateTaskStatus(taskId, 'completed', result, null);
-    }).catch(err => {
-      zkQueue.updateTaskStatus(taskId, 'failed', null, err.message);
+    }).then(async result => {
+      await zkQueue.updateTaskStatus(taskId, 'completed', result, null);
+    }).catch(async err => {
+      await zkQueue.updateTaskStatus(taskId, 'failed', null, err.message);
     });
 
     res.status(202).json({
@@ -76,7 +76,7 @@ router.post('/generate-proof', async (req, res) => {
 
 // GET /zk/task/:taskId - 查询任务状态
 router.get('/task/:taskId', async (req, res) => {
-  const status = zkQueue.getTaskStatus(req.params.taskId);
+  const status = await zkQueue.getTaskStatus(req.params.taskId);
   if (!status) {
     return res.status(404).json({ success: false, message: '任务不存在或已过期' });
   }
@@ -89,7 +89,7 @@ let systemBalance = 10000; // Initial system balance: 10000 yuan
 // Get system balance (admin only)
 router.get('/system-balance', async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
+    if (!req.user || req.user.role !== 'admin') {
       return res.status(403).json({ success: false, message: 'Unauthorized' });
     }
     res.json({ success: true, balance: systemBalance });
@@ -128,7 +128,7 @@ router.post('/verify-proof', async (req, res) => {
   }
 });
 
-// Create loan
+// @deprecated 请使用 POST /api/v1/loan/borrow 替代（路由 /loan.js）
 router.post('/lend', async (req, res) => {
   try {
     const { userId, amount, duration, interestRate } = req.body;
@@ -174,7 +174,7 @@ router.post('/lend', async (req, res) => {
   }
 });
 
-// Repay loan
+// @deprecated 请使用 POST /api/v1/loan/repay 替代（路由 /loan.js）
 router.post('/repay', async (req, res) => {
   try {
     const { userId, loanId } = req.body;
@@ -231,7 +231,7 @@ router.post('/repay', async (req, res) => {
   }
 });
 
-// Collect loan repayment
+// @deprecated 请使用 POST /api/v1/loan/repay（带 transactionId）替代
 router.post('/collect-loan', async (req, res) => {
   try {
     const { userId, transactionId } = req.body;
@@ -272,7 +272,7 @@ router.post('/collect-loan', async (req, res) => {
   }
 });
 
-// Get all loans
+// @deprecated 请使用 GET /api/v1/loan/loans 替代（路由 /loan.js）
 router.get('/all-loans', async (req, res) => {
   try {
     // Get all loan transactions from database
@@ -298,7 +298,7 @@ router.get('/all-loans', async (req, res) => {
   }
 });
 
-// Get all lending records
+// @deprecated 请使用 GET /api/v1/loan/loans?type=lend 替代
 router.get('/all-lends', async (req, res) => {
   try {
     // Get all lend transactions from database

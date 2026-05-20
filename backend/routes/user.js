@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const userDao = require('../dao/userDao');
 const blockchainService = require('../services/blockchainService');
+const blockchainQueueService = require('../services/blockchainQueueService');
 const logger = require('../utils/logger');
 
 // 获取用户信息API
@@ -96,27 +97,11 @@ router.put('/:id/update-sm2-key', async (req, res) => {
     // 重新获取更新后的用户
     const updatedUser = await userDao.findById(parseInt(id));
 
-    // 异步将公钥哈希锚定到区块链（不阻塞响应）
-    blockchainService.registerUserOnChain(
-      parseInt(id),
-      sm2PublicKey
-    ).then(result => {
-      if (result.success) {
-        logger.info('用户公钥锚定上链成功', {
-          userId: id,
-          pkHash: result.pkHash.substring(0, 20) + '...'
-        });
-      } else if (!result.skipped) {
-        logger.warning('用户公钥锚定上链失败', {
-          userId: id,
-          error: result.error
-        });
-      }
+    // 异步将公钥哈希锚定到区块链 - 加入重试队列
+    blockchainQueueService.enqueue('registerUserOnChain', {
+      userId: parseInt(id), publicKey: sm2PublicKey
     }).catch(err => {
-      logger.error('用户公钥锚定上链异常', {
-        userId: id,
-        error: err.message
-      });
+      logger.error('公钥锚定入队失败', { userId: id, error: err.message });
     });
 
     res.json({

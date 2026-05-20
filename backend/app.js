@@ -333,4 +333,8 @@ app.listen(PORT, () => {
       }
     }
   }, 60 * 1000);
+
+  // 启动区块链写入重试队列处理器
+  const blockchainQueueService = require('./services/blockchainQueueService');
+  blockchainQueueService.startProcessor();
 });

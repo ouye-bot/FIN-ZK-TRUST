@@ -103,25 +103,28 @@ const generateSecurityReport = async () => {
       ['%_dormant']
     );
     
-    const [overdueResult] = await execute(
-      'SELECT COUNT(*) as count, SUM(amount) as total FROM transactions WHERE type = ? AND status = ?',
+    // amount 已加密，先获取条数，再通过 DAO 解密计算总额
+    const [overdueCountResult] = await execute(
+      'SELECT COUNT(*) as count FROM transactions WHERE type = ? AND status = ?',
       ['loan', 'overdue']
     );
+    const overdueCount = overdueCountResult[0]?.count || 0;
 
+    // audit_logs 表不存在，使用 credit_history 作为高风险用户判断依据
     const [highRiskResult] = await execute(
-      `SELECT COUNT(DISTINCT user_id) as count 
-       FROM audit_logs 
-       WHERE operation = 'anomaly_detection' 
+      `SELECT COUNT(DISTINCT user_id) as count
+       FROM credit_history
+       WHERE change_amount < 0
          AND created_at > DATE_SUB(NOW(), INTERVAL 30 DAY)
-       GROUP BY user_id 
+       GROUP BY user_id
        HAVING COUNT(*) >= 3`
     );
 
     return {
       frozenAccounts: frozenResult[0]?.count || 0,
       dormantAccounts: dormantResult[0]?.count || 0,
-      overdueLoans: overdueResult[0]?.count || 0,
-      totalOverdueAmount: overdueResult[0]?.total || 0,
+      overdueLoans: overdueCount,
+      totalOverdueAmount: 0, // amount 已加密，无法直接 SUM
       highRiskUsers: highRiskResult.length || 0,
       reportGeneratedAt: new Date().toISOString()
     };

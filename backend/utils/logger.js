@@ -1,4 +1,4 @@
-const fs = require('fs').promises;
+const fs = require('fs');
 const path = require('path');
 
 // 日志级别
@@ -14,16 +14,24 @@ const LOG_DIR = path.join(__dirname, '../logs');
 const LOG_FILE = path.join(LOG_DIR, 'app.log');
 
 // 确保日志目录存在
-const ensureLogDir = async () => {
-  try {
-    await fs.mkdir(LOG_DIR, { recursive: true });
-  } catch (error) {
-    console.error('创建日志目录失败:', error);
-  }
-};
+try {
+  fs.mkdirSync(LOG_DIR, { recursive: true });
+} catch (error) {
+  console.error('创建日志目录失败:', error);
+}
 
-// 初始化日志目录
-ensureLogDir();
+// 使用持久化的写入流，避免每次写入都打开新文件句柄（EMFILE 修复）
+let logStream = null;
+function getLogStream() {
+  if (!logStream) {
+    logStream = fs.createWriteStream(LOG_FILE, { flags: 'a' });
+    logStream.on('error', (err) => {
+      console.error('日志写入流失效:', err.message);
+      logStream = null;
+    });
+  }
+  return logStream;
+}
 
 /**
  * 记录日志
@@ -31,7 +39,7 @@ ensureLogDir();
  * @param {string} message - 日志消息
  * @param {Object} data - 附加数据
  */
-const log = async (level, message, data = {}) => {
+const log = (level, message, data = {}) => {
   try {
     const timestamp = new Date().toISOString();
     const logEntry = {
@@ -54,9 +62,12 @@ const log = async (level, message, data = {}) => {
       );
     }
 
-    // 文件输出
+    // 文件输出（使用持久化写入流）
     const logString = JSON.stringify(logEntry) + '\n';
-    await fs.appendFile(LOG_FILE, logString);
+    const stream = getLogStream();
+    if (stream && !stream.destroyed) {
+      stream.write(logString);
+    }
   } catch (error) {
     console.error('记录日志失败:', error);
   }

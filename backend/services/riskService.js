@@ -188,7 +188,7 @@ exports.assessLoanRisk = async (userId, loanAmount, loanDuration, creditProof) =
       loanRiskScore: Math.round(loanRiskScore),
       loanRiskLevel: loanRiskLevel,
       loanSuggestion: loanSuggestion,
-      success: true // 始终返回成功，由调用方根据建议决定是否拒绝
+      success: !loanSuggestion.startsWith('建议拒绝')
     };
   } catch (error) {
     logger.error('评估贷款风险失败', { error: error.message, userId, loanAmount, loanDuration });

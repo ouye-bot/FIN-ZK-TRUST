@@ -642,6 +642,7 @@ class BlockchainService {
   getStatus() {
     return {
       isInitialized: this.isInitialized,
+      isConnected: this.isInitialized,
       walletAddress: this.wallet ? this.wallet.address : null,
       network: LOCAL_CHAIN_CONFIG,
       contracts: {

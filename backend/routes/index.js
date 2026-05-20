@@ -22,7 +22,7 @@ function registerRoutes() {
   router.use('/user', userRoutes);
   
   // 信用证明路由
-  router.use('/credit', creditRoutes.router);
+  router.use('/credit', creditRoutes);
   
   // 贷款路由
   router.use('/loan', loanRoutes);

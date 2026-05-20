@@ -16,6 +16,6 @@ exports.create = async ({ user_id, score, change_amount, reason, transaction_id 
  * 查询用户信用历史
  */
 exports.findByUserId = async (userId, limit = 50) => {
-  const sql = 'SELECT * FROM credit_history WHERE user_id = ? ORDER BY created_at DESC LIMIT ?';
-  return await execute(sql, [userId, limit]);
+  const sql = `SELECT * FROM credit_history WHERE user_id = ? ORDER BY created_at DESC LIMIT ${parseInt(limit) || 50}`;
+  return await execute(sql, [userId]);
 };

@@ -9,10 +9,12 @@ const proofDao = require('../dao/proofDao');
 const { verifySM2Signature, generateSM3Hash, buildSignatureData } = require('../utils/cryptoUtils');
 const poolService = require('../services/poolService');
 const logger = require('../utils/logger');
+const dynamicConfig = require('../services/dynamicConfigService');
 const blockchainService = require('../services/blockchainService');
+const blockchainQueueService = require('../services/blockchainQueueService');
 const challengeService = require('../services/challengeService');
 
-const LARGE_REDEEM_THRESHOLD = 10000;
+
 
 // 赎回API
 router.post('/', validate(redeemSchema), async (req, res) => {
@@ -81,7 +83,10 @@ router.post('/', validate(redeemSchema), async (req, res) => {
       });
     }
 
-    if (parseInt(amount) >= LARGE_REDEEM_THRESHOLD) {
+    const userCreditScore = user.credit_score || 600;
+    const userRisk = userCreditScore >= 750 ? 80 : userCreditScore >= 700 ? 70 : userCreditScore >= 650 ? 60 : userCreditScore >= 600 ? 40 : 20;
+    const dynamicThreshold = dynamicConfig.getChallengeThreshold('redeem', userRisk);
+    if (parseInt(amount) >= dynamicThreshold) {
       const { challengeId, challengeSignature } = req.body;
 
       if (!challengeId || !challengeSignature) {
@@ -111,42 +116,32 @@ router.post('/', validate(redeemSchema), async (req, res) => {
 
     // 获取资金池信息进行精确校验
     const pool = await poolDao.getPool();
-    
-    // 精确可赎回金额校验
+
+    // 使用动态流动性策略计算可赎回金额（替代旧的仅到期逻辑）
     const userInvestments = await transactionDao.findByUserId(userId, { type: 'invest' });
-    const activeInvests = userInvestments.filter(inv => inv.status === 'active');
-    const totalActiveInvest = activeInvests.reduce((sum, inv) => sum + Number(inv.amount || 0), 0);
-    const poolAvailable = Number(pool.available_amount || 0);
-    const exactRedeemable = Math.min(totalActiveInvest, poolAvailable);
+    const redeemInfo = poolService.calculateRedeemable(userInvestments, pool);
+    const exactRedeemable = redeemInfo.maxRedeemAmount;
 
     if (parseInt(amount) > exactRedeemable) {
-      logger.warning('赎回失败：精确可赎回金额不足', {
+      logger.warning('赎回失败：可赎回金额不足', {
         userId,
         requestedAmount: amount,
-        totalActiveInvest,
-        poolAvailable,
-        exactRedeemable,
-        borrowedAmount: Math.max(0, totalActiveInvest - poolAvailable)
+        ...redeemInfo
       });
       return res.status(400).json({
         success: false,
-        message: `可赎回金额不足，当前可赎回 ¥${exactRedeemable.toFixed(2)}（总出资 ¥${totalActiveInvest.toFixed(2)}，已借出 ¥${Math.max(0, totalActiveInvest - poolAvailable).toFixed(2)}）`
+        message: `可赎回金额不足，当前可赎回 ¥${exactRedeemable.toFixed(2)}（流动性档位：${redeemInfo.liquidityTier}，池可用率：${redeemInfo.liquidityRatio}%）`,
+        liquidity: {
+          tier: redeemInfo.liquidityTier,
+          ratio: redeemInfo.liquidityRatio,
+          earlyRedeemRatio: redeemInfo.earlyRedeemRatio
+        }
       });
     }
 
-    // 调用资金池服务处理赎回
-    await poolService.redeem(userId, parseInt(amount));
-
-    // 将对应的出资交易状态更新为 completed
-    const activeInvestments = await transactionDao.findByUserId(userId, { type: 'invest' });
-    for (const inv of activeInvestments) {
-      if (inv.status === 'active') {
-        await transactionDao.updateStatus(inv.id, 'completed');
-      }
-    }
-
-    // 计算总赎回金额
-    const totalRedeemed = parseInt(amount);
+    // 调用资金池服务处理赎回（原子事务：资金池扣除 + 投资关闭 + 收益累加）
+    const redeemResult = await poolService.redeem(userId, parseInt(amount));
+    const { totalRedeemed, totalInterestEarned } = redeemResult;
 
     // 生成交易数据的SM3哈希，用于数据完整性验证
     const transactionDataForHash = JSON.stringify({
@@ -165,46 +160,25 @@ router.post('/', validate(redeemSchema), async (req, res) => {
       tx_hash: transactionHash
     });
 
-    // 更新用户余额
-    await userDao.updateBalance(userId, user.balance + totalRedeemed);
-    const updatedUser = await userDao.findById(userId);
-    logger.info('更新用户余额', {
-      userId: user.id,
-      newBalance: updatedUser.balance
-    });
+    logger.info('赎回交易记录已创建', { transactionId: newTransaction.id, totalRedeemed });
 
     logger.info('赎回成功', { userId, totalRedeemed });
     
-    // 异步上链存证 - 不阻塞响应
-    blockchainService.storeTransactionHash(
-      newTransaction.id.toString(),
-      newTransaction,
-      'redeem',
-      userId.toString()
-    ).then(result => {
-      if (result.success) {
-        logger.info('赎回交易哈希上链存证成功', {
-          transactionId: newTransaction.id,
-          blockchainTxHash: result.blockchainTxHash
-        });
-      } else {
-        logger.warning('赎回交易哈希上链存证失败', {
-          transactionId: newTransaction.id,
-          error: result.error
-        });
-      }
+    // 异步上链存证 - 加入重试队列
+    blockchainQueueService.enqueue('storeTransactionHash', {
+      transactionId: newTransaction.id.toString(),
+      transactionData: newTransaction,
+      transactionType: 'redeem',
+      userId: userId.toString()
     }).catch(err => {
-      logger.error('赎回交易哈希上链存证异常', {
-        transactionId: newTransaction.id,
-        error: err.message
-      });
+      logger.error('赎回上链入队失败', { transactionId: newTransaction.id, error: err.message });
     });
     
     res.json({
       success: true,
       message: '赎回成功',
       amount: totalRedeemed,
-      newBalance: updatedUser.balance
+      newBalance: redeemResult.newBalance
     });
   } catch (error) {
     logger.error('赎回失败', { error: error.message, userId: req.body.userId });

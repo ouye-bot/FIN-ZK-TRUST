@@ -30,7 +30,7 @@ router.get('/', async (req, res) => {
     
     const { logs, total } = await cryptoLogger.getLogs({ limit, offset, userId });
     
-    res.status(200).json({ success: true, logs, total });
+    res.status(200).json({ success: true, data: { logs, total } });
   } catch (error) {
     console.error('Error getting crypto logs:', error);
     res.status(500).json({ success: false, message: 'Failed to get crypto logs' });

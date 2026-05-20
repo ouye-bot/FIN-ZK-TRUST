@@ -1,14 +1,14 @@
 const { execute } = require('../config/database');
 const logger = require('../utils/logger');
+const transactionDao = require('../dao/transactionDao');
 
 const checkOverdueLoans = async () => {
   const result = { total: 0, marked: 0, errors: 0 };
 
   try {
     const overdueLoans = await execute(
-      `SELECT t.*, u.credit_score
+      `SELECT t.id, t.user_id, t.due_date
        FROM transactions t
-       LEFT JOIN users u ON t.user_id = u.id
        WHERE t.type = 'loan'
          AND t.status = 'pending'
          AND t.due_date IS NOT NULL
@@ -37,7 +37,6 @@ const checkOverdueLoans = async () => {
         logger.info('借款已标记为逾期', {
           transactionId: loan.id,
           userId: loan.user_id,
-          amount: loan.amount,
           dueDate: loan.due_date,
           daysOverdue
         });
@@ -77,12 +76,11 @@ const getOverdueStats = async () => {
     );
     const pendingOverdueCount = pendingOverdueResult[0]?.count || 0;
 
-    const amountResult = await execute(
-      `SELECT COALESCE(SUM(amount), 0) as total
-       FROM transactions
-       WHERE type = 'loan' AND status = 'overdue'`
-    );
-    const totalOverdueAmount = amountResult[0]?.total || 0;
+    // amount 字段已加密，无法直接 SUM，使用解密后的 DAO 查询
+    const overdueTransactions = await transactionDao.findByStatus('overdue');
+    const totalOverdueAmount = overdueTransactions
+      .filter(t => t.type === 'loan')
+      .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
     return {
       overdueCount,
@@ -99,4 +97,16 @@ const getOverdueStats = async () => {
   }
 };
 
-module.exports = { checkOverdueLoans, getOverdueStats };
+const getOverdueDays = (transaction) => {
+  try {
+    const dueDate = new Date(transaction.due_date || transaction.dueDate);
+    const now = new Date();
+    if (dueDate >= now) return 0;
+    return Math.max(0, Math.floor((now - dueDate) / (24 * 60 * 60 * 1000)));
+  } catch (error) {
+    logger.error('计算逾期天数失败', { error: error.message, transactionId: transaction?.id });
+    return 0;
+  }
+};
+
+module.exports = { checkOverdueLoans, getOverdueStats, getOverdueDays };

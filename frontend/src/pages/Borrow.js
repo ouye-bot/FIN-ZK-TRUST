@@ -28,58 +28,22 @@ import { signWithSM2, getSM2KeyPair, saveSM2KeyPair, generateSM2KeyPair, generat
 import { post, get } from '../utils/apiUtils';
 import { syncLogToBackend } from '../utils/logUtils';
 
-// 信用评分规则
-const CREDIT_RULES = {
-  MIN_SCORE: 300,
-  MAX_SCORE: 850,
-  COOLING_OFF_DAYS: 7,
-  COOLING_OFF_LOAN_RATIO: 0.5,
-  LOAN_LIMITS: {
-    600: 1000,
-    650: 2000,
-    700: 5000,
-    750: 10000,
-    800: 20000,
-    850: 50000
-  },
-  INTEREST_RATES: {
-    600: 10.0,
-    650: 8.0,
-    700: 6.0,
-    750: 4.0
-  }
-};
+const getRemainingLoanLimit = (loanConfig, loans, user = null) => {
+  if (!loanConfig) return 0;
 
-// 获取可借款额度
-const getLoanLimit = (creditScore) => {
-  const scores = Object.keys(CREDIT_RULES.LOAN_LIMITS)
-    .map(Number)
-    .sort((a, b) => a - b);
+  let effectiveLimit = loanConfig.maxLoanLimit;
 
-  for (let i = scores.length - 1; i >= 0; i--) {
-    if (creditScore >= scores[i]) {
-      return CREDIT_RULES.LOAN_LIMITS[scores[i]];
-    }
-  }
-  return 0;
-};
-
-// 计算剩余可借额度
-const getRemainingLoanLimit = (creditScore, loans, user = null) => {
-  const maxLimit = getLoanLimit(Number(creditScore) || 0);
-
-  // 冷静期检查：注册后 7 天内额度减半
-  let effectiveLimit = maxLimit;
-  if (user?.created_at) {
+  // 冷静期检查：注册后指定天数内额度按比例缩减
+  if (user?.created_at && loanConfig.coolingOff) {
     const registerDate = new Date(user.created_at);
     const daysSinceRegister = Math.floor((Date.now() - registerDate) / (24 * 60 * 60 * 1000));
-    if (daysSinceRegister < CREDIT_RULES.COOLING_OFF_DAYS) {
-      effectiveLimit = Math.floor(maxLimit * CREDIT_RULES.COOLING_OFF_LOAN_RATIO);
+    if (daysSinceRegister < loanConfig.coolingOff.days) {
+      effectiveLimit = Math.floor(loanConfig.maxLoanLimit * loanConfig.coolingOff.ratio);
     }
   }
 
   const totalBorrowed = loans
-    .filter(loan => loan.status === 'pending') // 只计算进行中的借款
+    .filter(loan => loan.status === 'pending')
     .reduce((sum, loan) => sum + (Number(loan.amount) || 0), 0);
   return Math.max(0, effectiveLimit - totalBorrowed);
 };
@@ -124,8 +88,9 @@ const Borrow = ({ user, cryptoLogs, setCryptoLogs }) => {
   const [challengeData, setChallengeData] = useState(null);
   const [pendingBorrowData, setPendingBorrowData] = useState(null);
   const [term, setTerm] = useState(30);
+  const [loanConfig, setLoanConfig] = useState(null);
 
-  // 获取用户数据和借款记录
+  // 获取用户数据和借款配置
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -134,6 +99,13 @@ const Borrow = ({ user, cryptoLogs, setCryptoLogs }) => {
         const userData = await userResponse.json();
         if (userData.success) {
           setUserData(userData.user);
+        }
+
+        // Fetch loan config
+        const configResponse = await get(`/api/v1/loan/config/${user.id}`);
+        const configData = await configResponse.json();
+        if (configData.success) {
+          setLoanConfig(configData.data);
         }
 
         // Fetch user transactions (loans)
@@ -212,7 +184,7 @@ const Borrow = ({ user, cryptoLogs, setCryptoLogs }) => {
     }
 
     // 检查可借余额
-    const remainingLimit = getRemainingLoanLimit(userData?.creditScore || creditProof?.creditScore || 0, allLoans, userData);
+    const remainingLimit = getRemainingLoanLimit(loanConfig, allLoans, userData);
     if (remainingLimit <= 0) {
       setError('您的可借余额为0，无法发起借款');
       return;
@@ -392,6 +364,12 @@ const Borrow = ({ user, cryptoLogs, setCryptoLogs }) => {
       const userData = await userResponse.json();
       if (userData.success) {
         setUserData(userData.user);
+      }
+      // 刷新借款配置
+      const configResponse = await get(`/api/v1/loan/config/${user.id}`);
+      const configData = await configResponse.json();
+      if (configData.success) {
+        setLoanConfig(configData.data);
       }
       // 刷新借款记录
       const transactionsResponse = await get(`/api/v1/loan/transactions/${user.id}`);
@@ -656,7 +634,12 @@ const Borrow = ({ user, cryptoLogs, setCryptoLogs }) => {
                 </Grid>
                 <Grid item xs={12} sm={6}>
                   <Typography variant="body1" color="primary">
-                    可借额度：{getRemainingLoanLimit(userData?.creditScore || creditProof?.creditScore || 0, allLoans, userData)}
+                    可借额度：{getRemainingLoanLimit(loanConfig, allLoans, userData)}
+                  </Typography>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="body1" color="primary">
+                    借款利率：{loanConfig?.loanRate ? `${loanConfig.loanRate}%` : '计算中...'}
                   </Typography>
                 </Grid>
               </Grid>
@@ -720,7 +703,7 @@ const Borrow = ({ user, cryptoLogs, setCryptoLogs }) => {
 
               {creditProof && (
                 <Alert severity="info" sx={{ mb: 2 }}>
-                  当前信用分：{Number(userData?.creditScore || creditProof.creditScore)}，可借额度：{getRemainingLoanLimit(userData?.creditScore || creditProof.creditScore, allLoans, userData)}
+                  当前信用分：{Number(userData?.creditScore || creditProof.creditScore)}，可借额度：{getRemainingLoanLimit(loanConfig, allLoans, userData)}
                 </Alert>
               )}
 
@@ -906,7 +889,7 @@ const Borrow = ({ user, cryptoLogs, setCryptoLogs }) => {
         <DialogTitle>大额借款二次确认</DialogTitle>
         <DialogContent>
           <Typography variant="body2" sx={{ mb: 2 }}>
-            借款金额超过 ¥5,000，需要进行二次签名确认。
+            借款金额超过 ¥{loanConfig?.challengeThreshold || 5000}，需要进行二次签名确认。
           </Typography>
           <Alert severity="info" sx={{ mb: 2 }}>
             这是您在本次操作中的唯一挑战码，请确认后签名。

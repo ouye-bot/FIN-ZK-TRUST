@@ -57,12 +57,13 @@ exports.antiReplayMiddleware = async (req, res, next) => {
       '/api/v1/monitoring'
     ];
     
-    // 检查是否在白名单中
+    // 检查是否在白名单中（路径规范化后精确匹配，防止路径遍历）
+    const normalizedPath = req.path.replace(/\/+/g, '/').replace(/\/\.\./g, '');
     const isInWhitelist = WHITE_LIST.some(route => {
       if (route.endsWith('/')) {
-        return req.path.startsWith(route);
+        return normalizedPath.startsWith(route);
       }
-      return req.path === route;
+      return normalizedPath === route;
     });
     
     if (isInWhitelist) {

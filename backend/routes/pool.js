@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { getPoolInfo } = require('../services/poolService');
+const { getPoolInfo, calculateRedeemable } = require('../services/poolService');
+const { getCurrentLendingRate } = require('../services/interestRateService');
+const dynamicConfig = require('../services/dynamicConfigService');
 const transactionDao = require('../dao/transactionDao');
 const poolDao = require('../dao/poolDao');
 const logger = require('../utils/logger');
@@ -45,21 +47,39 @@ router.get('/', async (req, res) => {
       status = 'warning';
     }
     
+    const totalPool = poolData.totalPool || (poolData.platformCapital + poolData.userCapital);
+    const utilizationRate = totalPool > 0 ? (poolData.loanedAmount / totalPool) : 0;
+    const userRatio = totalPool > 0 ? (poolData.userCapital / totalPool) : 0;
+    const availableRatio = totalPool > 0 ? (poolData.availableAmount / totalPool) : 0;
+
+    const poolHealth = await dynamicConfig.getPoolHealth();
+
     const responseData = {
       platformCapital: poolData.platformCapital,
       userCapital: poolData.userCapital,
       loanedAmount: poolData.loanedAmount,
-      totalPool: poolData.totalPool,
+      totalPool: totalPool,
       availableAmount: poolData.availableAmount,
-      // 以下保留旧字段兼容（前端适配后将逐步弃用）
+      // 利息分层
+      platformInterest: poolData.platformInterest || 0,
+      userInterest: poolData.userInterest || 0,
+      totalInterest: poolData.totalInterest || 0,
+      // 健康指标
+      health: {
+        utilizationRate: Math.round(utilizationRate * 10000) / 100, // 百分比，两位小数
+        userRatio: Math.round(userRatio * 10000) / 100,
+        availableRatio: Math.round(availableRatio * 10000) / 100,
+        overdueRate: Math.round(poolHealth.overdueRate * 10000) / 100,
+      },
+      // 状态
+      status,
+      totalInvestors: poolData.totalInvestors,
+      // 兼容旧字段
       originalPool: poolData.originalPoolBalance,
       userPool: poolData.userPoolBalance,
       totalAvailable: poolData.totalAvailable,
-      status,
       userPoolStatus: poolData.userPoolStatus,
-      totalInvestors: poolData.totalInvestors,
-      emergencyBorrow: poolData.emergencyBorrow,
-      totalInterest: poolData.totalInterest
+      emergencyBorrow: 0
     };
     
     logger.info('获取资金池信息成功', responseData);
@@ -89,56 +109,49 @@ router.get('/my-invest/:userId', async (req, res) => {
 
     // 从数据库获取用户的投资记录
     const investments = await transactionDao.findByUserId(parseInt(userId), { type: 'invest' });
-    
-    // 获取资金池当前可用余额
+
+    // 获取资金池当前数据
     const pool = await poolDao.getPool();
-    const poolAvailable = Number(pool.available_amount || 0);
-    
-    // 计算总出资金额和有效可赎回金额
+
+    // 计算总出资金额
     let investAmount = 0;
     let todayInvestAmount = 0;
-    let totalActiveInvestAmount = 0;
-    
     const today = new Date().toISOString().split('T')[0];
-    
-    investments.forEach(investment => {
-      investAmount += investment.amount || 0;
-      
-      // 检查是否是今天的投资
-      const investDate = new Date(investment.created_at).toISOString().split('T')[0];
-      if (investDate === today) {
-        todayInvestAmount += investment.amount || 0;
-      }
-      
-      // 只计算状态为 active 的记录作为可赎回金额
-      if (investment.status === 'active') {
-        totalActiveInvestAmount += investment.amount || 0;
-      }
+    investments.forEach(inv => {
+      investAmount += inv.amount || 0;
+      const investDate = new Date(inv.created_at).toISOString().split('T')[0];
+      if (investDate === today) todayInvestAmount += inv.amount || 0;
     });
-    
-    // 精确可赎回金额 = min(用户出资总额, 资金池当前可用余额)
-    const exactRedeemableAmount = Math.min(totalActiveInvestAmount, poolAvailable);
-    
-    logger.info('精确可赎回金额计算完成', {
+
+    // 使用动态流动性策略计算可赎回金额
+    const redeemInfo = calculateRedeemable(investments, pool);
+
+    logger.info('可赎回金额计算完成', {
       userId,
-      totalActiveInvest: totalActiveInvestAmount,
-      poolAvailable: poolAvailable,
-      exactRedeemableAmount: exactRedeemableAmount,
-      borrowedAmount: Math.max(0, totalActiveInvestAmount - poolAvailable)
+      ...redeemInfo
     });
-    
+
     return res.json({
       success: true,
       data: {
         userId: userId,
-        investAmount: investAmount,
-        todayInvestAmount: todayInvestAmount,
-        pendingInterest: 0, // 简化处理，暂时返回0
-        canRedeemToday: true,
-        maxRedeemAmount: exactRedeemableAmount,
-        totalAsset: exactRedeemableAmount,
-        totalActiveInvest: totalActiveInvestAmount,
-        poolAvailable: poolAvailable
+        investAmount,
+        todayInvestAmount,
+        pendingInterest: 0,
+        canRedeemToday: redeemInfo.maxRedeemAmount > 0,
+        maxRedeemAmount: redeemInfo.maxRedeemAmount,
+        totalAsset: redeemInfo.totalActive,
+        totalActiveInvest: redeemInfo.totalActive,
+        totalMaturedActiveInvest: redeemInfo.totalMaturedActive,
+        poolAvailable: redeemInfo.poolAvailable,
+        // 流动性策略信息
+        liquidity: {
+          ratio: redeemInfo.liquidityRatio,
+          tier: redeemInfo.liquidityTier,
+          earlyRedeemRatio: redeemInfo.earlyRedeemRatio,
+          totalImmaturedActive: redeemInfo.totalImmaturedActive,
+          totalEligible: redeemInfo.totalEligible
+        }
       }
     });
   } catch (error) {

@@ -12,6 +12,8 @@ const poolService = require('../services/poolService');
 const { getCurrentLendingRate } = require('../services/interestRateService');
 const logger = require('../utils/logger');
 const blockchainService = require('../services/blockchainService');
+const blockchainQueueService = require('../services/blockchainQueueService');
+const dynamicConfig = require('../services/dynamicConfigService');
 
 /**
  * @swagger
@@ -157,6 +159,31 @@ router.post('/', validate(investSchema), async (req, res) => {
       });
     }
 
+    // 动态出资限额检查
+    const investLimit = await dynamicConfig.getInvestLimit();
+    if (amount < investLimit.minInvest) {
+      logger.warning('投资失败：金额低于最低出资限额', {
+        userId,
+        amount,
+        minInvest: investLimit.minInvest
+      });
+      return res.status(400).json({
+        success: false,
+        message: `单笔出资不能低于 ${investLimit.minInvest} 元`
+      });
+    }
+    if (amount > investLimit.maxInvest) {
+      logger.warning('投资失败：金额超过最高出资限额', {
+        userId,
+        amount,
+        maxInvest: investLimit.maxInvest
+      });
+      return res.status(400).json({
+        success: false,
+        message: `单笔出资不能超过 ${investLimit.maxInvest} 元`
+      });
+    }
+
     // 计算预期收益（使用动态浮动利率）
     const annualRate = await getCurrentLendingRate();
     const dailyRate = annualRate / 365;
@@ -196,55 +223,30 @@ router.post('/', validate(investSchema), async (req, res) => {
 
     logger.info('投资成功', { userId, transactionId: newTransaction.id, amount, expectedReturn });
 
-    // 出资成功，增加信用分 +2
+    // 出资成功，增加信用分 +2（统一信用分更新）
     try {
-      const currentUser = await userDao.findById(userId);
-      if (currentUser) {
-        const newScore = Math.max(
-          CREDIT_RULES.MIN_SCORE,
-          Math.min(CREDIT_RULES.MAX_SCORE, (currentUser.credit_score || 600) + CREDIT_RULES.SCORE_CHANGES.INVEST_REWARD)
-        );
-        await userDao.updateCreditScore(userId, newScore);
-        logger.info('出资奖励信用分 +2', {
-          userId,
-          oldScore: currentUser.credit_score,
-          newScore
-        });
-        creditHistoryDao.create({
-          user_id: parseInt(userId),
-          score: newScore,
-          change_amount: CREDIT_RULES.SCORE_CHANGES.INVEST_REWARD,
-          reason: '出资奖励',
-          transaction_id: newTransaction ? newTransaction.id : null
-        }).catch(err => logger.error('记录出资信用历史失败', { error: err.message }));
-      }
+      const newScore = await dynamicConfig.updateCreditScore(
+        userId,
+        CREDIT_RULES.SCORE_CHANGES.INVEST_REWARD,
+        '出资奖励',
+        newTransaction ? newTransaction.id : null
+      );
+      logger.info('出资奖励信用分 +2', {
+        userId,
+        newScore
+      });
     } catch (scoreErr) {
       logger.warning('出资奖励信用分失败', { error: scoreErr.message });
     }
     
-    // 异步上链存证 - 不阻塞响应
-    blockchainService.storeTransactionHash(
-      newTransaction.id.toString(),
-      newTransaction,
-      'invest',
-      userId.toString()
-    ).then(result => {
-      if (result.success) {
-        logger.info('投资交易哈希上链存证成功', {
-          transactionId: newTransaction.id,
-          blockchainTxHash: result.blockchainTxHash
-        });
-      } else {
-        logger.warning('投资交易哈希上链存证失败', {
-          transactionId: newTransaction.id,
-          error: result.error
-        });
-      }
+    // 异步上链存证 - 加入重试队列
+    blockchainQueueService.enqueue('storeTransactionHash', {
+      transactionId: newTransaction.id.toString(),
+      transactionData: newTransaction,
+      transactionType: 'invest',
+      userId: userId.toString()
     }).catch(err => {
-      logger.error('投资交易哈希上链存证异常', {
-        transactionId: newTransaction.id,
-        error: err.message
-      });
+      logger.error('投资上链入队失败', { transactionId: newTransaction.id, error: err.message });
     });
     
     res.json({
@@ -261,6 +263,24 @@ router.post('/', validate(investSchema), async (req, res) => {
   }
 });
 
+// 动态出资配置查询（用于前端展示）
+router.get('/config', async (req, res) => {
+  try {
+    const investLimit = await dynamicConfig.getInvestLimit();
+    const currentRate = await getCurrentLendingRate();
+    res.json({
+      success: true,
+      data: {
+        ...investLimit,
+        currentRate: Math.round(currentRate * 10000) / 100
+      }
+    });
+  } catch (error) {
+    logger.error('获取出资配置失败', { error: error.message });
+    res.status(500).json({ success: false, message: '获取出资配置失败' });
+  }
+});
+
 // 获取用户投资列表
 router.get('/:userId', async (req, res) => {
   try {
@@ -274,6 +294,14 @@ router.get('/:userId', async (req, res) => {
 
     // 从数据库获取投资列表
     const userInvestments = await transactionDao.findByUserId(parseInt(userId), { type: 'invest' });
+
+    // 计算到期日期
+    for (const inv of userInvestments) {
+      if (inv.term && inv.timestamp) {
+        inv.maturityDate = new Date(new Date(inv.timestamp).getTime() + inv.term * 86400000).toISOString();
+      }
+    }
+
     logger.info('获取用户投资列表成功', { userId, investmentCount: userInvestments.length });
     res.json({
       success: true,
@@ -281,33 +309,6 @@ router.get('/:userId', async (req, res) => {
     });
   } catch (error) {
     logger.error('获取投资列表失败', { error: error.message, stack: error.stack, userId: req.params.userId });
-    res.status(500).json({
-      success: false,
-      message: '获取投资列表失败: ' + error.message
-    });
-  }
-});
-
-// 为前端兼容添加/api/v1/investments/:userId路由
-router.get('/investments/:userId', async (req, res) => {
-  try {
-    const { userId } = req.params;
-    logger.info('获取用户投资列表（兼容路由）', { userId });
-
-    // 数据隔离检查
-    if (parseInt(req.params.userId) !== req.user.id) {
-      return res.status(403).json({ success: false, message: '无权查看其他用户的投资' });
-    }
-
-    // 从数据库获取投资列表
-    const userInvestments = await transactionDao.findByUserId(parseInt(userId), { type: 'invest' });
-    logger.info('获取用户投资列表成功（兼容路由）', { userId, investmentCount: userInvestments.length });
-    res.json({
-      success: true,
-      investments: userInvestments
-    });
-  } catch (error) {
-    logger.error('获取投资列表失败（兼容路由）', { error: error.message, stack: error.stack, userId: req.params.userId });
     res.status(500).json({
       success: false,
       message: '获取投资列表失败: ' + error.message

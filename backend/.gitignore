@@ -19,6 +19,19 @@ logs/
 .env.local
 .env.development.local
 
+# Test results and reports
+test_results/
+test/results/
+test/test_results/
+test_data/
+
+# Build artifacts (regeneratable)
+artifacts/
+cache/
+
+# Credentials
+e2e-creds.json
+
 # OS files
 .DS_Store
 Thumbs.db

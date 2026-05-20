@@ -51,11 +51,25 @@ const InvestPage = ({ user, cryptoLogs, setCryptoLogs }) => {
   const [showVerificationDialog, setShowVerificationDialog] = useState(false);
   const [latestProof, setLatestProof] = useState(null);
   const [userData, setUserData] = useState(null);
+  const [investConfig, setInvestConfig] = useState(null);
 
   useEffect(() => {
     fetchUserData();
     fetchLatestCreditProof();
+    fetchInvestConfig();
   }, [user]);
+
+  const fetchInvestConfig = async () => {
+    try {
+      const response = await get('/api/v1/invest/config');
+      const data = await response.json();
+      if (data.success) {
+        setInvestConfig(data.data);
+      }
+    } catch (err) {
+      console.error('获取出资配置失败:', err);
+    }
+  };
 
   const fetchUserData = async () => {
     try {
@@ -105,8 +119,7 @@ const InvestPage = ({ user, cryptoLogs, setCryptoLogs }) => {
   }, []);
 
   const calculateExpectedReturn = (amount, term) => {
-    // 简单的收益计算模型
-    const annualRate = 0.08; // 8%年利率
+    const annualRate = investConfig?.currentRate ? investConfig.currentRate / 100 : 0.08;
     const dailyRate = annualRate / 365;
     return amount * dailyRate * term;
   };
@@ -308,6 +321,19 @@ const InvestPage = ({ user, cryptoLogs, setCryptoLogs }) => {
               <Typography variant="body1" sx={{ mb: 1 }}>
                 信用评分：{userData?.creditScore || 0}
               </Typography>
+              {investConfig && (
+                <Box sx={{ mt: 2, p: 1.5, backgroundColor: '#f0f8ff', borderRadius: 1 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    出资限额
+                  </Typography>
+                  <Typography variant="body1" color="primary">
+                    单笔最低：¥{investConfig.minInvest}
+                  </Typography>
+                  <Typography variant="body1" color="primary">
+                    单笔最高：¥{investConfig.maxInvest}
+                  </Typography>
+                </Box>
+              )}
             </CardContent>
           </Card>
         </Grid>

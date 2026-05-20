@@ -169,62 +169,56 @@ function decryptWithDEK(dek, ciphertext, aad = '') {
 }
 
 async function rotateDEK(userId) {
-  const oldDek = await getDEK(userId);
-  const newDekHex = crypto.randomBytes(16).toString('hex');
-  const encryptedNewDek = encryptWithMasterKey(newDekHex);
+  const { transaction } = require('../config/database');
 
-  const users = await execute('SELECT balance, credit_score FROM users WHERE id = ?', [userId]);
-  if (users.length === 0) throw new Error('用户不存在');
+  await transaction(async (connection) => {
+    // 锁定用户密钥行，防止并发轮换
+    const [keyRows] = await connection.execute(
+      'SELECT encrypted_dek FROM user_keys WHERE user_id = ? FOR UPDATE', [userId]
+    );
+    if (keyRows.length === 0) throw new Error('用户密钥不存在');
 
-  const user = users[0];
-  const updates = {};
+    const oldDek = await getDEK(userId);
+    const newDekHex = crypto.randomBytes(16).toString('hex');
+    const encryptedNewDek = encryptWithMasterKey(newDekHex);
 
-  if (user.balance) {
-    const plain = decryptWithDEK(oldDek, user.balance, 'users:balance:' + userId);
-    updates.balance = encryptWithDEK(newDekHex, plain, 'users:balance:' + userId);
-  }
-  if (user.credit_score) {
-    const plain = decryptWithDEK(oldDek, user.credit_score, 'users:credit_score:' + userId);
-    updates.credit_score = encryptWithDEK(newDekHex, plain, 'users:credit_score:' + userId);
-  }
+    const [users] = await connection.execute('SELECT balance, credit_score FROM users WHERE id = ? FOR UPDATE', [userId]);
+    if (users.length === 0) throw new Error('用户不存在');
 
-  const txns = await execute(
-    'SELECT id, amount, interest, total_amount FROM transactions WHERE user_id = ?',
-    [userId]
-  );
-  for (const txn of txns) {
-    if (txn.amount) {
-      const plain = decryptWithDEK(oldDek, txn.amount, 'transactions:amount:' + txn.id);
-      const reEncrypted = encryptWithDEK(newDekHex, plain, 'transactions:amount:' + txn.id);
-      await execute('UPDATE transactions SET amount = ? WHERE id = ?', [reEncrypted, txn.id]);
+    const user = users[0];
+
+    if (user.balance) {
+      const plain = decryptWithDEK(oldDek, user.balance, 'users:balance:' + userId);
+      const reEncrypted = encryptWithDEK(newDekHex, plain, 'users:balance:' + userId);
+      await connection.execute('UPDATE users SET balance = ? WHERE id = ?', [reEncrypted, userId]);
     }
-    if (txn.interest) {
-      const plain = decryptWithDEK(oldDek, txn.interest, 'transactions:interest:' + txn.id);
-      const reEncrypted = encryptWithDEK(newDekHex, plain, 'transactions:interest:' + txn.id);
-      await execute('UPDATE transactions SET interest = ? WHERE id = ?', [reEncrypted, txn.id]);
+    if (user.credit_score) {
+      const plain = decryptWithDEK(oldDek, user.credit_score, 'users:credit_score:' + userId);
+      const reEncrypted = encryptWithDEK(newDekHex, plain, 'users:credit_score:' + userId);
+      await connection.execute('UPDATE users SET credit_score = ? WHERE id = ?', [reEncrypted, userId]);
     }
-    if (txn.total_amount) {
-      const plain = decryptWithDEK(oldDek, txn.total_amount, 'transactions:total_amount:' + txn.id);
-      const reEncrypted = encryptWithDEK(newDekHex, plain, 'transactions:total_amount:' + txn.id);
-      await execute('UPDATE transactions SET total_amount = ? WHERE id = ?', [reEncrypted, txn.id]);
+
+    const [txns] = await connection.execute(
+      'SELECT id, amount, interest, total_amount FROM transactions WHERE user_id = ?', [userId]
+    );
+    for (const txn of txns) {
+      for (const field of ['amount', 'interest', 'total_amount']) {
+        if (txn[field]) {
+          const plain = decryptWithDEK(oldDek, txn[field], `transactions:${field}:${txn.id}`);
+          const reEncrypted = encryptWithDEK(newDekHex, plain, `transactions:${field}:${txn.id}`);
+          await connection.execute(`UPDATE transactions SET ${field} = ? WHERE id = ?`, [reEncrypted, txn.id]);
+        }
+      }
     }
-  }
 
-  if (updates.balance !== undefined) {
-    await execute('UPDATE users SET balance = ? WHERE id = ?', [updates.balance, userId]);
-  }
-  if (updates.credit_score !== undefined) {
-    await execute('UPDATE users SET credit_score = ? WHERE id = ?', [updates.credit_score, userId]);
-  }
-
-  await execute(
-    'UPDATE user_keys SET encrypted_dek = ?, rotated_at = ? WHERE user_id = ?',
-    [encryptedNewDek, Date.now(), userId]
-  );
+    await connection.execute(
+      'UPDATE user_keys SET encrypted_dek = ?, rotated_at = ? WHERE user_id = ?',
+      [encryptedNewDek, Date.now(), userId]
+    );
+  });
 
   dekCache.delete(userId);
-
-  logger.info('用户 DEK 轮换完成', { userId });
+  logger.info('用户 DEK 轮换完成（原子事务）', { userId });
 }
 
 const dekCacheCleanup = setInterval(() => {

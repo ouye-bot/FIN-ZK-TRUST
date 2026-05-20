@@ -145,7 +145,6 @@ const FundPoolPage = ({ user }) => {
   const fundUsageData = [
     { name: '可用资金', value: poolData.availableAmount, color: '#06D6A0' },
     { name: '已借出', value: poolData.loanedAmount, color: '#7209B7' },
-    { name: '应急借款', value: poolData.emergencyBorrow, color: '#F72585' },
   ];
 
   // 资金池健康度
@@ -308,25 +307,61 @@ const FundPoolPage = ({ user }) => {
                       </Grid>
                       <Grid item xs={12} sm={6} md={3}>
                         <Box sx={{ textAlign: 'center', p: 2 }}>
-                          <Typography variant="h5" color="error.main">
-                            ¥{Number(poolData.emergencyBorrow || 0).toFixed(2)}
+                          <Typography variant="h5" color="warning.main">
+                            ¥{Number(poolData.platformInterest || 0).toFixed(2)}
                           </Typography>
                           <Typography variant="body2" color="text.secondary">
-                            应急借款
+                            平台利息
                           </Typography>
                         </Box>
                       </Grid>
                       <Grid item xs={12} sm={6} md={3}>
                         <Box sx={{ textAlign: 'center', p: 2 }}>
-                          <Typography variant="h5" color="secondary.main">
-                            ¥{Number(poolData.totalInterest || 0).toFixed(2)}
+                          <Typography variant="h5" color="info.main">
+                            ¥{Number(poolData.userInterest || 0).toFixed(2)}
                           </Typography>
                           <Typography variant="body2" color="text.secondary">
-                            总利息
+                            用户利息
                           </Typography>
                         </Box>
                       </Grid>
                     </Grid>
+
+                    {/* 资金池健康指标 */}
+                    {poolData.health && (
+                      <Box sx={{ mt: 3, p: 2, backgroundColor: '#f5f5f5', borderRadius: 2 }}>
+                        <Typography variant="subtitle2" gutterBottom>
+                          池健康指标
+                        </Typography>
+                        <Grid container spacing={2}>
+                          <Grid item xs={3}>
+                            <Typography variant="body2" color="text.secondary">资金利用率</Typography>
+                            <Typography variant="h6" color={poolData.health.utilizationRate > 80 ? 'error.main' : poolData.health.utilizationRate > 60 ? 'warning.main' : 'success.main'}>
+                              {poolData.health.utilizationRate}%
+                            </Typography>
+                          </Grid>
+                          <Grid item xs={3}>
+                            <Typography variant="body2" color="text.secondary">用户出资占比</Typography>
+                            <Typography variant="h6" color="primary">
+                              {poolData.health.userRatio}%
+                            </Typography>
+                          </Grid>
+                          <Grid item xs={3}>
+                            <Typography variant="body2" color="text.secondary">可用资金占比</Typography>
+                            <Typography variant="h6" color={poolData.health.availableRatio < 20 ? 'error.main' : 'success.main'}>
+                              {poolData.health.availableRatio}%
+                            </Typography>
+                          </Grid>
+                          <Grid item xs={3}>
+                            <Typography variant="body2" color="text.secondary">逾期率</Typography>
+                            <Typography variant="h6" color={poolData.health.overdueRate > 10 ? 'error.main' : poolData.health.overdueRate > 5 ? 'warning.main' : 'success.main'}>
+                              {poolData.health.overdueRate}%
+                            </Typography>
+                          </Grid>
+                        </Grid>
+                      </Box>
+                    )}
+
                     <Box sx={{ mt: 2, textAlign: 'center' }}>
                       <Button
                         variant="outlined"

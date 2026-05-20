@@ -183,10 +183,13 @@ router.post('/verify-and-enable', async (req, res) => {
     const hashedCodes = mfaService.hashBackupCodes(backupCodes);
     await userDao.enableTotp(userId, JSON.stringify(hashedCodes));
 
-    // 签发 sessionKey 用于设备主密钥恢复
+    // 签发 sessionKey 用于设备主密钥恢复（使用派生密钥）
+    const sessionSecret = crypto.createHash('sha256')
+      .update(process.env.JWT_SECRET + ':session-key-salt')
+      .digest('hex');
     const sessionKey = jwt.sign(
       { userId: user.id, purpose: 'key-session' },
-      process.env.JWT_SECRET,
+      sessionSecret,
       { expiresIn: '1h' }
     );
 
@@ -265,9 +268,12 @@ router.post('/verify', async (req, res) => {
         { expiresIn: '24h' }
       );
 
+      const sessionSecret = crypto.createHash('sha256')
+        .update(process.env.JWT_SECRET + ':session-key-salt')
+        .digest('hex');
       const sessionKey = jwt.sign(
         { userId: user.id, purpose: 'key-session' },
-        process.env.JWT_SECRET,
+        sessionSecret,
         { expiresIn: '1h' }
       );
 

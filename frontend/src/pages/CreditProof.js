@@ -398,11 +398,16 @@ const CreditProof = ({ user, cryptoLogs, setCryptoLogs }) => {
                   您当前有逾期借款记录，无法生成信用证明
                 </Alert>
               )}
+              {hasNoOverdue && (user.creditScore || 0) < 600 && (
+                <Alert severity="warning" sx={{ mb: 2 }}>
+                  您当前信用分不足600分，无法生成信用证明。请通过按时还款提升信用分。
+                </Alert>
+              )}
               <Button
                 variant="contained"
                 color="primary"
                 onClick={handleGenerateProof}
-                disabled={loading || !zkWorkerReady || !hasNoOverdue}
+                disabled={loading || !zkWorkerReady || !hasNoOverdue || (user.creditScore || 0) < 600}
                 fullWidth
               >
                 {loading ? <CircularProgress size={24} /> : (zkStatus || '生成信用证明')}

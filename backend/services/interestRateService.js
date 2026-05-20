@@ -1,17 +1,16 @@
 const { execute } = require('../config/database');
 const logger = require('../utils/logger');
+const dynamicConfig = require('./dynamicConfigService');
+const transactionDao = require('../dao/transactionDao');
 
 const DEFAULT_LENDING_RATE = 0.06;
-const PLATFORM_SPREAD = 0.02;
 const MIN_LENDING_RATE = 0.02;
+const MAX_LENDING_RATE = 0.15;
 
 async function getCurrentLendingRate() {
   try {
-    const loans = await execute(
-      `SELECT t.amount, t.interest, t.created_at, t.updated_at
-       FROM transactions t
-       WHERE t.type = 'loan' AND t.status = 'completed'`
-    );
+    const allLoans = await transactionDao.findByType('loan');
+    const loans = allLoans.filter(t => t.status === 'completed');
 
     if (!loans || loans.length === 0) {
       logger.info('无历史借款记录，使用默认出资利率', { rate: DEFAULT_LENDING_RATE });
@@ -38,11 +37,13 @@ async function getCurrentLendingRate() {
     if (totalPrincipal <= 0) return DEFAULT_LENDING_RATE;
 
     const weightedAverage = totalWeightedRate / totalPrincipal;
-    const lendingRate = Math.max(MIN_LENDING_RATE, weightedAverage - PLATFORM_SPREAD);
+    const platformSpread = await dynamicConfig.getPlatformSpread();
+    const lendingRate = Math.min(MAX_LENDING_RATE, Math.max(MIN_LENDING_RATE, weightedAverage - platformSpread));
 
     logger.info('出资利率计算完成', {
       weightedAverage: (weightedAverage * 100).toFixed(2) + '%',
       lendingRate: (lendingRate * 100).toFixed(2) + '%',
+      platformSpread,
       totalPrincipal,
       loanCount: loans.length
     });

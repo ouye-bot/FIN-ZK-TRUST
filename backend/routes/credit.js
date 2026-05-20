@@ -8,6 +8,7 @@ const logger = require('../utils/logger');
 const { generateSM3Hash } = require('../utils/cryptoUtils');
 const { verifyProof } = require('../services/zkService');
 const blockchainService = require('../services/blockchainService');
+const blockchainQueueService = require('../services/blockchainQueueService');
 const creditHistoryDao = require('../dao/creditHistoryDao');
 const path = require('path');
 const fs = require('fs');
@@ -164,20 +165,14 @@ router.post('/generate-proof', async (req, res) => {
     });
     logger.info('信用证明生成成功', { userId, proofId, expiresAt: expiresAtDate.toISOString() });
 
-    // 异步上链存证
-    blockchainService.storeAuditHash(
+    // 异步上链存证 - 加入重试队列
+    blockchainQueueService.enqueue('storeAuditHash', {
       sm3Hash,
-      Math.floor(Date.now() / 1000),
-      'CREDIT_PROOF_GENERATE',
-      userId.toString()
-    ).then(result => {
-      if (result.success) {
-        logger.info('信用证明生成上链存证成功', { proofId, blockchainTxHash: result.blockchainTxHash });
-      } else {
-        logger.warning('信用证明生成上链存证跳过', { proofId, error: result.error });
-      }
+      timestamp: Math.floor(Date.now() / 1000),
+      transactionType: 'CREDIT_PROOF_GENERATE',
+      userId: userId.toString()
     }).catch(err => {
-      logger.error('信用证明生成上链存证异常', { proofId, error: err.message });
+      logger.error('信用证明上链入队失败', { proofId, error: err.message });
     });
 
     // 构建 ZKP 标准嵌套结构
@@ -254,21 +249,15 @@ router.post('/verify-proof', async (req, res) => {
     if (isValid) {
       logger.info('信用证明验证成功', { proofId });
 
-      // 异步上链存证
+      // 异步上链存证 - 加入重试队列
       const verifyHash = generateSM3Hash(JSON.stringify({ proofId, action: 'verify', timestamp: Date.now() }));
-      blockchainService.storeAuditHash(
-        verifyHash,
-        Math.floor(Date.now() / 1000),
-        'CREDIT_PROOF_VERIFY',
-        proof.user_id ? proof.user_id.toString() : '0'
-      ).then(result => {
-        if (result.success) {
-          logger.info('信用证明验证上链存证成功', { proofId, blockchainTxHash: result.blockchainTxHash });
-        } else {
-          logger.warning('信用证明验证上链存证跳过', { proofId, error: result.error });
-        }
+      blockchainQueueService.enqueue('storeAuditHash', {
+        sm3Hash: verifyHash,
+        timestamp: Math.floor(Date.now() / 1000),
+        transactionType: 'CREDIT_PROOF_VERIFY',
+        userId: proof.user_id ? proof.user_id.toString() : '0'
       }).catch(err => {
-        logger.error('信用证明验证上链存证异常', { proofId, error: err.message });
+        logger.error('信用证明验证上链入队失败', { proofId, error: err.message });
       });
 
       const responseData = {
@@ -384,67 +373,38 @@ router.get('/:userId', async (req, res) => {
   }
 });
 
-// 信用评分API
+// 信用评分API（直接读取数据库中的信用分，不再全量重算）
 router.get('/score/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
-    
     logger.info('获取用户信用评分', { userId });
-    
-    // 从数据库获取用户信息
+
     const user = await userDao.findById(parseInt(userId));
     if (!user) {
-      return res.json({
-        success: false,
-        message: '用户不存在'
-      });
+      return res.json({ success: false, message: '用户不存在' });
     }
-    
-    // 从数据库获取用户的交易记录
-    const transactions = await transactionDao.findByUserId(parseInt(userId));
-    
-    // 计算信用评分
-    let score = user.credit_score || 600;
-    let history = [];
-    
-    // 基于交易记录更新信用评分
-    transactions.forEach(transaction => {
-      if (transaction.type === 'loan' && transaction.status === 'completed') {
-        // 按时还款，增加信用分
-        score += 10;
-        history.push({
-          timestamp: transaction.created_at,
-          type: 'repayment',
-          description: '按时还款',
-          scoreChange: 10
-        });
-      } else if (transaction.type === 'loan' && transaction.status === 'default') {
-        // 逾期还款，减少信用分
-        score -= 50;
-        history.push({
-          timestamp: transaction.created_at,
-          type: 'default',
-          description: '逾期还款',
-          scoreChange: -50
-        });
-      }
-    });
-    
-    // 确保评分在合理范围内
-    score = Math.max(CREDIT_RULES.MIN_SCORE, Math.min(CREDIT_RULES.MAX_SCORE, score));
-    
-    // 更新用户信用评分
-    await userDao.updateCreditScore(parseInt(userId), score);
-    
-    logger.info('获取用户信用评分成功', { userId, score });
-    
+
+    // 直接读取数据库中的信用分（增量更新的正确结果）
+    const creditScore = user.credit_score || 600;
+
+    // 从信用历史表获取变化记录（只读，不重新计算）
+    const records = await creditHistoryDao.findByUserId(parseInt(userId));
+    const history = records.map(r => ({
+      timestamp: r.created_at,
+      type: r.reason,
+      description: r.reason,
+      scoreChange: r.change_amount
+    }));
+
+    logger.info('获取用户信用评分成功', { userId, creditScore });
+
     res.json({
       success: true,
       data: {
         userId: user.id,
         username: user.username,
-        creditScore: score,
-        history: history
+        creditScore,
+        history
       }
     });
   } catch (error) {

@@ -4,6 +4,7 @@ const poolDao = require('../dao/poolDao');
 const userDao = require('../dao/userDao');
 const transactionDao = require('../dao/transactionDao');
 const { getCurrentLendingRate } = require('./interestRateService');
+const { encryptFields, decryptFields } = require('../utils/sm4Crypto');
 
 const autoRedeemMaturedInvestments = async () => {
   let total = 0;
@@ -12,23 +13,20 @@ const autoRedeemMaturedInvestments = async () => {
   let errors = 0;
 
   try {
-    const results = await execute(
-      `SELECT * FROM transactions
-       WHERE type = 'invest'
-         AND status = 'active'
-         AND due_date IS NOT NULL
-         AND due_date <= NOW()
-       ORDER BY due_date ASC
-       LIMIT 100`,
-    );
+    // 使用 transactionDao 获取已解密的投资记录
+    const allInvests = await transactionDao.findByType('invest');
+    const maturedInvests = allInvests
+      .filter(inv => inv.status === 'active' && inv.due_date && new Date(inv.due_date) <= new Date())
+      .sort((a, b) => new Date(a.due_date) - new Date(b.due_date))
+      .slice(0, 100);
 
-    total = results.length;
+    total = maturedInvests.length;
     logger.info('查询到期出资金', { count: total });
 
-    for (const record of results) {
+    for (const inv of maturedInvests) {
       try {
-        const userId = record.user_id;
-        const investmentId = record.id;
+        const userId = inv.user_id;
+        const investmentId = inv.id;
 
         const user = await userDao.findById(userId);
         if (!user) {
@@ -37,8 +35,8 @@ const autoRedeemMaturedInvestments = async () => {
           continue;
         }
 
-        const principal = Number(record.amount || 0);
-        const investDays = Math.max(1, Math.ceil((new Date() - new Date(record.created_at)) / (24 * 60 * 60 * 1000)));
+        const principal = Number(inv.amount || 0);
+        const investDays = Math.max(1, Math.ceil((new Date() - new Date(inv.created_at)) / (24 * 60 * 60 * 1000)));
         const annualRate = await getCurrentLendingRate();
         const dailyRate = annualRate / 365;
         const dynamicInterest = Math.round(principal * dailyRate * investDays * 100) / 100;
@@ -64,20 +62,42 @@ const autoRedeemMaturedInvestments = async () => {
             };
           }
 
+          // 更新资金池 — 本金从 user_capital 扣减，利息从 user_interest_earned 扣减
+          const currentUserInterest = Number(pool.user_interest_earned || 0);
+          const actualInterest = Math.min(dynamicInterest, currentUserInterest);
+          const newUC = Number(pool.user_capital || 0) - principal;
+          const newPC = Number(pool.platform_capital || 0);
+          const newLA = Number(pool.loaned_amount || 0);
+          const newTotal = newPC + newUC;
+          const newAvail = newTotal - newLA;
+          const newUserInterest = currentUserInterest - actualInterest;
+
           await connection.execute(
-            'UPDATE fund_pool SET total_amount = ?, available_amount = ? WHERE id = 1',
-            [Number(pool.total_amount) - totalRedeemAmount, poolAvailable - totalRedeemAmount],
+            `UPDATE fund_pool SET platform_capital=?, user_capital=?, loaned_amount=?,
+             total_amount=?, available_amount=?, reserved_amount=?,
+             user_interest_earned=? WHERE id=1`,
+            [newPC, newUC, newLA, newTotal, newAvail, newLA, newUserInterest],
           );
 
-          await connection.execute('UPDATE users SET balance = balance + ? WHERE id = ?', [
-            totalRedeemAmount,
-            userId,
-          ]);
-
-          await connection.execute(
-            'UPDATE transactions SET status = ?, interest = ?, total_amount = ? WHERE id = ?',
-            ['completed', dynamicInterest, totalRedeemAmount, investmentId],
+          // 使用加密方式更新用户余额（本金 + 实际可付利息）
+          const [userRows] = await connection.execute(
+            'SELECT balance FROM users WHERE id = ? FOR UPDATE', [userId]
           );
+          const balanceRow = { balance: userRows[0].balance };
+          await decryptFields('users', balanceRow, userId, connection);
+          const currentBalance = Number(balanceRow.balance) || 0;
+          const payoutAmount = principal + actualInterest;
+          const newBalance = currentBalance + payoutAmount;
+          const balanceData = { balance: newBalance };
+          await encryptFields('users', balanceData, userId, connection);
+          await connection.execute('UPDATE users SET balance = ? WHERE id = ?', [balanceData.balance, userId]);
+
+          // 使用 transactionDao 更新投资记录（加密写入）
+          await transactionDao.update(investmentId, {
+            status: 'completed',
+            interest: actualInterest,
+            total_amount: principal + actualInterest
+          }, connection);
 
           return { success: true };
         });
@@ -88,57 +108,23 @@ const autoRedeemMaturedInvestments = async () => {
             investmentId,
             userId,
             principal,
+            actualInterest,
             dynamicInterest,
-            totalRedeemAmount,
-            correlationInfo: {
-              investmentId,
-              userId,
-              action: 'auto_redeem',
-              principal,
-              interest: expectedInterest,
-              totalAmount: totalRedeemAmount,
-              timestamp: new Date().toISOString(),
-            },
+            payoutAmount: principal + actualInterest,
           });
         } else {
           skipped++;
-          if (result.reason === '资金池余额不足') {
-            logger.error('自动赎回跳过：资金池余额严重不足', {
-              investmentId,
-              userId,
-              totalRedeemAmount: result.required,
-              poolAvailable: result.available,
-              shortage: result.required - result.available,
-              correlationInfo: {
-                investmentId,
-                userId,
-                action: 'auto_redeem_skipped_insufficient_funds',
-                required: result.required,
-                available: result.available,
-                shortage: result.required - result.available,
-                timestamp: new Date().toISOString(),
-              },
-            });
-          } else {
-            logger.warning('自动赎回跳过', {
-              investmentId,
-              userId,
-              reason: result.reason,
-              correlationInfo: {
-                investmentId,
-                userId,
-                action: 'auto_redeem_skipped',
-                reason: result.reason,
-                timestamp: new Date().toISOString(),
-              },
-            });
-          }
+          logger.warning('自动赎回跳过', {
+            investmentId,
+            userId,
+            reason: result.reason,
+          });
         }
       } catch (error) {
         errors++;
         logger.error('自动赎回失败', {
-          investmentId: record.id,
-          userId: record.user_id,
+          investmentId: inv.id,
+          userId: inv.user_id,
           error: error.message,
         });
       }

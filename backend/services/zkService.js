@@ -90,7 +90,7 @@ exports.verifyProof = async (proof, publicSignals) => {
       throw new Error('无效的验证密钥格式');
     }
     
-    logger.info('验证零知识证明', { publicSignalsLength: publicSignals.length, proofKeys: Object.keys(proof), publicSignals: publicSignals, proof: proof });
+    logger.info('验证零知识证明', { publicSignalsLength: publicSignals.length, proofKeys: Object.keys(proof) });
 
     // 确保publicSignals是数组且不为空
       if (!Array.isArray(publicSignals) || publicSignals.length === 0) {
@@ -182,7 +182,9 @@ exports.verifyProof = async (proof, publicSignals) => {
           const proofData = { proof, publicSignals };
           const proofHash = generateSM3Hash(JSON.stringify(proofData));
 
-          const userAddress = '0x0000000000000000000000000000000000000000';
+          // 使用 proofId 的哈希派生唯一地址（避免硬编码零地址）
+          const addressHash = generateSM3Hash(proofId);
+          const userAddress = '0x' + addressHash.slice(0, 40);
           const sm3Hash = proofHash;
 
           // 先记录 proofResult，再做链上验证和状态更新

@@ -114,16 +114,28 @@ function signFiscoTx(privateKey, { randomid, blockLimit, to, data, value, gasPri
   return ethers.utils.RLP.encode(signedFields);
 }
 
+// 清理命令参数，防止 shell 注入
+function sanitizeCommandArg(arg) {
+  if (typeof arg !== 'string') return String(arg);
+  // 仅保留十六进制、数字、字母、下划线、点、0x 前缀
+  return arg.replace(/[^0-9a-zA-Zx._\-]/g, '');
+}
+
 // 通过 FISCO BCOS Console 执行写操作
 function consoleExec(groupId, command) {
   return new Promise((resolve, reject) => {
     const consoleDir = FISCO_CONFIG.consolePath;
-    const javaArgs = `-Djdk.tls.namedGroups="SM2,secp256k1,x25519,secp256r1,secp384r1,secp521r1" -cp "apps/*:conf/:lib/*:classes/:accounts/" console.Console ${groupId}`;
+    // groupId 也需验证，防止注入
+    const safeGroupId = parseInt(groupId) || 1;
+    const javaArgs = `-Djdk.tls.namedGroups="SM2,secp256k1,x25519,secp256r1,secp384r1,secp521r1" -cp "apps/*:conf/:lib/*:classes/:accounts/" console.Console ${safeGroupId}`;
+
+    // 清理命令中的 shell 特殊字符
+    const safeCommand = command.replace(/[;&|`$(){}!<>]/g, '');
 
     if (process.platform === 'win32') {
       // Windows: 写入临时脚本避免嵌套引号转义问题
       const tmpFile = path.join(require('os').tmpdir(), `fisco_cmd_${Date.now()}.sh`);
-      const script = `#!/bin/bash\ncd "${consoleDir}" && printf '${command}\\nquit\\n' | java ${javaArgs} 2>&1`;
+      const script = `#!/bin/bash\ncd "${consoleDir}" && printf '${safeCommand}\\nquit\\n' | java ${javaArgs} 2>&1`;
       fs.writeFileSync(tmpFile, script);
 
       const wslPath = tmpFile.replace(/\\/g, '/').replace(/^([A-Z]):/i, (_, d) => `/mnt/${d.toLowerCase()}`);
@@ -153,7 +165,7 @@ function consoleExec(groupId, command) {
         reject(new Error(`Console exec failed: ${err.message}`));
       });
     } else {
-      const cmd = `cd "${consoleDir}" && printf '${command}\\nquit\\n' | java ${javaArgs} 2>&1`;
+      const cmd = `cd "${consoleDir}" && printf '${safeCommand}\\nquit\\n' | java ${javaArgs} 2>&1`;
       exec(cmd, { timeout: 30000, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
         if (error && !stdout) {
           reject(new Error(`Console exec failed: ${error.message}`));
@@ -195,10 +207,12 @@ class BlockchainServiceFisco {
     this.verifierAbi = null;
     this.isInitialized = false;
     this.auditHashSent = new Set();
+    this.AUDIT_HASH_SENT_MAX = 10000; // 防止 Set 无限增长
     this.networkName = 'fisco-bcos';
-    this.privateKey = process.env.FISCO_BCOS_PRIVATE_KEY || '0x4c0883a69102937d6231471b5dbb6204fe512961708279f0ccfd5c3ef3e2e6c4';
-    if (!process.env.FISCO_BCOS_PRIVATE_KEY) {
-      logger.warning('FISCO_BCOS_PRIVATE_KEY 未设置，使用默认测试私钥（仅限开发环境）');
+    this.privateKey = process.env.FISCO_BCOS_PRIVATE_KEY;
+    if (!this.privateKey) {
+      this.privateKey = '0x4c0883a69102937d6231471b5dbb6204fe512961708279f0ccfd5c3ef3e2e6c4';
+      logger.warning('FISCO_BCOS_PRIVATE_KEY 未设置，使用默认测试私钥（仅限开发环境，生产环境必须配置）');
     }
   }
 
@@ -451,13 +465,16 @@ class BlockchainServiceFisco {
         if (!contractAddress) throw new Error(`合约 ${contractName} 地址未配置`);
 
         const paramStr = params.map(p => {
-          if (typeof p === 'string' && p.startsWith('0x') && p.length === 66) return `"${p}"`; // bytes32
+          if (typeof p === 'string' && p.startsWith('0x') && p.length === 66) return `"${sanitizeCommandArg(p)}"`; // bytes32
           if (typeof p === 'boolean') return p ? 'true' : 'false';
           if (typeof p === 'number') return String(p);
-          return `"${p}"`;
+          return `"${sanitizeCommandArg(p)}"`;
         }).join(' ');
 
-        const command = `call ${contractName} ${contractAddress} ${methodName} ${paramStr}`;
+        const safeContractName = sanitizeCommandArg(contractName);
+        const safeContractAddress = sanitizeCommandArg(contractAddress);
+        const safeMethodName = sanitizeCommandArg(methodName);
+        const command = `call ${safeContractName} ${safeContractAddress} ${safeMethodName} ${paramStr}`;
         logger.info('执行 FISCO BCOS Console 写操作', { command });
 
         const output = await consoleExec(FISCO_CONFIG.groupId, command);
@@ -541,6 +558,12 @@ class BlockchainServiceFisco {
       return Promise.resolve({ success: false, skipped: true, reason: 'duplicate' });
     }
 
+    // 防止 Set 无限增长：达到上限时清空最旧的一半
+    if (this.auditHashSent.size >= this.AUDIT_HASH_SENT_MAX) {
+      const entries = [...this.auditHashSent];
+      this.auditHashSent = new Set(entries.slice(Math.floor(entries.length / 2)));
+      logger.info('auditHashSent 已清理', { newSize: this.auditHashSent.size });
+    }
     this.auditHashSent.add(sm3Hash);
 
     logger.info('准备审计上链存证 (FISCO BCOS)', {
@@ -884,6 +907,7 @@ class BlockchainServiceFisco {
   getStatus() {
     return {
       isInitialized: this.isInitialized,
+      isConnected: this.isInitialized,
       walletAddress: null, // FISCO BCOS 使用 Channel 协议，无本地钱包地址
       network: FISCO_CONFIG,
       networkName: this.networkName,

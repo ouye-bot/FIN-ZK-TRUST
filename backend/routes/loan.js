@@ -11,6 +11,7 @@ const { verifyProof } = require('../services/zkService');
 const { verifySM2Signature, buildSignatureData } = require('../utils/cryptoUtils');
 const { CREDIT_RULES, getInterestRate } = require('./credit');
 const challengeService = require('../services/challengeService');
+const dynamicConfig = require('../services/dynamicConfigService');
 
 /**
  * @swagger
@@ -76,28 +77,29 @@ const challengeService = require('../services/challengeService');
  *         description: 借款列表
  */
 
-const getLoanLimit = (creditScore) => {
-  const limits = { 600: 1000, 650: 2000, 700: 5000, 750: 10000, 800: 20000, 850: 50000 };
-  const scores = Object.keys(limits).map(Number).sort((a, b) => b - a);
-  for (const s of scores) {
-    if (creditScore >= s) return limits[s];
-  }
-  return 0;
-};
 const poolService = require('../services/poolService');
 const { assessLoanRisk } = require('../services/riskService');
 const logger = require('../utils/logger');
 const blockchainService = require('../services/blockchainService');
+const blockchainQueueService = require('../services/blockchainQueueService');
 
-// 计算利息 - 基于信用评分的差异化利率
-const calculateInterest = (principal, days, creditScore, isOverdue = false) => {
-  const annualRate = getInterestRate(creditScore) / 100;
-  const dailyRate = annualRate / 365;
-  const rate = isOverdue ? dailyRate * 2 : dailyRate;
+// 计算利息 - 基于信用评分的差异化利率 + 动态分级罚息
+const calculateInterest = async (principal, days, creditScore, isOverdue = false, overdueDays = 0) => {
+  const baseAnnualRate = getInterestRate(creditScore) / 100;
+  const dailyRate = baseAnnualRate / 365;
+
+  let rate;
+  if (isOverdue && overdueDays > 0) {
+    const penaltyMultiplier = dynamicConfig.getOverduePenaltyRate(overdueDays);
+    rate = dailyRate * penaltyMultiplier;
+  } else if (isOverdue) {
+    rate = dailyRate * 1.5;
+  } else {
+    rate = dailyRate;
+  }
+
   return Math.round(principal * rate * days * 100) / 100;
 };
-
-const LARGE_LOAN_THRESHOLD = 5000;
 
 // 借款API
 router.post('/borrow', validate(borrowSchema), async (req, res) => {
@@ -181,7 +183,18 @@ router.post('/borrow', validate(borrowSchema), async (req, res) => {
       });
     }
 
-    if (parseInt(amount) >= LARGE_LOAN_THRESHOLD) {
+    // 提前执行风控评估（同时用于挑战阈值、借款限额、冷静期判断）
+    const riskAssessment = await assessLoanRisk(
+      userId,
+      parseInt(amount),
+      term,
+      creditProof
+    );
+    const userRisk = riskAssessment.riskScore || 60;
+
+    // 动态挑战阈值
+    const dynamicThreshold = dynamicConfig.getChallengeThreshold('borrow', userRisk);
+    if (parseInt(amount) >= dynamicThreshold) {
       const { challengeId, challengeSignature } = req.body;
 
       if (!challengeId || !challengeSignature) {
@@ -211,7 +224,8 @@ router.post('/borrow', validate(borrowSchema), async (req, res) => {
 
     // 检查借款额度
     const proofData = JSON.parse(matchingProof.proof_data);
-    const loanLimit = getLoanLimit(proofData.creditScore);
+    const proofDataCreditScore = proofData.creditScore;
+    const loanLimit = await dynamicConfig.getLoanLimit(proofDataCreditScore, userRisk);
 
     // 计算用户已借未还金额
     const activeLoans = await transactionDao.findByUserId(userId, { type: 'loan', status: 'pending' });
@@ -220,28 +234,32 @@ router.post('/borrow', validate(borrowSchema), async (req, res) => {
     // 计算实际可借额度
     let actualLoanLimit = loanLimit - totalActiveLoanAmount;
 
-    // 新用户借款冷静期：注册后 7 天内借款额度减半
+    // 动态冷静期
     let isCoolingOff = false;
     let daysSinceRegister = 0;
     if (user.created_at) {
       const registerDate = new Date(user.created_at);
       daysSinceRegister = Math.floor((Date.now() - registerDate) / (24 * 60 * 60 * 1000));
 
-      if (daysSinceRegister < CREDIT_RULES.COOLING_OFF_DAYS) {
-        const coolOffLimit = Math.floor(actualLoanLimit * CREDIT_RULES.COOLING_OFF_LOAN_RATIO);
+      const coolingOff = dynamicConfig.getCoolingOff(userRisk);
+      if (daysSinceRegister < coolingOff.days) {
+        const coolingOffTotalLimit = Math.floor(loanLimit * coolingOff.ratio);
+        const coolOffRemaining = Math.max(0, coolingOffTotalLimit - totalActiveLoanAmount);
         logger.info('用户处于借款冷静期', {
           userId,
           daysSinceRegister,
-          originalLimit: actualLoanLimit,
-          coolOffLimit
+          loanLimit,
+          coolingOffTotalLimit,
+          totalActiveLoanAmount,
+          coolOffRemaining
         });
-        actualLoanLimit = coolOffLimit;
+        actualLoanLimit = coolOffRemaining;
         isCoolingOff = true;
       }
     }
 
     logger.info('借款额度检查', {
-      creditScore: proofData.creditScore,
+      creditScore: proofDataCreditScore,
       requestedAmount: amount,
       loanLimit,
       totalActiveLoanAmount,
@@ -254,14 +272,15 @@ router.post('/borrow', validate(borrowSchema), async (req, res) => {
         loanLimit,
         totalActiveLoanAmount,
         actualLoanLimit,
-        creditScore: proofData.creditScore,
+        creditScore: proofDataCreditScore,
         isCoolingOff
       });
       let errorMessage;
       if (isCoolingOff) {
-        errorMessage = `借款金额超过限额，当前处于冷静期（注册后${daysSinceRegister}天，需满${CREDIT_RULES.COOLING_OFF_DAYS}天），可借${actualLoanLimit}，已借${totalActiveLoanAmount}`;
+        const coolingOff = dynamicConfig.getCoolingOff(userRisk);
+        errorMessage = `借款金额超过限额，当前处于冷静期（注册后${daysSinceRegister}天，需满${coolingOff.days}天），可借${actualLoanLimit}，已借${totalActiveLoanAmount}`;
       } else {
-        errorMessage = `借款金额超过限额，当前信用分${proofData.creditScore}可借${loanLimit}，已借${totalActiveLoanAmount}，剩余可借${actualLoanLimit}`;
+        errorMessage = `借款金额超过限额，当前信用分${proofDataCreditScore}可借${loanLimit}，已借${totalActiveLoanAmount}，剩余可借${actualLoanLimit}`;
       }
       return res.status(400).json({
         success: false,
@@ -297,26 +316,19 @@ router.post('/borrow', validate(borrowSchema), async (req, res) => {
       });
     }
 
-    // 智能风控评估
-    const riskAssessment = await assessLoanRisk(
-      userId,
-      parseInt(amount),
-      term,
-      creditProof
-    );
-
+    // 风控评估结果判定
     if (!riskAssessment.success) {
-      logger.warning('风险评估失败', {
+      logger.warning('风险评估拒绝', {
         userId,
         amount,
-        riskLevel: riskAssessment.riskLevel,
-        recommendations: riskAssessment.recommendations
+        loanRiskLevel: riskAssessment.loanRiskLevel,
+        loanSuggestion: riskAssessment.loanSuggestion
       });
       return res.status(400).json({
         success: false,
-        message: '风险评估失败',
-        riskLevel: riskAssessment.riskLevel,
-        recommendations: riskAssessment.recommendations
+        message: riskAssessment.loanSuggestion || '风险评估未通过',
+        loanRiskLevel: riskAssessment.loanRiskLevel,
+        loanRiskScore: riskAssessment.loanRiskScore
       });
     }
 
@@ -336,28 +348,13 @@ router.post('/borrow', validate(borrowSchema), async (req, res) => {
     // 计算 SM3 哈希（返回给前端 + 异步上链）
     const borrowData = { ...borrowResult.transaction };
     const borrowHash = blockchainService.generateSM3Hash(borrowData);
-    blockchainService.storeAuditHash(
-      borrowHash,
-      Math.floor(Date.now() / 1000),
-      'loan',
-      userId.toString()
-    ).then(result => {
-      if (result.success) {
-        logger.info('借款审计上链存证成功', {
-          transactionId: borrowResult.transaction.id,
-          blockchainTxHash: result.blockchainTxHash
-        });
-      } else {
-        logger.warning('借款审计上链存证失败', {
-          transactionId: borrowResult.transaction.id,
-          error: result.error
-        });
-      }
+    blockchainQueueService.enqueue('storeAuditHash', {
+      sm3Hash: borrowHash,
+      timestamp: Math.floor(Date.now() / 1000),
+      transactionType: 'loan',
+      userId: userId.toString()
     }).catch(err => {
-      logger.error('借款审计上链存证异常', {
-        transactionId: borrowResult.transaction.id,
-        error: err.message
-      });
+      logger.error('借款审计入队失败', { transactionId: borrowResult.transaction.id, error: err.message });
     });
 
     res.json({
@@ -468,14 +465,14 @@ router.post('/repay', validate(repaySchema), async (req, res) => {
     const agreedInterest = Number(transaction.interest || 0);
     const principal = Number(transaction.amount);
     const creditScore = user.credit_score || 600;
-    const actualInterest = calculateInterest(principal, actualDays, creditScore, false);
+    const actualInterest = await calculateInterest(principal, actualDays, creditScore, false);
 
     const dueDate = new Date(transaction.due_date || transaction.dueDate);
     const daysLate = Math.max(0, Math.floor((now - dueDate) / (24 * 60 * 60 * 1000)));
 
     let finalInterest;
     if (daysLate > 0) {
-      finalInterest = agreedInterest + calculateInterest(principal, daysLate, creditScore, true);
+      finalInterest = agreedInterest + await calculateInterest(principal, daysLate, creditScore, true, daysLate);
     } else {
       finalInterest = Math.min(actualInterest, agreedInterest);
     }
@@ -511,21 +508,23 @@ router.post('/repay', validate(repaySchema), async (req, res) => {
       const now = new Date();
       const daysRemaining = Math.max(1, Math.ceil((dueDate - now) / (24 * 60 * 60 * 1000)));
 
-      const remainingInterest = calculateInterest(remainingPrincipal, daysRemaining, creditScore, false);
+      const remainingInterest = await calculateInterest(remainingPrincipal, daysRemaining, creditScore, false);
 
       const newTotalAmount = Math.round((remainingPrincipal + remainingInterest) * 100) / 100;
 
       // 如果剩余本金为0，标记交易完成
       const newStatus = remainingPrincipal <= 0 ? 'completed' : 'pending';
 
-      await transactionDao.update(transactionId, {
-        amount: remainingPrincipal,
-        interest: remainingInterest,
-        total_amount: newTotalAmount,
-        status: newStatus
+      // 在同一个事务内完成：扣余额 + 更新资金池 + 更新贷款记录（保证原子性）
+      await poolService.repay(userId, paidPrincipal, paidInterest, {
+        transactionId,
+        loanUpdateFields: {
+          amount: remainingPrincipal,
+          interest: remainingInterest,
+          total_amount: newTotalAmount,
+          status: newStatus
+        }
       });
-
-      await poolService.repay(userId, paidPrincipal, paidInterest);
 
       // 记录部分还款的信用历史
       const partialReason = `部分还款 ¥${actualRepayAmount.toFixed(2)}`;
@@ -564,9 +563,11 @@ router.post('/repay', validate(repaySchema), async (req, res) => {
       });
     }
 
-    await poolService.repay(userId, principal, finalInterest);
-
-    await transactionDao.updateStatus(transactionId, 'completed');
+    // 在同一个事务内完成：扣余额 + 更新资金池 + 标记贷款完成（保证原子性）
+    await poolService.repay(userId, principal, finalInterest, {
+      transactionId,
+      newStatus: 'completed'
+    });
 
     // 更新信用分
     const repaidAt = new Date();
@@ -592,48 +593,19 @@ router.post('/repay', validate(repaySchema), async (req, res) => {
       reason = '提前还款';
     }
 
-    // 借款频率因子：统计 30 天内借款次数，超过 3 次扣分
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const recentLoans = await transactionDao.findByUserId(userId, { type: 'loan' });
-    const recentLoanCount = recentLoans.filter(
-      loan => new Date(loan.created_at) >= thirtyDaysAgo
-    ).length;
+    // 注意：借款频率惩罚已在借款时通过冷静期/限额机制体现，
+    // 还款时不再重复扣分，避免同一笔借款被多次惩罚
 
-    if (recentLoanCount > 3) {
-      const frequencyPenalty = (recentLoanCount - 3) * 5;
-      scoreChange -= frequencyPenalty;
-      reason += `；30天内借款${recentLoanCount}次，扣${frequencyPenalty}分`;
-      logger.info('借款频率过高扣分', {
-        userId,
-        recentLoanCount,
-        frequencyPenalty,
-        newScoreChange: scoreChange
-      });
-    }
-
-    // 更新用户信用分
-    const newScore = Math.max(
-      CREDIT_RULES.MIN_SCORE,
-      Math.min(CREDIT_RULES.MAX_SCORE, user.credit_score + scoreChange)
-    );
-
-    const updatedUser = await userDao.updateCreditScore(userId, newScore);
+    // 使用统一信用分更新
+    const newScore = await dynamicConfig.updateCreditScore(userId, scoreChange, reason, transactionId);
+    const updatedUser = await userDao.findById(userId);
     const newBalance = updatedUser.balance;
-
-    // 记录信用分变化历史
-    creditHistoryDao.create({
-      user_id: parseInt(userId),
-      score: newScore,
-      change_amount: scoreChange,
-      reason,
-      transaction_id: transactionId
-    }).catch(err => logger.error('记录信用历史失败', { error: err.message }));
 
     logger.info('还款成功', {
       userId,
       transactionId,
       newBalance,
-      newScore: user.credit_score,
+      newScore: newScore,
       scoreChange,
       reason
     });
@@ -652,34 +624,19 @@ router.post('/repay', validate(repaySchema), async (req, res) => {
     };
     
     const repayHash = blockchainService.generateSM3Hash(repayTransactionData);
-    blockchainService.storeAuditHash(
-      repayHash,
-      Math.floor(Date.now() / 1000),
-      'repay',
-      userId.toString()
-    ).then(result => {
-      if (result.success) {
-        logger.info('还款审计上链存证成功', {
-          transactionId,
-          blockchainTxHash: result.blockchainTxHash
-        });
-      } else {
-        logger.warning('还款审计上链存证失败', {
-          transactionId,
-          error: result.error
-        });
-      }
+    blockchainQueueService.enqueue('storeAuditHash', {
+      sm3Hash: repayHash,
+      timestamp: Math.floor(Date.now() / 1000),
+      transactionType: 'repay',
+      userId: userId.toString()
     }).catch(err => {
-      logger.error('还款审计上链存证异常', {
-        transactionId,
-        error: err.message
-      });
+      logger.error('还款审计入队失败', { transactionId, error: err.message });
     });
 
     res.json({
       success: true,
       message: '还款成功',
-      creditScore: user.credit_score,
+      creditScore: newScore,
       scoreChange,
       newBalance,
       hash: repayHash
@@ -794,6 +751,52 @@ router.get('/blockchain-status', async (req, res) => {
       success: false,
       message: '获取区块链状态失败'
     });
+  }
+});
+
+// 动态借款配置查询（用于前端展示）
+router.get('/config/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    if (parseInt(userId) !== req.user.id) {
+      return res.status(403).json({ success: false, message: '无权查看其他用户的配置' });
+    }
+
+    const user = await userDao.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: '用户不存在' });
+    }
+
+    const creditScore = user.credit_score || 600;
+    const userRisk = creditScore >= 750 ? 80 : creditScore >= 700 ? 70 : creditScore >= 650 ? 60 : creditScore >= 600 ? 40 : 20;
+
+    const [loanRate, loanLimit, challengeThreshold, coolingOff, activeLoans] = await Promise.all([
+      dynamicConfig.getLoanRate(creditScore),
+      dynamicConfig.getLoanLimit(creditScore, userRisk),
+      Promise.resolve(dynamicConfig.getChallengeThreshold('borrow', userRisk)),
+      Promise.resolve(dynamicConfig.getCoolingOff(userRisk)),
+      transactionDao.findByUserId(userId, { type: 'loan', status: 'pending' })
+    ]);
+
+    const totalActiveLoanAmount = activeLoans.reduce((sum, loan) => sum + loan.amount, 0);
+
+    res.json({
+      success: true,
+      data: {
+        creditScore,
+        loanRate: Math.round(loanRate * 100) / 100,
+        maxLoanLimit: loanLimit,
+        availableLimit: Math.max(0, loanLimit - totalActiveLoanAmount),
+        challengeThreshold,
+        coolingOff: {
+          days: coolingOff.days,
+          ratio: coolingOff.ratio
+        }
+      }
+    });
+  } catch (error) {
+    logger.error('获取借款配置失败', { error: error.message, userId: req.params.userId });
+    res.status(500).json({ success: false, message: '获取借款配置失败' });
   }
 });
 

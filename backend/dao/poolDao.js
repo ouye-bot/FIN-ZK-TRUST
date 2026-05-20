@@ -18,6 +18,7 @@ exports.getPool = async () => {
     pool.platform_capital = Number(pool.platform_capital || 0);
     pool.user_capital = Number(pool.user_capital || 0);
     pool.loaned_amount = Number(pool.loaned_amount || 0);
+    pool.user_interest_earned = Number(pool.user_interest_earned || 0);
     return pool;
   }
   // 如果不存在，创建初始记录（兼容旧逻辑）
@@ -106,7 +107,7 @@ exports.updatePool = async (poolData) => {
  * @param {Object} poolData - 资金池数据
  * @returns {Promise<Object>} - 更新后的资金池
  */
-exports.updatePoolV2 = async ({ platform_capital, user_capital, loaned_amount, total_interest_earned }) => {
+exports.updatePoolV2 = async ({ platform_capital, user_capital, loaned_amount, total_interest_earned, user_interest_earned }) => {
   const pc = Number(platform_capital);
   const uc = Number(user_capital);
   const la = Number(loaned_amount);
@@ -118,13 +119,14 @@ exports.updatePoolV2 = async ({ platform_capital, user_capital, loaned_amount, t
     const [results] = await connection.execute('SELECT * FROM fund_pool WHERE id = 1 FOR UPDATE');
 
     let tie = total_interest_earned !== undefined ? Number(total_interest_earned) : Number(results[0]?.total_interest_earned || 0);
+    let uie = user_interest_earned !== undefined ? Number(user_interest_earned) : Number(results[0]?.user_interest_earned || 0);
 
     await connection.execute(`
       UPDATE fund_pool
       SET platform_capital = ?, user_capital = ?, loaned_amount = ?,
-          total_amount = ?, available_amount = ?, reserved_amount = ?, total_interest_earned = ?
+          total_amount = ?, available_amount = ?, reserved_amount = ?, total_interest_earned = ?, user_interest_earned = ?
       WHERE id = 1
-    `, [pc, uc, la, total_amount, available_amount, reserved_amount, tie]);
+    `, [pc, uc, la, total_amount, available_amount, reserved_amount, tie, uie]);
 
     const [updatedResults] = await connection.execute('SELECT * FROM fund_pool WHERE id = 1');
     const pool = updatedResults[0];
@@ -135,6 +137,7 @@ exports.updatePoolV2 = async ({ platform_capital, user_capital, loaned_amount, t
     pool.platform_capital = Number(pool.platform_capital || 0);
     pool.user_capital = Number(pool.user_capital || 0);
     pool.loaned_amount = Number(pool.loaned_amount || 0);
+    pool.user_interest_earned = Number(pool.user_interest_earned || 0);
     return pool;
   });
 };
