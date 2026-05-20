@@ -89,9 +89,9 @@ class CryptoLogger {
         return { logs: [], total: 0 };
       }
       
-      // 按用户筛选
+      // 按用户筛选（兼容字符串和数字类型）
       if (userId) {
-        logs = logs.filter(log => log.userId === userId);
+        logs = logs.filter(log => String(log.userId) === String(userId));
       }
       
       // 按时间倒序排序

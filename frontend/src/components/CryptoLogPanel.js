@@ -28,12 +28,16 @@ const CryptoLogPanel = ({ logs, isVisible, onToggle, user }) => {
   const [allLogs, setAllLogs] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
 
-  // 从后端获取完整日志列表
+  // 从后端获取当前用户的日志列表
   React.useEffect(() => {
     const fetchLogs = async () => {
       try {
         const token = localStorage.getItem('token');
-        const resp = await fetch('/api/v1/crypto-log?limit=200', {
+        const userId = user?.id || user?.userId || '';
+        const url = userId
+          ? `/api/v1/crypto-log?limit=200&userId=${encodeURIComponent(userId)}`
+          : '/api/v1/crypto-log?limit=200';
+        const resp = await fetch(url, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         const data = await resp.json();
@@ -44,7 +48,7 @@ const CryptoLogPanel = ({ logs, isVisible, onToggle, user }) => {
       } catch (e) { /* ignore */ }
     };
     if (isVisible) fetchLogs();
-  }, [isVisible, logs.length]);
+  }, [isVisible, logs.length, user?.id, user?.userId]);
 
   const handleLogToggle = (logId) => {
     setExpandedLogId(expandedLogId === logId ? null : logId);
@@ -129,12 +133,12 @@ const CryptoLogPanel = ({ logs, isVisible, onToggle, user }) => {
               disabled={isVerifying}
               sx={{ fontSize: '0.75rem' }}
             >
-              {isVerifying ? '验证中...' : '验证完整性'}
+              {isVerifying ? '验证中...' : '验证全局审计链'}
             </Button>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Typography variant="body2" color="text.secondary">
-              共 {totalCount || logs.length} 条
+              我的日志: {totalCount || logs.length} 条
             </Typography>
             <IconButton onClick={onToggle} size="small">
               <CloseIcon />
@@ -154,8 +158,8 @@ const CryptoLogPanel = ({ logs, isVisible, onToggle, user }) => {
             {verifyResult && (
               <Alert severity={verifyResult.valid ? 'success' : 'error'} sx={{ py: 0.5 }}>
                 {verifyResult.valid
-                  ? `✅ 审计链完整，共 ${verifyResult.totalEntries} 条日志，未发现篡改`
-                  : `❌ 审计链已被篡改，第 ${verifyResult.firstInvalidIndex} 条日志异常（共 ${verifyResult.totalEntries} 条）`
+                  ? `✅ 全局审计链完整，共 ${verifyResult.totalEntries} 条日志（含全部用户），未发现篡改`
+                  : `❌ 全局审计链已被篡改，第 ${verifyResult.firstInvalidIndex} 条日志异常（共 ${verifyResult.totalEntries} 条）`
                 }
               </Alert>
             )}
