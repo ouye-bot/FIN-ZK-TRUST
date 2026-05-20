@@ -62,6 +62,7 @@ const setupSecurityChain = (app) => {
         console.log('[JWT] User parsed:', req.user?.id);
       } catch(err) {
         console.log('[JWT] Token invalid:', err.message);
+        return res.status(401).json({ success: false, message: '无效的认证令牌' });
       }
     }
     next();

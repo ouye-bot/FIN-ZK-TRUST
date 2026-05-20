@@ -328,8 +328,8 @@ router.post('/borrow', validate(borrowSchema), async (req, res) => {
       proofQuality: riskAssessment.proofQuality
     });
 
-    // 调用资金池借款函数（使用事务）
-    const borrowResult = await poolService.borrowFromPool(userId, parseInt(amount), term);
+    // 调用资金池借款函数（使用事务，传入限额防止 TOCTOU 竞态）
+    const borrowResult = await poolService.borrowFromPool(userId, parseInt(amount), term, actualLoanLimit);
 
     logger.info('借款成功', { userId, transactionId: borrowResult.transaction.id, amount });
 

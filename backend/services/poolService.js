@@ -341,7 +341,7 @@ exports.redeem = async (userId, amount, investmentId = null) => {
 };
 
 // 从资金池借款
-exports.borrowFromPool = async (userId, amount, duration = 30) => {
+exports.borrowFromPool = async (userId, amount, duration = 30, loanLimit = Infinity) => {
   try {
     userId = userId.toString();
 
@@ -372,6 +372,17 @@ exports.borrowFromPool = async (userId, amount, duration = 30) => {
     const dueDate = new Date(Date.now() + duration * 24 * 60 * 60 * 1000);
 
     const result = await transaction(async (connection) => {
+      // 在事务内检查借款限额（防止 TOCTOU 竞态）
+      if (loanLimit !== Infinity) {
+        const [activeLoanRows] = await connection.execute(
+          "SELECT COALESCE(SUM(amount), 0) AS total FROM transactions WHERE user_id = ? AND type = 'loan' AND status = 'pending' FOR UPDATE",
+          [parseInt(userId)]
+        );
+        const totalActive = Number(activeLoanRows[0].total) || 0;
+        if (totalActive + amount > loanLimit) {
+          throw new Error(`借款超限：已借${totalActive}，本次${amount}，限额${loanLimit}`);
+        }
+      }
       const [poolRows] = await connection.execute(
         'SELECT * FROM fund_pool WHERE id = 1 FOR UPDATE'
       );
