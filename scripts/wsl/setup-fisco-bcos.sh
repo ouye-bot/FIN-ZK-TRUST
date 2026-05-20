@@ -30,8 +30,8 @@ cat > "$NODE_DIR/conf/config.ini" << 'CONFIG_EOF'
 listen_ip=0.0.0.0
 listen_port=30300
 ; ssl or sm_ssl
-ssl_type=ssl
-; ssl_type=sm_ssl
+; ssl_type=ssl
+ssl_type=sm_ssl
 
 [channel]
 listen_port=20200

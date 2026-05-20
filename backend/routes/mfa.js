@@ -74,11 +74,12 @@ const router = express.Router();
 
 router.post('/reset', async (req, res) => {
   try {
-    const { userId } = req.body;
-    
-    if (!userId) {
-      return res.status(400).json({ success: false, message: '缺少用户 ID' });
+    // 检查认证
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ success: false, message: '未认证' });
     }
+
+    const userId = req.user.id;
 
     const user = await userDao.findById(userId);
     if (!user) {
@@ -91,9 +92,9 @@ router.post('/reset', async (req, res) => {
 
     logger.info('MFA reset completed for user', { userId });
 
-    res.status(200).json({ 
-      success: true, 
-      message: 'MFA 已重置，请重新登录设置新的 MFA' 
+    res.status(200).json({
+      success: true,
+      message: 'MFA 已重置，请重新登录设置新的 MFA'
     });
   } catch (error) {
     console.error('MFA reset error:', error);

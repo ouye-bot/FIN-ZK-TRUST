@@ -44,9 +44,7 @@ template CreditVerification() {
     // 私有输入
     signal private input creditScore;   // 信用分（300-850）
     signal private input hasNoOverdue;  // 无逾期记录标志（0 或 1）
-
-    // 公共输入
-    signal input threshold;             // 阈值（由验证者提供）
+    signal private input threshold;     // 阈值
 
     // 公共输出
     signal output isValid;              // 最终验证结果（0 或 1）

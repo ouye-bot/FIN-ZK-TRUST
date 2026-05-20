@@ -21,11 +21,13 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  TextField
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { ethers } from 'ethers';
-import { signWithSM2, getSM2KeyPair, generateSM2KeyPair, saveSM2KeyPair, generateSignatureData } from '../utils/sm2Utils';
+import { useAesKey } from '../App';
+import { signWithSM2, getSM2KeyPairWithAesKey, generateSM2KeyPair, saveSM2KeyPair, generateSignatureData } from '../utils/sm2Utils';
 import { get, post } from '../utils/apiUtils';
 
 function TabPanel(props) {
@@ -45,6 +47,7 @@ function TabPanel(props) {
 }
 
 const Profile = ({ user }) => {
+  const aesKey = useAesKey();
   const [account, setAccount] = useState('');
   const [activeTab, setActiveTab] = useState(0);
   const [error, setError] = useState('');
@@ -56,6 +59,9 @@ const Profile = ({ user }) => {
   const [latestProof, setLatestProof] = useState(null);
   const [repayDialogOpen, setRepayDialogOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
+  const [repayVerificationCode, setRepayVerificationCode] = useState('');
+  const [repayLoading, setRepayLoading] = useState(false);
+  const [repayAmount, setRepayAmount] = useState('');
   const [systemBalance, setSystemBalance] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
   const [mfaEnabled, setMfaEnabled] = useState(false);
@@ -78,11 +84,11 @@ const Profile = ({ user }) => {
       }
 
       // 获取信用历史
-      const creditResponse = await get(`/api/v1/credit/${user.id}`);
+      const creditResponse = await get(`/api/v1/credit/history/${user.id}`);
       const creditData = await creditResponse.json();
 
-      if (creditData.success && creditData.creditHistory) {
-        setCreditHistory(creditData.creditHistory);
+      if (creditData.success && creditData.data?.history) {
+        setCreditHistory(creditData.data.history);
       } else {
         setCreditHistory([]);
       }
@@ -101,8 +107,8 @@ const Profile = ({ user }) => {
       const proofResponse = await get(`/api/v1/credit/${user.id}`);
       const proofData = await proofResponse.json();
 
-      if (proofData.success && proofData.proof) {
-        setLatestProof(proofData.proof);
+      if (proofData.success && proofData.data?.proof) {
+        setLatestProof(proofData.data.proof);
       } else {
         setLatestProof(null);
       }
@@ -196,39 +202,78 @@ const Profile = ({ user }) => {
 
   const handleRepay = (transaction) => {
     setSelectedTransaction(transaction);
+    const total = Number(transaction.total_amount) || 0;
+    setRepayAmount(total.toFixed(2));
     setRepayDialogOpen(true);
   };
 
   const handleConfirmRepay = async () => {
+    if (!repayVerificationCode) {
+      setError('请输入验证口令');
+      return;
+    }
+    if (!latestProof) {
+      setError('请先生成信用证明');
+      return;
+    }
+
+    const totalRepayment = Number(selectedTransaction?.total_amount) || 0;
+    const repayValue = Number(repayAmount);
+
+    if (isNaN(repayValue) || repayValue <= 0) {
+      setError('请输入有效的还款金额');
+      return;
+    }
+
+    if (repayValue > totalRepayment) {
+      setError('还款金额不能超过应还总额');
+      return;
+    }
+
+    setRepayLoading(true);
     try {
       // 检查是否有SM2密钥对，如果没有则生成
-      let keyPair = getSM2KeyPair();
+      let keyPair = await getSM2KeyPairWithAesKey(aesKey);
       if (!keyPair) {
         keyPair = generateSM2KeyPair();
-        saveSM2KeyPair(keyPair);
+        await saveSM2KeyPair(keyPair, aesKey);
       }
-      
-      // 准备签名数据
+
+      // 准备签名数据（与后端 buildSignatureData 一致）
       const transactionData = {
-        userId: user.id,
-        transactionId: selectedTransaction.id
+        userId: String(user.id),
+        transactionId: selectedTransaction.id,
+        creditProofId: latestProof.id
       };
-      
+
       // 生成签名
       const signatureData = generateSignatureData(transactionData);
       const signature = signWithSM2(signatureData, keyPair.privateKey);
-      
+
+      const isPartialRepay = repayValue < totalRepayment;
+
       const response = await post('/api/v1/loan/repay', {
         userId: user.id,
         transactionId: selectedTransaction.id,
-        signature
+        creditProof: latestProof,
+        verificationCode: repayVerificationCode,
+        signature,
+        ...(isPartialRepay ? { partialAmount: repayValue } : {})
       });
 
       const data = await response.json();
 
       if (data.success) {
-        setSuccess(`还款成功！信用分${data.scoreChange > 0 ? '增加' : '减少'}${Math.abs(data.scoreChange)}分`);
+        if (data.completed) {
+          setSuccess('还款成功！已还清全部欠款');
+        } else if (data.scoreChange && data.scoreChange !== 0) {
+          setSuccess(`还款成功！信用分${data.scoreChange > 0 ? '增加' : '减少'}${Math.abs(data.scoreChange)}分`);
+        } else {
+          setSuccess(data.message || '部分还款成功');
+        }
         setRepayDialogOpen(false);
+        setRepayVerificationCode('');
+        setRepayAmount('');
         // 刷新数据
         fetchUserData();
       } else {
@@ -236,6 +281,8 @@ const Profile = ({ user }) => {
       }
     } catch (err) {
       setError('网络错误，请稍后重试');
+    } finally {
+      setRepayLoading(false);
     }
   };
 
@@ -610,21 +657,41 @@ const Profile = ({ user }) => {
       >
         <DialogTitle sx={{ fontWeight: 600 }}>确认还款</DialogTitle>
         <DialogContent sx={{ py: 3 }}>
-          <Typography variant="body1" sx={{ mb: 2 }}>
-            您确定要还款 <strong>¥{(Number(selectedTransaction?.amount) || 0).toFixed(2)}</strong> 元吗？
+          <Typography variant="body1" sx={{ mb: 1 }}>
+            应还总额：<strong>¥{(Number(selectedTransaction?.total_amount) || 0).toFixed(2)}</strong>
+            （本金 ¥{(Number(selectedTransaction?.amount) || 0).toFixed(2)} + 利息 ¥{(Number(selectedTransaction?.interest) || 0).toFixed(2)}）
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             当前余额：¥{(Number(userData?.balance) || 0).toFixed(2)} 元
           </Typography>
-          {userData && userData.balance < (selectedTransaction?.amount || 0) && (
+          <TextField
+            fullWidth
+            label="还款金额"
+            type="number"
+            value={repayAmount}
+            onChange={(e) => setRepayAmount(e.target.value)}
+            margin="normal"
+            disabled={repayLoading}
+            inputProps={{ min: 0, step: 0.01 }}
+            helperText={repayAmount && Number(repayAmount) < (Number(selectedTransaction?.total_amount) || 0) ? '部分还款：先扣利息，剩余冲抵本金' : ''}
+          />
+          {!latestProof && (
             <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>
-              余额不足，请先充值
+              请先在"信用证明"页面生成信用证明
             </Alert>
           )}
+          <TextField
+            fullWidth
+            label="验证口令"
+            value={repayVerificationCode}
+            onChange={(e) => setRepayVerificationCode(e.target.value)}
+            margin="normal"
+            disabled={repayLoading}
+          />
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 3 }}>
-          <Button 
-            onClick={() => setRepayDialogOpen(false)}
+          <Button
+            onClick={() => { setRepayDialogOpen(false); setRepayVerificationCode(''); setRepayAmount(''); }}
             sx={{
               color: '#64748b',
               '&:hover': {
@@ -637,7 +704,7 @@ const Profile = ({ user }) => {
           <Button
             onClick={handleConfirmRepay}
             variant="contained"
-            disabled={!userData || userData.balance < (selectedTransaction?.amount || 0)}
+            disabled={repayLoading || !repayVerificationCode || !latestProof || !repayAmount || Number(repayAmount) <= 0}
             sx={{
               background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
               '&:hover': {

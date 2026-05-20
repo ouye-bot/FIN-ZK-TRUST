@@ -105,7 +105,7 @@ class CodeQualityEnhancer {
       this.checkCodeStyle(filePath, content, lines);
 
     } catch (error) {
-      logger.warn(`分析文件失败: ${filePath}`, error.message);
+      logger.warning(`分析文件失败: ${filePath}`, error.message);
     }
   }
 

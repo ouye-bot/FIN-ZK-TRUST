@@ -15,7 +15,7 @@ logs/
 *.sqlite3
 
 # Environment variables
-.env
+**/.env
 .env.local
 .env.development.local
 

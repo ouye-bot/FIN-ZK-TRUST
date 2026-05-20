@@ -6,21 +6,25 @@ const { decryptFields, encryptFields, encrypt } = require('../utils/sm4Crypto');
  * @param {Object} transactionData - 交易数据
  * @returns {Promise<Object>} - 创建的交易
  */
-exports.create = async (transactionData) => {
+exports.create = async (transactionData, connection) => {
   const { user_id, type, amount, interest, total_amount, status, tx_hash, due_date, term } = transactionData;
+
+  const exec = connection
+    ? (sql, params) => connection.execute(sql, params).then(([rows]) => rows)
+    : execute;
 
   const amountData = { amount: Number(amount) };
   const interestData = { interest: Number(interest || 0) };
   const totalAmountData = { total_amount: Number(total_amount || 0) };
-  await encryptFields('transactions', amountData, user_id);
-  await encryptFields('transactions', interestData, user_id);
-  await encryptFields('transactions', totalAmountData, user_id);
+  await encryptFields('transactions', amountData, user_id, connection);
+  await encryptFields('transactions', interestData, user_id, connection);
+  await encryptFields('transactions', totalAmountData, user_id, connection);
 
   const sql = `
     INSERT INTO transactions (user_id, type, amount, interest, total_amount, status, tx_hash, due_date, term)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
-  const result = await execute(sql, [
+  const result = await exec(sql, [
     user_id,
     type,
     amountData.amount,
@@ -31,17 +35,21 @@ exports.create = async (transactionData) => {
     due_date || null,
     term || null
   ]);
-  return await exports.findById(result.insertId);
+  return await exports.findById(result.insertId, connection);
 };
 
 /**
  * 根据ID查找交易
  * @param {number} id - 交易ID
+ * @param {Object} [connection] - 可选事务连接
  * @returns {Promise<Object|null>} - 交易对象
  */
-exports.findById = async (id) => {
+exports.findById = async (id, connection) => {
+  const exec = connection
+    ? (sql, params) => connection.execute(sql, params).then(([rows]) => rows)
+    : execute;
   const sql = 'SELECT * FROM transactions WHERE id = ?';
-  const results = await execute(sql, [id]);
+  const results = await exec(sql, [id]);
   if (results.length > 0) {
     const transaction = {...results[0]};
     await decryptFields('transactions', transaction, results[0].user_id);
@@ -160,7 +168,8 @@ exports.update = async (id, updates) => {
 
   for (const [field, value] of Object.entries(updates)) {
     if (['amount', 'interest', 'total_amount', 'paid_amount'].includes(field)) {
-      const encrypted = await encrypt(String(Number(value)), userId, `transactions:${field}:${id}`);
+      const aad = `transactions:${field}:${userId}`;
+      const encrypted = await encrypt(String(Number(value)), userId, aad);
       fields.push(`${field} = ?`);
       params.push(encrypted);
     } else {

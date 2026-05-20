@@ -22,7 +22,8 @@ exports.authPermissionMiddleware = (req, res, next) => {
       '/api/v1/loan/list',
       '/api/v1/pool/status',
       '/api/v1/risk/assessment',
-      '/api/v1/mfa/verify'
+      '/api/v1/mfa/verify',
+      '/api/v1/crypto-log'
     ];
     
     // 检查是否在白名单中

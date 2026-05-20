@@ -82,6 +82,11 @@ router.get('/my-invest/:userId', async (req, res) => {
     const { userId } = req.params;
     logger.info('获取用户个人出资信息', { userId });
 
+    // 数据隔离检查
+    if (parseInt(userId) !== req.user.id) {
+      return res.status(403).json({ success: false, message: '无权查看其他用户的投资详情' });
+    }
+
     // 从数据库获取用户的投资记录
     const investments = await transactionDao.findByUserId(parseInt(userId), { type: 'invest' });
     

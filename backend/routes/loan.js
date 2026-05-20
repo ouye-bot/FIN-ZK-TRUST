@@ -5,6 +5,7 @@ const { borrowSchema, repaySchema } = require('../middleware/validators');
 const userDao = require('../dao/userDao');
 const transactionDao = require('../dao/transactionDao');
 const proofDao = require('../dao/proofDao');
+const creditHistoryDao = require('../dao/creditHistoryDao');
 const { transaction } = require('../config/database');
 const { verifyProof } = require('../services/zkService');
 const { verifySM2Signature, buildSignatureData } = require('../utils/cryptoUtils');
@@ -103,6 +104,11 @@ router.post('/borrow', validate(borrowSchema), async (req, res) => {
   try {
     const { userId, amount, creditProof, verificationCode, signature, term = 30 } = req.body;
     logger.info('借款请求', { userId, amount, term });
+
+    // 数据隔离检查
+    if (parseInt(userId) !== req.user.id) {
+      return res.status(403).json({ success: false, message: '无权操作其他用户的借款' });
+    }
 
     // 验证请求参数
     if (!userId || !amount || !creditProof || !verificationCode || !signature) {
@@ -327,7 +333,7 @@ router.post('/borrow', validate(borrowSchema), async (req, res) => {
 
     logger.info('借款成功', { userId, transactionId: borrowResult.transaction.id, amount });
 
-    // 异步上链存证 - 使用 AuditStorage 合约（不阻塞响应）
+    // 计算 SM3 哈希（返回给前端 + 异步上链）
     const borrowData = { ...borrowResult.transaction };
     const borrowHash = blockchainService.generateSM3Hash(borrowData);
     blockchainService.storeAuditHash(
@@ -357,7 +363,8 @@ router.post('/borrow', validate(borrowSchema), async (req, res) => {
     res.json({
       success: true,
       message: '借款成功',
-      transaction: borrowResult.transaction
+      transaction: borrowResult.transaction,
+      hash: borrowHash
     });
   } catch (error) {
     logger.error('借款失败', { error: error.message, stack: error.stack, userId: req.body.userId });
@@ -373,6 +380,11 @@ router.post('/repay', validate(repaySchema), async (req, res) => {
   try {
     const { userId, transactionId, creditProof, verificationCode, signature, partialAmount } = req.body;
     logger.info('还款请求', { userId, transactionId });
+
+    // 数据隔离检查
+    if (parseInt(userId) !== req.user.id) {
+      return res.status(403).json({ success: false, message: '无权操作其他用户的还款' });
+    }
 
     // 验证请求参数
     if (!userId || !transactionId || !creditProof || !verificationCode || !signature) {
@@ -481,18 +493,6 @@ router.post('/repay', validate(repaySchema), async (req, res) => {
     if (actualRepayAmount > totalRepayment) {
       return res.status(400).json({ success: false, message: '还款金额不能超过应还总额' });
     }
-    
-    if (user.balance < actualRepayAmount) {
-      logger.warning('还款失败：余额不足', {
-        userId,
-        balance: user.balance,
-        required: actualRepayAmount
-      });
-      return res.status(400).json({
-        success: false,
-        message: `余额不足，需要 ${actualRepayAmount.toFixed(2)} 元`
-      });
-    }
 
     if (partialAmount && actualRepayAmount < totalRepayment) {
       let paidInterest = 0;
@@ -514,14 +514,28 @@ router.post('/repay', validate(repaySchema), async (req, res) => {
       const remainingInterest = calculateInterest(remainingPrincipal, daysRemaining, creditScore, false);
 
       const newTotalAmount = Math.round((remainingPrincipal + remainingInterest) * 100) / 100;
+
+      // 如果剩余本金为0，标记交易完成
+      const newStatus = remainingPrincipal <= 0 ? 'completed' : 'pending';
+
       await transactionDao.update(transactionId, {
         amount: remainingPrincipal,
         interest: remainingInterest,
         total_amount: newTotalAmount,
-        status: 'pending'
+        status: newStatus
       });
 
       await poolService.repay(userId, paidPrincipal, paidInterest);
+
+      // 记录部分还款的信用历史
+      const partialReason = `部分还款 ¥${actualRepayAmount.toFixed(2)}`;
+      creditHistoryDao.create({
+        user_id: parseInt(userId),
+        score: user.credit_score,
+        change_amount: 0,
+        reason: partialReason,
+        transaction_id: transactionId
+      }).catch(err => logger.error('记录部分还款信用历史失败', { error: err.message }));
 
       logger.info('部分还款成功', {
         userId,
@@ -530,18 +544,23 @@ router.post('/repay', validate(repaySchema), async (req, res) => {
         paidPrincipal,
         paidInterest,
         remainingPrincipal,
-        remainingInterest
+        remainingInterest,
+        newStatus
       });
 
       return res.json({
         success: true,
-        message: `部分还款成功！已还 ¥${actualRepayAmount.toFixed(2)}，剩余本金 ¥${remainingPrincipal.toFixed(2)}，剩余利息 ¥${remainingInterest.toFixed(2)}`,
+        message: remainingPrincipal <= 0
+          ? `还款成功！已还清全部欠款 ¥${actualRepayAmount.toFixed(2)}`
+          : `部分还款成功！已还 ¥${actualRepayAmount.toFixed(2)}，剩余本金 ¥${remainingPrincipal.toFixed(2)}，剩余利息 ¥${remainingInterest.toFixed(2)}`,
         paidTotal: actualRepayAmount,
         paidPrincipal,
         paidInterest,
         remainingPrincipal,
         remainingInterest,
-        newTotalRepayment: newTotalAmount
+        newTotalRepayment: newTotalAmount,
+        scoreChange: 0,
+        completed: remainingPrincipal <= 0
       });
     }
 
@@ -601,6 +620,15 @@ router.post('/repay', validate(repaySchema), async (req, res) => {
     const updatedUser = await userDao.updateCreditScore(userId, newScore);
     const newBalance = updatedUser.balance;
 
+    // 记录信用分变化历史
+    creditHistoryDao.create({
+      user_id: parseInt(userId),
+      score: newScore,
+      change_amount: scoreChange,
+      reason,
+      transaction_id: transactionId
+    }).catch(err => logger.error('记录信用历史失败', { error: err.message }));
+
     logger.info('还款成功', {
       userId,
       transactionId,
@@ -653,7 +681,8 @@ router.post('/repay', validate(repaySchema), async (req, res) => {
       message: '还款成功',
       creditScore: user.credit_score,
       scoreChange,
-      newBalance
+      newBalance,
+      hash: repayHash
     });
   } catch (error) {
     logger.error('还款失败', { error: error.message, userId: req.body.userId, transactionId: req.body.transactionId });
@@ -669,6 +698,10 @@ router.get('/transactions/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
     logger.info('获取用户交易历史', { userId });
+
+    if (parseInt(userId) !== req.user.id) {
+      return res.status(403).json({ success: false, message: '无权查看其他用户的交易记录' });
+    }
 
     const userTransactions = await transactionDao.findByUserId(userId);
 

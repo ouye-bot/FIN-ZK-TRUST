@@ -25,6 +25,26 @@ const CryptoLogPanel = ({ logs, isVisible, onToggle, user }) => {
   const [isVerifying, setIsVerifying] = useState(false);
   const [verifyResult, setVerifyResult] = useState(null);
   const [verifyError, setVerifyError] = useState('');
+  const [allLogs, setAllLogs] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
+
+  // 从后端获取完整日志列表
+  React.useEffect(() => {
+    const fetchLogs = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const resp = await fetch('/api/v1/crypto-log?limit=200', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await resp.json();
+        if (data.success && data.data) {
+          setAllLogs(data.data.logs || []);
+          setTotalCount(data.data.total || 0);
+        }
+      } catch (e) { /* ignore */ }
+    };
+    if (isVisible) fetchLogs();
+  }, [isVisible, logs.length]);
 
   const handleLogToggle = (logId) => {
     setExpandedLogId(expandedLogId === logId ? null : logId);
@@ -114,7 +134,7 @@ const CryptoLogPanel = ({ logs, isVisible, onToggle, user }) => {
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Typography variant="body2" color="text.secondary">
-              共 {logs.length} 条
+              共 {totalCount || logs.length} 条
             </Typography>
             <IconButton onClick={onToggle} size="small">
               <CloseIcon />
@@ -147,15 +167,15 @@ const CryptoLogPanel = ({ logs, isVisible, onToggle, user }) => {
         )}
         
         <List dense>
-          {logs.length === 0 ? (
+          {allLogs.length === 0 && logs.length === 0 ? (
             <ListItem>
-              <ListItemText 
+              <ListItemText
                 primary="暂无密码操作日志"
                 secondary="执行密码相关操作后将在此显示"
               />
             </ListItem>
           ) : (
-            logs.slice().reverse().map((log) => (
+            (allLogs.length > 0 ? allLogs : logs.slice().reverse()).map((log) => (
               <React.Fragment key={log.id}>
                 <ListItem 
                   secondaryAction={

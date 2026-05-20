@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
 contract AuditStorage {
@@ -8,12 +9,42 @@ contract AuditStorage {
         string userId;
     }
 
-    mapping(string => AuditRecord) public records;
-    string[] public recordIndex;
+    address public owner;
+    mapping(address => bool) public authorizedOperators;
 
-    event AuditStored(string hashValue, uint256 timestamp, string operationType, string userId);
+    mapping(bytes32 => AuditRecord) public records;
+    bytes32[] public recordIndex;
 
-    function storeAuditHash(string memory hashValue, uint256 timestamp, string memory operationType, string memory userId) public returns (bool) {
+    event AuditStored(bytes32 indexed hashValue, uint256 timestamp, string operationType, string userId);
+    event OperatorAuthorized(address indexed operator);
+    event OperatorRevoked(address indexed operator);
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner");
+        _;
+    }
+
+    modifier onlyAuthorized() {
+        require(msg.sender == owner || authorizedOperators[msg.sender], "Not authorized");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function authorizeOperator(address op) external onlyOwner {
+        require(op != address(0), "Zero address");
+        authorizedOperators[op] = true;
+        emit OperatorAuthorized(op);
+    }
+
+    function revokeOperator(address op) external onlyOwner {
+        authorizedOperators[op] = false;
+        emit OperatorRevoked(op);
+    }
+
+    function storeAuditHash(bytes32 hashValue, uint256 timestamp, string memory operationType, string memory userId) public onlyAuthorized returns (bool) {
         require(records[hashValue].timestamp == 0, "Hash already exists");
         records[hashValue] = AuditRecord(timestamp, msg.sender, operationType, userId);
         recordIndex.push(hashValue);
@@ -25,7 +56,7 @@ contract AuditStorage {
         return recordIndex.length;
     }
 
-    function getRecordByHash(string memory hashValue) public view returns (
+    function getRecordByHash(bytes32 hashValue) public view returns (
         uint256 timestamp,
         address submitter,
         string memory operationType,
@@ -37,14 +68,14 @@ contract AuditStorage {
     }
 
     function getRecordByIndex(uint256 index) public view returns (
-        string memory hashValue,
+        bytes32 hashValue,
         uint256 timestamp,
         address submitter,
         string memory operationType,
         string memory userId
     ) {
         require(index < recordIndex.length, "Index out of bounds");
-        string memory key = recordIndex[index];
+        bytes32 key = recordIndex[index];
         AuditRecord memory r = records[key];
         return (key, r.timestamp, r.submitter, r.operationType, r.userId);
     }

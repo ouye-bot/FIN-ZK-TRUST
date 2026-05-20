@@ -5,6 +5,22 @@ const logger = require('../utils/logger');
 const SM4_ALGORITHM = 'sm4-cbc';
 const HMAC_ALGORITHM = 'sm3';
 
+function timingSafeCompare(a, b) {
+  const bufA = Buffer.from(a, 'hex');
+  const bufB = Buffer.from(b, 'hex');
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+// 从 DEK 派生独立的加密密钥和 HMAC 密钥（密钥分离）
+function deriveEncKey(dek) {
+  return Buffer.from(crypto.hkdfSync('sha256', Buffer.from(dek, 'hex'), '', 'sm4-encryption', 16));
+}
+
+function deriveHmacKey(dek) {
+  return Buffer.from(crypto.hkdfSync('sha256', Buffer.from(dek, 'hex'), '', 'sm3-hmac', 16));
+}
+
 function getMasterKey() {
   const keyHex = process.env.SM4_MASTER_KEY;
   if (!keyHex || !/^[0-9a-fA-F]{32}$/.test(keyHex)) {
@@ -33,7 +49,7 @@ function decryptWithMasterKey(ciphertext) {
   const [ivHex, authTagHex, encryptedHex] = parts;
   const expectedTag = crypto.createHmac(HMAC_ALGORITHM, key)
     .update(ivHex + encryptedHex).digest('hex');
-  if (authTagHex !== expectedTag) throw new Error('认证标签不匹配');
+  if (!timingSafeCompare(authTagHex, expectedTag)) throw new Error('认证标签不匹配');
 
   const iv = Buffer.from(ivHex, 'hex');
   const decipher = crypto.createDecipheriv(SM4_ALGORITHM, key, iv);
@@ -42,8 +58,11 @@ function decryptWithMasterKey(ciphertext) {
   return decrypted;
 }
 
-async function generateDEK(userId) {
-  const existing = await execute('SELECT encrypted_dek FROM user_keys WHERE user_id = ?', [userId]);
+async function generateDEK(userId, connection) {
+  const exec = connection
+    ? (sql, params) => connection.execute(sql, params).then(([rows]) => rows)
+    : execute;
+  const existing = await exec('SELECT encrypted_dek FROM user_keys WHERE user_id = ?', [userId]);
   if (existing.length > 0) {
     logger.info('DEK 已存在，跳过生成', { userId });
     return decryptWithMasterKey(existing[0].encrypted_dek);
@@ -52,7 +71,7 @@ async function generateDEK(userId) {
   const dekHex = crypto.randomBytes(16).toString('hex');
   const encryptedDek = encryptWithMasterKey(dekHex);
 
-  await execute(
+  await exec(
     'INSERT INTO user_keys (user_id, encrypted_dek, created_at) VALUES (?, ?, ?)',
     [userId, encryptedDek, Date.now()]
   );
@@ -64,20 +83,24 @@ async function generateDEK(userId) {
 const dekCache = new Map();
 const DEK_CACHE_TTL = 5 * 60 * 1000;
 
-async function getDEK(userId) {
+async function getDEK(userId, connection) {
   const cached = dekCache.get(userId);
   if (cached && Date.now() - cached.cachedAt < DEK_CACHE_TTL) {
     return cached.dek;
   }
 
-  const rows = await execute(
+  const exec = connection
+    ? (sql, params) => connection.execute(sql, params).then(([rows]) => rows)
+    : execute;
+
+  const rows = await exec(
     'SELECT encrypted_dek FROM user_keys WHERE user_id = ?',
     [userId]
   );
 
   if (rows.length === 0) {
     logger.info('用户无 DEK，自动生成（兼容迁移）', { userId });
-    return await generateDEK(userId);
+    return await generateDEK(userId, connection);
   }
 
   const dek = decryptWithMasterKey(rows[0].encrypted_dek);
@@ -86,14 +109,15 @@ async function getDEK(userId) {
 }
 
 function encryptWithDEK(dek, plaintext, aad = '') {
-  const key = Buffer.from(dek, 'hex');
+  const encKey = deriveEncKey(dek);
+  const hmacKey = deriveHmacKey(dek);
   const iv = crypto.randomBytes(16);
-  const cipher = crypto.createCipheriv(SM4_ALGORITHM, key, iv);
+  const cipher = crypto.createCipheriv(SM4_ALGORITHM, encKey, iv);
   let encrypted = cipher.update(String(plaintext), 'utf8', 'hex');
   encrypted += cipher.final('hex');
-  const authTag = crypto.createHmac(HMAC_ALGORITHM, key)
+  const authTag = crypto.createHmac(HMAC_ALGORITHM, hmacKey)
     .update(iv.toString('hex') + encrypted + aad).digest('hex');
-  return `v1:${iv.toString('hex')}:${authTag}:${encrypted}`;
+  return `v2:${iv.toString('hex')}:${authTag}:${encrypted}`;
 }
 
 function decryptWithDEK(dek, ciphertext, aad = '') {
@@ -101,20 +125,34 @@ function decryptWithDEK(dek, ciphertext, aad = '') {
     throw new Error('密文格式无效');
   }
 
+  const versionMatch = ciphertext.match(/^(v\d+):/);
+  const version = versionMatch ? versionMatch[1] : 'v1';
   const dataPart = ciphertext.replace(/^v\d+:/, '');
   const parts = dataPart.split(':');
   if (parts.length !== 3) throw new Error('密文格式无效');
 
   const [ivHex, authTagHex, encryptedHex] = parts;
-  const key = Buffer.from(dek, 'hex');
+  const iv = Buffer.from(ivHex, 'hex');
 
-  const expectedTag = crypto.createHmac(HMAC_ALGORITHM, key)
+  // v2: 密钥分离（encKey + hmacKey），v1: 单一密钥
+  let encKey, hmacKey;
+  if (version === 'v2') {
+    encKey = deriveEncKey(dek);
+    hmacKey = deriveHmacKey(dek);
+  } else {
+    encKey = Buffer.from(dek, 'hex');
+    hmacKey = encKey;
+  }
+
+  const expectedTag = crypto.createHmac(HMAC_ALGORITHM, hmacKey)
     .update(ivHex + encryptedHex + aad).digest('hex');
-  if (authTagHex !== expectedTag) {
+  if (!timingSafeCompare(authTagHex, expectedTag)) {
+    if (version === 'v2') throw new Error('认证标签不匹配');
+    // v1 旧格式兼容：尝试无 AAD
     if (aad) {
-      const legacyTag = crypto.createHmac(HMAC_ALGORITHM, key)
+      const legacyTag = crypto.createHmac(HMAC_ALGORITHM, hmacKey)
         .update(ivHex + encryptedHex).digest('hex');
-      if (authTagHex === legacyTag) {
+      if (timingSafeCompare(authTagHex, legacyTag)) {
         logger.warning('解密使用旧格式（无 AAD），建议运行迁移脚本', { aad });
       } else {
         throw new Error('认证标签不匹配（AAD 校验失败）');
@@ -124,8 +162,7 @@ function decryptWithDEK(dek, ciphertext, aad = '') {
     }
   }
 
-  const iv = Buffer.from(ivHex, 'hex');
-  const decipher = crypto.createDecipheriv(SM4_ALGORITHM, key, iv);
+  const decipher = crypto.createDecipheriv(SM4_ALGORITHM, encKey, iv);
   let decrypted = decipher.update(encryptedHex, 'hex', 'utf8');
   decrypted += decipher.final('utf8');
   return decrypted;

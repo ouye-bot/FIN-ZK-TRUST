@@ -61,7 +61,7 @@ class Initializer {
     for (const file of requiredFiles) {
       const filePath = path.join(dataDir, file);
       if (!fs.existsSync(filePath)) {
-        logger.warn(`Data file ${file} not found, creating empty file`);
+        logger.warning(`Data file ${file} not found, creating empty file`);
         fs.writeFileSync(filePath, JSON.stringify([], null, 2));
       }
     }

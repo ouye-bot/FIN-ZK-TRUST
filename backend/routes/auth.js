@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 const userDao = require('../dao/userDao');
 const { execute } = require('../config/database');
 const { generateToken, generateRefreshToken, verifyRefreshToken } = require('../utils/authUtils');
-const { generateSaltedSM3Hash, verifySM3Hash } = require('../utils/cryptoUtils');
+const { generateSaltedSM3Hash, verifySM3Hash, generatePBKDF2Hash, verifyPBKDF2Hash, isPBKDF2Hash } = require('../utils/cryptoUtils');
 const logger = require('../utils/logger');
 const { logCryptoOperation } = require('../utils/cryptoLogger');
 
@@ -114,17 +114,14 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    // 使用SM3哈希函数处理密码
-    const { hash, salt } = generateSaltedSM3Hash(password);
-    
-    // 打印调试日志
-    console.log('User registered:', username, 'salt:', salt, 'hash:', hash);
-    
-    // 创建新用户
+    // 使用 PBKDF2-SM3 生成密码哈希（国密合规慢速密钥派生）
+    const pbkdf2Hash = generatePBKDF2Hash(password);
+
+    // 创建新用户（salt 字段留空，哈希信息已包含在 password_hash 中）
     const newUser = await userDao.create({
       username: username,
-      password_hash: hash,
-      salt: salt,
+      password_hash: pbkdf2Hash,
+      salt: '',
       sm2_public_key: sm2PublicKey
     });
 
@@ -225,35 +222,29 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // 打印调试日志
-    console.log('Login attempt, found user:', username, 'stored salt:', user.salt, 'stored hash:', user.password_hash);
-
-    // 验证密码
+    // 验证密码（支持 PBKDF2-SM3 新格式 + SM3 旧格式透明升级）
     let isPasswordValid = false;
-    let computedHash = '';
-    
-    // 首先尝试加盐验证
-    if (user.password_hash && user.salt) {
+    let needUpgrade = false;
+
+    if (isPBKDF2Hash(user.password_hash)) {
+      // 新用户：PBKDF2-SM3 验证
+      isPasswordValid = verifyPBKDF2Hash(password, user.password_hash);
+    } else if (user.password_hash && user.salt) {
+      // 旧用户（加盐 SM3）：验证后透明升级为 PBKDF2
       isPasswordValid = verifySM3Hash(password, user.password_hash, user.salt);
-      computedHash = require('../utils/cryptoUtils').generateSaltedSM3Hash(password, user.salt).hash;
-      console.log('Computed hash with salt:', computedHash, 'match:', isPasswordValid);
-    }
-    
-    // 如果加盐验证失败，且salt为空（老用户），尝试不加盐验证
-    if (!isPasswordValid && user.salt === '') {
-      console.log('Trying without salt for old user');
-      const { hash: noSaltHash } = require('../utils/cryptoUtils').generateSaltedSM3Hash(password, '');
+      if (isPasswordValid) needUpgrade = true;
+    } else if (user.password_hash) {
+      // 极旧用户（无盐 SM3）：验证后透明升级
+      const { hash: noSaltHash } = generateSaltedSM3Hash(password, '');
       isPasswordValid = user.password_hash === noSaltHash;
-      computedHash = noSaltHash;
-      console.log('Computed hash without salt:', computedHash, 'match:', isPasswordValid);
-      
-      // 如果不加盐验证成功，为老用户生成新盐并更新
-      if (isPasswordValid) {
-        console.log('Updating old user with new salt');
-        const { hash: newHash, salt: newSalt } = require('../utils/cryptoUtils').generateSaltedSM3Hash(password);
-        await execute('UPDATE users SET password_hash = ?, salt = ? WHERE id = ?', [newHash, newSalt, user.id]);
-        console.log('Updated user with new salt and hash');
-      }
+      if (isPasswordValid) needUpgrade = true;
+    }
+
+    // 透明升级：旧 SM3 哈希 → PBKDF2-SM3
+    if (isPasswordValid && needUpgrade) {
+      const pbkdf2Hash = generatePBKDF2Hash(password);
+      await execute('UPDATE users SET password_hash = ?, salt = ? WHERE id = ?', [pbkdf2Hash, '', user.id]);
+      logger.info('用户密码哈希已透明升级为 PBKDF2-SM3', { username });
     }
 
     if (!isPasswordValid) {

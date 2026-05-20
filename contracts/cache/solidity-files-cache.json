@@ -2,7 +2,7 @@
   "_format": "hh-sol-cache-2",
   "files": {
     "D:\\ZK SM DEFI\\fin-zk-trust-master\\fin-zk-trust-master\\contracts\\contracts\\FinZkTrust.sol": {
-      "lastModificationDate": 1774681874795,
+      "lastModificationDate": 1779199731846,
       "contentHash": "de755a14157c1b7ac25835f553c2afc7",
       "sourceName": "contracts/FinZkTrust.sol",
       "solcConfig": {
@@ -43,8 +43,8 @@
       ]
     },
     "D:\\ZK SM DEFI\\fin-zk-trust-master\\fin-zk-trust-master\\contracts\\contracts\\Verifier.sol": {
-      "lastModificationDate": 1774681875439,
-      "contentHash": "e784bc520aa974f2676caafdfa31103c",
+      "lastModificationDate": 1779199659837,
+      "contentHash": "4600dfa0e90f5bb73be02c43a23f6f39",
       "sourceName": "contracts/Verifier.sol",
       "solcConfig": {
         "version": "0.8.19",
@@ -71,7 +71,7 @@
       },
       "imports": [],
       "versionPragmas": [
-        "^0.8.19"
+        ">=0.7.0 <0.9.0"
       ],
       "artifacts": [
         "Verifier"
@@ -475,8 +475,8 @@
       ]
     },
     "D:\\ZK SM DEFI\\fin-zk-trust-master\\fin-zk-trust-master\\contracts\\contracts\\AuditStorage.sol": {
-      "lastModificationDate": 1777733200288,
-      "contentHash": "13a1f5f8ea39df69dc77711cd897fa8d",
+      "lastModificationDate": 1779120620714,
+      "contentHash": "c48167fc0fde4ca763ce5dd61a84a17f",
       "sourceName": "contracts/AuditStorage.sol",
       "solcConfig": {
         "version": "0.8.19",
@@ -545,8 +545,8 @@
       ]
     },
     "D:\\ZK SM DEFI\\fin-zk-trust-master\\fin-zk-trust-master\\contracts\\contracts\\ZKPVerifier.sol": {
-      "lastModificationDate": 1777733200304,
-      "contentHash": "e0feff5af4a05513dc44b97f5868b725",
+      "lastModificationDate": 1779186159358,
+      "contentHash": "9534822f271dd63cb79454c5c6ebc562",
       "sourceName": "contracts/ZKPVerifier.sol",
       "solcConfig": {
         "version": "0.8.19",

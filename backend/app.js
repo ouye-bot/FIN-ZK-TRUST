@@ -6,7 +6,6 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const bcrypt = require('bcrypt');
 const { ethers } = require('ethers');
-const { execSync } = require('child_process');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
 
@@ -155,6 +154,9 @@ app.use('/api-docs', (req, res, next) => {
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
+// favicon 不需要认证
+app.get('/favicon.ico', (req, res) => res.status(204).end());
+
 // 统一安全过滤器链
 setupSecurityChain(app);
 
@@ -252,12 +254,12 @@ app.listen(PORT, () => {
   logger.info(`服务器启动在端口 ${PORT}`);
 
   // 初始化数据库表
-  try {
-    const createTablesScript = execSync('node ./scripts/create-tables.js', { encoding: 'utf8' });
-    logger.info('数据库表初始化成功', { output: createTablesScript });
-  } catch (error) {
+  const { createTables } = require('./scripts/create-tables');
+  createTables().then(() => {
+    logger.info('数据库表初始化成功');
+  }).catch(error => {
     logger.error('数据库表初始化失败', { error: error.message });
-  }
+  });
 
   // 每 1 小时检查一次逾期借款
   setInterval(async () => {

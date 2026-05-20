@@ -7,6 +7,8 @@ const { execute } = require('../config/database');
 const logger = require('../utils/logger');
 const { generateSM3Hash } = require('../utils/cryptoUtils');
 const { verifyProof } = require('../services/zkService');
+const blockchainService = require('../services/blockchainService');
+const creditHistoryDao = require('../dao/creditHistoryDao');
 const path = require('path');
 const fs = require('fs');
 
@@ -162,6 +164,22 @@ router.post('/generate-proof', async (req, res) => {
     });
     logger.info('信用证明生成成功', { userId, proofId, expiresAt: expiresAtDate.toISOString() });
 
+    // 异步上链存证
+    blockchainService.storeAuditHash(
+      sm3Hash,
+      Math.floor(Date.now() / 1000),
+      'CREDIT_PROOF_GENERATE',
+      userId.toString()
+    ).then(result => {
+      if (result.success) {
+        logger.info('信用证明生成上链存证成功', { proofId, blockchainTxHash: result.blockchainTxHash });
+      } else {
+        logger.warning('信用证明生成上链存证跳过', { proofId, error: result.error });
+      }
+    }).catch(err => {
+      logger.error('信用证明生成上链存证异常', { proofId, error: err.message });
+    });
+
     // 构建 ZKP 标准嵌套结构
     const proofResult = {
       proofId: proofId,
@@ -236,6 +254,23 @@ router.post('/verify-proof', async (req, res) => {
     if (isValid) {
       logger.info('信用证明验证成功', { proofId });
 
+      // 异步上链存证
+      const verifyHash = generateSM3Hash(JSON.stringify({ proofId, action: 'verify', timestamp: Date.now() }));
+      blockchainService.storeAuditHash(
+        verifyHash,
+        Math.floor(Date.now() / 1000),
+        'CREDIT_PROOF_VERIFY',
+        proof.user_id ? proof.user_id.toString() : '0'
+      ).then(result => {
+        if (result.success) {
+          logger.info('信用证明验证上链存证成功', { proofId, blockchainTxHash: result.blockchainTxHash });
+        } else {
+          logger.warning('信用证明验证上链存证跳过', { proofId, error: result.error });
+        }
+      }).catch(err => {
+        logger.error('信用证明验证上链存证异常', { proofId, error: err.message });
+      });
+
       const responseData = {
         proofId,
         expiresAt: proof.expires_at
@@ -248,7 +283,7 @@ router.post('/verify-proof', async (req, res) => {
           responseData.publicSignals = JSON.parse(proof.public_signals);
         }
       } catch (parseErr) {
-        logger.warn('ZKP data parse failed, returning proof without ZKP fields', {
+        logger.warning('ZKP data parse failed, returning proof without ZKP fields', {
           proofId, error: parseErr.message
         });
       }
@@ -259,7 +294,7 @@ router.post('/verify-proof', async (req, res) => {
         data: responseData
       });
     } else {
-      logger.warn('信用证明验证失败', { proofId });
+      logger.warning('信用证明验证失败', { proofId });
       res.json({
         success: false,
         message: '信用证明验证失败'
@@ -426,41 +461,23 @@ router.get('/score/:userId', async (req, res) => {
 router.get('/history/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
-    
+
     logger.info('获取用户信用历史', { userId });
-    
-    // 从数据库获取用户信息
+
     const user = await userDao.findById(parseInt(userId));
     if (!user) {
-      return res.json({
-        success: false,
-        message: '用户不存在'
-      });
+      return res.json({ success: false, message: '用户不存在' });
     }
-    
-    // 从数据库获取用户的交易记录
-    const transactions = await transactionDao.findByUserId(parseInt(userId));
-    
-    // 构建信用历史
-    const history = [];
-    
-    transactions.forEach(transaction => {
-      if (transaction.type === 'loan') {
-        const historyItem = {
-          id: transaction.id,
-          timestamp: transaction.created_at,
-          type: transaction.status === 'completed' ? 'repayment' : 'default',
-          description: transaction.status === 'completed' ? '按时还款' : '逾期还款',
-          amount: transaction.amount,
-          scoreChange: transaction.status === 'completed' ? 10 : -50
-        };
-        history.push(historyItem);
-      }
-    });
-    
-    // 按时间倒序排序
-    history.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-    
+
+    const records = await creditHistoryDao.findByUserId(parseInt(userId));
+    const history = records.map(r => ({
+      id: r.id,
+      timestamp: r.created_at,
+      score: r.score,
+      change: r.change_amount,
+      description: r.reason
+    }));
+
     logger.info('获取用户信用历史成功', { userId, historyCount: history.length });
     
     res.json({

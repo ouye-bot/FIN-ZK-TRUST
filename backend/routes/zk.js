@@ -46,18 +46,14 @@ router.post('/generate-proof', async (req, res) => {
       logger.info('ZKP生成-用户逾期状态', { userId, hasNoOverdue });
     }
 
-    const taskId = zkQueue.addTask(
-      { creditScore, threshold, hasNoOverdue },
-      wasmPath,
-      zkeyPath
-    );
+    const taskId = zkQueue.addTask({ creditScore, threshold, hasNoOverdue });
 
     const workerTaskId = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
 
     runTask({
       id: workerTaskId,
       type: 'generate',
-      args: [creditScore, threshold, wasmPath, zkeyPath]
+      args: [creditScore, threshold, hasNoOverdue]
     }).then(result => {
       zkQueue.updateTaskStatus(taskId, 'completed', result, null);
     }).catch(err => {

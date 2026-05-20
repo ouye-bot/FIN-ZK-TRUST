@@ -18,7 +18,7 @@
     along with snarkJS. If not, see <https://www.gnu.org/licenses/>.
 */
 
-pragma solidity ^0.8.19;
+pragma solidity >=0.7.0 <0.9.0;
 
 contract Verifier {
     // Scalar field size
@@ -37,17 +37,17 @@ contract Verifier {
     uint256 constant gammax2 = 10857046999023057135944570762232829481370756359578518086990519993285655852781;
     uint256 constant gammay1 = 4082367875863433681332203403145435568316851327593401208105741076214120093531;
     uint256 constant gammay2 = 8495653923123431417604973247489272438418190587263600148770280649306958101930;
-    uint256 constant deltax1 = 11559732032986387107991004021392285783925812861821192530917403151452391805634;
-    uint256 constant deltax2 = 10857046999023057135944570762232829481370756359578518086990519993285655852781;
+    uint256 constant deltax1 = 10857046999023057135944570762232829481370756359578518086990519993285655852781;
+    uint256 constant deltax2 = 11559732032986387107991004021392285783925812861821192530917403151452391805634;
     uint256 constant deltay1 = 4082367875863433681332203403145435568316851327593401208105741076214120093531;
     uint256 constant deltay2 = 8495653923123431417604973247489272438418190587263600148770280649306958101930;
 
-    
-    uint256 constant IC0x = 3870579345899727345347031597578832127817037728449672692215865443093667590190;
-    uint256 constant IC0y = 5377411567264220215006197612666751200049506185513190769403779338825237990468;
-    
-    uint256 constant IC1x = 3940735862683713915145504210162642124241294243740956268105000149014516881112;
-    uint256 constant IC1y = 10616925878752946721746891951230853400855527862330085990618022542570759795832;
+
+    uint256 constant IC0x = 1646600300408981759572594271957486227286462135500207575381084260970096029381;
+    uint256 constant IC0y = 14313353596411706690746970772776548295259744077882247943553701684159448286559;
+
+    uint256 constant IC1x = 1525447445093220299228656999914161167890764599490162092590351317417630633355;
+    uint256 constant IC1y = 1363761345461084533184554958139374733890101252995029479590415647427093689869;
     
  
     // Memory data
@@ -68,20 +68,18 @@ contract Verifier {
         bytes32 sm3Hash
     ) public returns (bool) {
         // Parameter validation
-        require(user != address(0), "User address cannot be zero");
         require(sm3Hash != bytes32(0), "SM3 hash cannot be empty");
 
-        bool isValid = verify(_pA, _pB, _pC, _pubSignals);
-        
+        bool isValid = _verifyProofInternal(_pA, _pB, _pC, _pubSignals);
+
         if (isValid) {
-            // Emit event on successful verification
             emit ProofVerifySuccess(user, sm3Hash, block.timestamp);
         }
-        
+
         return isValid;
     }
 
-    function verify(uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[1] calldata _pubSignals) internal view returns (bool) {
+    function _verifyProofInternal(uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[1] calldata _pubSignals) internal view returns (bool) {
         assembly {
             function checkField(v) {
                 if iszero(lt(v, r)) {
@@ -126,7 +124,6 @@ contract Verifier {
                 // Compute the linear combination vk_x
                 
                 g1_mulAccC(_pVk, IC1x, IC1y, calldataload(add(pubSignals, 0)))
-                
 
                 // -A
                 mstore(_pPairing, calldataload(pA))
@@ -181,7 +178,6 @@ contract Verifier {
             // Validate that all evaluations ∈ F
             
             checkField(calldataload(add(_pubSignals, 0)))
-            
 
             // Validate all evaluations
             let isValid := checkPairing(_pA, _pB, _pC, _pubSignals, pMem)
@@ -190,4 +186,4 @@ contract Verifier {
              return(0, 0x20)
          }
      }
- } 
+ }

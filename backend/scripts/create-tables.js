@@ -160,14 +160,34 @@ const createTables = async () => {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
     console.log('user_keys表创建成功');
-    
+
+    // 创建credit_history表
+    await execute(`
+      CREATE TABLE IF NOT EXISTS credit_history (
+        id INT PRIMARY KEY AUTO_INCREMENT,
+        user_id BIGINT NOT NULL,
+        score INT NOT NULL COMMENT '变更后的信用分',
+        change_amount INT NOT NULL COMMENT '分值变化（正为增加，负为减少）',
+        reason VARCHAR(255) NOT NULL COMMENT '变更原因',
+        transaction_id INT DEFAULT NULL COMMENT '关联的交易ID',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_user_id (user_id),
+        INDEX idx_created_at (created_at),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log('credit_history表创建成功');
+
     console.log('所有表创建完成');
   } catch (error) {
     console.error('创建表时出错:', error);
-  } finally {
-    process.exit(0);
+    throw error;
   }
 };
 
-// 执行创建表操作
-createTables();
+module.exports = { createTables };
+
+// 直接运行时执行
+if (require.main === module) {
+  createTables().then(() => process.exit(0)).catch(() => process.exit(1));
+}

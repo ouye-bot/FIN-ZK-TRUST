@@ -7,6 +7,7 @@ const transactionDao = require('../dao/transactionDao');
 const proofDao = require('../dao/proofDao');
 const { verifySM2Signature, generateSM3Hash, buildSignatureData } = require('../utils/cryptoUtils');
 const { CREDIT_RULES } = require('./credit');
+const creditHistoryDao = require('../dao/creditHistoryDao');
 const poolService = require('../services/poolService');
 const { getCurrentLendingRate } = require('../services/interestRateService');
 const logger = require('../utils/logger');
@@ -76,6 +77,11 @@ router.post('/', validate(investSchema), async (req, res) => {
   try {
     const { userId, amount, term, creditProof, verificationCode, signature } = req.body;
     logger.info('投资请求', { userId, amount, term });
+
+    // 数据隔离检查
+    if (parseInt(userId) !== req.user.id) {
+      return res.status(403).json({ success: false, message: '无权操作其他用户的投资' });
+    }
 
     // 验证请求参数
     if (!userId || !amount || !term || !creditProof || !verificationCode || !signature) {
@@ -188,13 +194,6 @@ router.post('/', validate(investSchema), async (req, res) => {
       term: term
     });
 
-    // 更新余额
-    await userDao.updateBalance(userId, user.balance - parseInt(amount));
-    logger.info('更新用户余额', {
-      userId: user.id,
-      newBalance: user.balance - parseInt(amount)
-    });
-
     logger.info('投资成功', { userId, transactionId: newTransaction.id, amount, expectedReturn });
 
     // 出资成功，增加信用分 +2
@@ -211,6 +210,13 @@ router.post('/', validate(investSchema), async (req, res) => {
           oldScore: currentUser.credit_score,
           newScore
         });
+        creditHistoryDao.create({
+          user_id: parseInt(userId),
+          score: newScore,
+          change_amount: CREDIT_RULES.SCORE_CHANGES.INVEST_REWARD,
+          reason: '出资奖励',
+          transaction_id: newTransaction ? newTransaction.id : null
+        }).catch(err => logger.error('记录出资信用历史失败', { error: err.message }));
       }
     } catch (scoreErr) {
       logger.warning('出资奖励信用分失败', { error: scoreErr.message });
@@ -261,6 +267,11 @@ router.get('/:userId', async (req, res) => {
     const { userId } = req.params;
     logger.info('获取用户投资列表', { userId });
 
+    // 数据隔离检查
+    if (parseInt(req.params.userId) !== req.user.id) {
+      return res.status(403).json({ success: false, message: '无权查看其他用户的投资' });
+    }
+
     // 从数据库获取投资列表
     const userInvestments = await transactionDao.findByUserId(parseInt(userId), { type: 'invest' });
     logger.info('获取用户投资列表成功', { userId, investmentCount: userInvestments.length });
@@ -282,6 +293,11 @@ router.get('/investments/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
     logger.info('获取用户投资列表（兼容路由）', { userId });
+
+    // 数据隔离检查
+    if (parseInt(req.params.userId) !== req.user.id) {
+      return res.status(403).json({ success: false, message: '无权查看其他用户的投资' });
+    }
 
     // 从数据库获取投资列表
     const userInvestments = await transactionDao.findByUserId(parseInt(userId), { type: 'invest' });

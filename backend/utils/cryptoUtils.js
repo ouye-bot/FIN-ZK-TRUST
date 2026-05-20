@@ -139,10 +139,11 @@ function validateSM2PublicKey(publicKey) {
 /**
  * 生成带盐的SM3哈希
  * @param {string} password - 原始密码
+ * @param {string} [existingSalt] - 已有盐值（验证时传入），不传则自动生成
  * @returns {Object} - 包含哈希值和盐的对象
  */
-exports.generateSaltedSM3Hash = (password) => {
-  const salt = crypto.randomBytes(16).toString('hex');
+exports.generateSaltedSM3Hash = (password, existingSalt) => {
+  const salt = existingSalt !== undefined ? existingSalt : crypto.randomBytes(16).toString('hex');
   const saltedPassword = password + salt;
   const hash = sm3(saltedPassword);
   return { hash, salt };
@@ -158,7 +159,48 @@ exports.generateSaltedSM3Hash = (password) => {
 exports.verifySM3Hash = (password, storedHash, salt) => {
   const saltedPassword = password + salt;
   const hash = sm3(saltedPassword);
-  return hash === storedHash;
+  if (hash.length !== storedHash.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(storedHash, 'hex'));
+};
+
+const PBKDF2_ITERATIONS = 100000;
+const PBKDF2_KEYLEN = 32;
+const PBKDF2_DIGEST = 'sm3';
+
+/**
+ * 使用 PBKDF2-SM3 生成密码哈希（国密合规慢速密钥派生）
+ * @param {string} password - 原始密码
+ * @returns {string} - 格式: pbkdf2:iterations:salt:hash（均为 hex）
+ */
+exports.generatePBKDF2Hash = (password) => {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const derived = crypto.pbkdf2Sync(password, salt, PBKDF2_ITERATIONS, PBKDF2_KEYLEN, PBKDF2_DIGEST);
+  return `pbkdf2:${PBKDF2_ITERATIONS}:${salt}:${derived.toString('hex')}`;
+};
+
+/**
+ * 验证 PBKDF2-SM3 密码哈希
+ * @param {string} password - 原始密码
+ * @param {string} storedHash - 存储的哈希（pbkdf2:iterations:salt:hash 格式）
+ * @returns {boolean} - 验证结果
+ */
+exports.verifyPBKDF2Hash = (password, storedHash) => {
+  const parts = storedHash.split(':');
+  if (parts.length !== 4 || parts[0] !== 'pbkdf2') return false;
+  const [, iterations, salt, expectedHash] = parts;
+  const derived = crypto.pbkdf2Sync(password, salt, parseInt(iterations), PBKDF2_KEYLEN, PBKDF2_DIGEST);
+  const derivedHex = derived.toString('hex');
+  if (derivedHex.length !== expectedHash.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(derivedHex, 'hex'), Buffer.from(expectedHash, 'hex'));
+};
+
+/**
+ * 检测是否为 PBKDF2 格式的哈希
+ * @param {string} hash - 存储的哈希值
+ * @returns {boolean}
+ */
+exports.isPBKDF2Hash = (hash) => {
+  return typeof hash === 'string' && hash.startsWith('pbkdf2:');
 };
 
 /**
@@ -244,7 +286,7 @@ exports.signWithSM2 = (message, privateKey) => {
   }
   validateSM2PrivateKey(privateKey);
 
-  const cacheKey = `sm2_sign::${message}`;
+  const cacheKey = `sm2_sign::${message}::${crypto.createHash('sha256').update(privateKey).digest('hex').slice(0, 16)}`;
   const cachedSignature = signatureCache.get(cacheKey);
 
   if (cachedSignature !== null) {

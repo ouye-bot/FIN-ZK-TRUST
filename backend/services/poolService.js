@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const { generateSM3Hash } = require('../utils/cryptoUtils');
 const { getInterestRate } = require('../routes/credit');
 const { getCurrentLendingRate } = require('./interestRateService');
+const { encryptFields, decryptFields } = require('../utils/sm4Crypto');
 
 // 生成日志ID
 const generateLogId = () => {
@@ -112,7 +113,7 @@ exports.getPoolInfo = async () => {
     
     // 如果检测到异常，记录日志
     if (poolStatus === 'abnormal') {
-      logger.warn('检测到资金池异常状态（负余额），当前值:', safeAvailableAmount);
+      logger.warning('检测到资金池异常状态（负余额），当前值:', safeAvailableAmount);
     }
     
     // 记录资金池状态信息（新模型字段）
@@ -174,7 +175,7 @@ exports.checkPoolConsistency = async () => {
     // 检查资金池是否存在
     const pool = await poolDao.getPool();
     if (!pool) {
-      logger.warn('资金池数据不存在，正在重新初始化');
+      logger.warning('资金池数据不存在，正在重新初始化');
       await exports.initializePool();
       return;
     }
@@ -188,52 +189,61 @@ exports.checkPoolConsistency = async () => {
 // 执行出资操作
 exports.invest = async (userId, amount) => {
   try {
-    // 确保userId是字符串类型
     userId = userId.toString();
-    
-    // 业务规则校验
+
     if (!userId || !amount) {
       throw new Error('缺少必要参数');
     }
-    
+
     if (amount < 100) {
       throw new Error('出资金额必须大于等于100元');
     }
-    
+
     if (amount > 100000) {
       throw new Error('单次出资金额不能超过10万元');
     }
-    
-    // 读取用户数据，验证用户状态和信用评分
+
     const user = await userDao.findById(userId);
-    
     if (!user) {
       throw new Error('用户不存在');
     }
-    
+
     if (user.credit_score < 600) {
       throw new Error('信用分低于600，无法出资');
     }
-    
-    if (user.balance < amount) {
-      throw new Error('余额不足');
-    }
-    
-    // 获取资金池信息
-    const pool = await poolDao.getPool();
-    
-    // 更新资金池（新模型：仅增加 user_capital）和用户余额，在同一事务中执行
+
     await transaction(async (connection) => {
-      await poolDao.updatePoolV2({
-        platform_capital: pool.platform_capital,
-        user_capital: (pool.user_capital || 0) + amount,
-        loaned_amount: pool.loaned_amount || 0
-      });
-      await userDao.updateBalance(userId, user.balance - amount);
+      const [userRows] = await connection.execute(
+        'SELECT balance FROM users WHERE id = ? FOR UPDATE', [userId]
+      );
+      const balanceRow = { balance: userRows[0].balance };
+      await decryptFields('users', balanceRow, userId, connection);
+      const currentBalance = Number(balanceRow.balance) || 0;
+      if (currentBalance < amount) {
+        throw new Error('余额不足');
+      }
+
+      const [poolRows] = await connection.execute(
+        'SELECT * FROM fund_pool WHERE id = 1 FOR UPDATE'
+      );
+      const pool = poolRows[0];
+
+      const newUC = Number(pool.user_capital || 0) + amount;
+      const newTotal = Number(pool.platform_capital || 0) + newUC;
+      const newAvail = newTotal - Number(pool.loaned_amount || 0);
+      await connection.execute(
+        'UPDATE fund_pool SET user_capital=?, total_amount=?, available_amount=? WHERE id=1',
+        [newUC, newTotal, newAvail]
+      );
+
+      const newBalance = currentBalance - amount;
+      const balanceData = { balance: newBalance };
+      await encryptFields('users', balanceData, userId, connection);
+      await connection.execute('UPDATE users SET balance = ? WHERE id = ?', [balanceData.balance, userId]);
     });
-    
+
     logger.info(`用户 ${userId} 出资 ${amount} 元成功，信用分 ${user.credit_score}`);
-    
+
     return true;
   } catch (error) {
     logger.error('出资操作失败:', { error: error.message, userId, amount });
@@ -245,27 +255,27 @@ exports.invest = async (userId, amount) => {
 exports.redeem = async (userId, amount, investmentId = null) => {
   try {
     userId = userId.toString();
-    
+
     if (!userId || !amount) {
       throw new Error('缺少必要参数');
     }
-    
+
     if (amount < 100) {
       throw new Error('赎回金额必须大于等于100元');
     }
-    
+
     if (amount > 50000) {
       throw new Error('单次赎回金额不能超过5万元');
     }
-    
+
     const user = await userDao.findById(userId);
-    
+
     if (!user) {
       throw new Error('用户不存在');
     }
-    
+
     let dynamicInterest = 0;
-    
+
     if (investmentId) {
       const investment = await transactionDao.findById(investmentId);
       if (investment && investment.type === 'invest' && investment.status === 'active') {
@@ -273,15 +283,15 @@ exports.redeem = async (userId, amount, investmentId = null) => {
         const annualRate = await getCurrentLendingRate();
         const dailyRate = annualRate / 365;
         dynamicInterest = Math.round(Number(investment.amount) * dailyRate * investDays * 100) / 100;
-        
+
         const newTotalAmount = Math.round((Number(investment.amount) + dynamicInterest) * 100) / 100;
-        
+
         await transactionDao.update(investmentId, {
           interest: dynamicInterest,
           total_amount: newTotalAmount,
           status: 'completed'
         });
-        
+
         logger.info('投资记录收益已更新', {
           investmentId,
           principal: investment.amount,
@@ -290,24 +300,39 @@ exports.redeem = async (userId, amount, investmentId = null) => {
         });
       }
     }
-    
-    const pool = await poolDao.getPool();
-    
-    if (amount > pool.available_amount) {
-      throw new Error(`可赎回金额不足，当前可赎回 ${pool.available_amount} 元`);
-    }
-    
+
     await transaction(async (connection) => {
-      await poolDao.updatePoolV2({
-        platform_capital: pool.platform_capital,
-        user_capital: (pool.user_capital || 0) - amount,
-        loaned_amount: pool.loaned_amount || 0
-      });
-      await userDao.updateBalance(userId, user.balance + amount);
+      const [poolRows] = await connection.execute(
+        'SELECT * FROM fund_pool WHERE id = 1 FOR UPDATE'
+      );
+      const pool = poolRows[0];
+
+      if (amount > Number(pool.available_amount)) {
+        throw new Error(`可赎回金额不足，当前可赎回 ${pool.available_amount} 元`);
+      }
+
+      const newUC = Number(pool.user_capital || 0) - amount;
+      const newTotal = Number(pool.platform_capital || 0) + newUC;
+      const newAvail = newTotal - Number(pool.loaned_amount || 0);
+      await connection.execute(
+        'UPDATE fund_pool SET user_capital=?, total_amount=?, available_amount=? WHERE id=1',
+        [newUC, newTotal, newAvail]
+      );
+
+      const [userRows] = await connection.execute(
+        'SELECT balance FROM users WHERE id = ? FOR UPDATE', [userId]
+      );
+      const balanceRow = { balance: userRows[0].balance };
+      await decryptFields('users', balanceRow, userId, connection);
+      const currentBalance = Number(balanceRow.balance) || 0;
+      const newBalance = currentBalance + amount;
+      const balanceData = { balance: newBalance };
+      await encryptFields('users', balanceData, userId, connection);
+      await connection.execute('UPDATE users SET balance = ? WHERE id = ?', [balanceData.balance, userId]);
     });
-    
+
     logger.info(`用户 ${userId} 赎回 ${amount} 元成功`, { dynamicInterest });
-    
+
     return true;
   } catch (error) {
     logger.error('赎回操作失败:', { error: error.message, userId, amount });
@@ -318,61 +343,63 @@ exports.redeem = async (userId, amount, investmentId = null) => {
 // 从资金池借款
 exports.borrowFromPool = async (userId, amount, duration = 30) => {
   try {
-    // 确保userId是字符串类型
     userId = userId.toString();
-    
-    // 业务规则校验
+
     if (!userId || !amount) {
       throw new Error('缺少必要参数');
     }
-    
+
     if (amount < 100) {
       throw new Error('借款金额必须大于等于100元');
     }
-    
+
     if (amount > 50000) {
       throw new Error('单次借款金额不能超过5万元');
     }
-    
-    // 读取用户数据
+
     const user = await userDao.findById(userId);
     if (!user) {
       throw new Error('用户不存在');
     }
-    
-    // 验证用户信用评分
+
     if (user.credit_score < 600) {
       throw new Error('信用分低于600，无法借款');
     }
-    
-    // 计算利息和应还总额
+
     const interest = calculateInterest(amount, duration, user.credit_score);
     const totalRepay = amount + interest;
-    
-    // 计算到期日期
+
     const dueDate = new Date(Date.now() + duration * 24 * 60 * 60 * 1000);
-    
-    // 获取资金池信息
-    const pool = await poolDao.getPool();
-    
-    // 检查资金池余额
-    if (amount > pool.available_amount) {
-      throw new Error('资金池余额不足');
-    }
-    
-    // 执行事务
+
     const result = await transaction(async (connection) => {
-      // 1. 更新资金池（新模型：仅增加 loaned_amount）
-      await poolDao.updatePoolV2({
-        platform_capital: pool.platform_capital,
-        user_capital: pool.user_capital || 0,
-        loaned_amount: (pool.loaned_amount || 0) + amount
-      });
-      
-      // 2. 更新用户余额
-      await userDao.updateBalance(userId, user.balance + amount);
-      
-      // 3. 创建交易记录
+      const [poolRows] = await connection.execute(
+        'SELECT * FROM fund_pool WHERE id = 1 FOR UPDATE'
+      );
+      const pool = poolRows[0];
+
+      if (amount > Number(pool.available_amount)) {
+        throw new Error('资金池余额不足');
+      }
+
+      const newLA = Number(pool.loaned_amount || 0) + amount;
+      const newAvail = Number(pool.total_amount || 0) - newLA;
+      const newReserved = newLA;
+      await connection.execute(
+        'UPDATE fund_pool SET loaned_amount=?, available_amount=?, reserved_amount=? WHERE id=1',
+        [newLA, newAvail, newReserved]
+      );
+
+      const [userRows] = await connection.execute(
+        'SELECT balance FROM users WHERE id = ? FOR UPDATE', [userId]
+      );
+      const balanceRow = { balance: userRows[0].balance };
+      await decryptFields('users', balanceRow, userId, connection);
+      const currentBalance = Number(balanceRow.balance) || 0;
+      const newBalance = currentBalance + amount;
+      const balanceData = { balance: newBalance };
+      await encryptFields('users', balanceData, userId, connection);
+      await connection.execute('UPDATE users SET balance = ? WHERE id = ?', [balanceData.balance, userId]);
+
       const newTransaction = await transactionDao.create({
         user_id: parseInt(userId),
         type: 'loan',
@@ -381,11 +408,11 @@ exports.borrowFromPool = async (userId, amount, duration = 30) => {
         total_amount: totalRepay,
         status: 'pending',
         due_date: dueDate
-      });
-      
+      }, connection);
+
       return newTransaction;
     });
-    
+
     logger.info('借款操作成功', { userId, amount, interest, totalRepay, duration });
     return {
       success: true,
@@ -406,65 +433,68 @@ exports.borrow = async (userId, amount, interestRate, duration) => {
 // 执行还款操作
 exports.repay = async (userId, amount, interest) => {
   try {
-    // 确保userId是字符串类型
     userId = userId.toString();
-    
-    // 业务规则校验
+
     if (!userId || !amount || !interest) {
       throw new Error('缺少必要参数');
     }
-    
+
     if (amount < 0 || interest < 0) {
       throw new Error('金额不能为负数');
     }
-    
-    // 读取用户数据
+
     const user = await userDao.findById(userId);
     if (!user) {
       throw new Error('用户不存在');
     }
-    
-    // 验证用户余额
+
     const totalRepayment = amount + interest;
-    if (user.balance < totalRepayment) {
-      throw new Error('余额不足');
-    }
-    
-    // 获取资金池信息
-    const pool = await poolDao.getPool();
-    
-    // 利息独立记录
-    const oldInterestEarned = pool.total_interest_earned || 0;
-    const newInterestEarned = oldInterestEarned + interest;
-    
-    // 执行事务
+    let newInterestEarned = 0;
+
     await transaction(async (connection) => {
-      // 1. 更新资金池（新模型：减少 loaned_amount，增加 total_interest_earned）
-      await poolDao.updatePoolV2({
-        platform_capital: pool.platform_capital,
-        user_capital: pool.user_capital || 0,
-        loaned_amount: (pool.loaned_amount || 0) - amount,
-        total_interest_earned: newInterestEarned
-      });
-      
-      // 2. 更新用户余额
-      await userDao.updateBalance(userId, user.balance - totalRepayment);
+      const [userRows] = await connection.execute(
+        'SELECT balance FROM users WHERE id = ? FOR UPDATE', [userId]
+      );
+      const balanceRow = { balance: userRows[0].balance };
+      await decryptFields('users', balanceRow, userId, connection);
+      const currentBalance = Number(balanceRow.balance) || 0;
+      if (currentBalance < totalRepayment) {
+        throw new Error('余额不足');
+      }
+
+      const [poolRows] = await connection.execute(
+        'SELECT * FROM fund_pool WHERE id = 1 FOR UPDATE'
+      );
+      const pool = poolRows[0];
+
+      newInterestEarned = Number(pool.total_interest_earned || 0) + interest;
+      const newLA = Number(pool.loaned_amount || 0) - amount;
+      const newAvail = Number(pool.total_amount || 0) - newLA;
+      const newReserved = newLA;
+      await connection.execute(
+        'UPDATE fund_pool SET loaned_amount=?, total_interest_earned=?, available_amount=?, reserved_amount=? WHERE id=1',
+        [newLA, newInterestEarned, newAvail, newReserved]
+      );
+
+      const newBalance = currentBalance - totalRepayment;
+      const balanceData = { balance: newBalance };
+      await encryptFields('users', balanceData, userId, connection);
+      await connection.execute('UPDATE users SET balance = ? WHERE id = ?', [balanceData.balance, userId]);
     });
-    
+
     logger.info('利息已独立记录', {
       interest,
       totalInterestEarned: newInterestEarned
     });
-    
+
     logger.info('还款操作成功', {
       userId,
       totalRepayment,
       principal: amount,
       interest,
-      userBalanceAfter: user.balance - totalRepayment,
       totalInterestEarned: newInterestEarned
     });
-    
+
     return true;
   } catch (error) {
     logger.error('还款操作失败:', { error: error.message, userId, amount, interest });

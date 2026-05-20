@@ -6,10 +6,10 @@
     "rpcUrl": "http://127.0.0.1:8545",
     "deployer": "0x6645B20a1B128E344F765016aF86D332499537f5",
     "contracts": {
-      "AuditStorage": "0x29613a0e24579e3ce9da2387f1d41f5ccf68b24c",
-      "ZKPVerifier": "0x7d139b0b297886c5211de878ee93244cc46ddf66",
-      "Verifier": "0x0000000000000000000000000000000000000000"
+      "AuditStorage": "0xe3612a7d8c48adf54efa3638c6f327d44241b558",
+      "ZKPVerifier": "0xbeb33ad1419e41b10e1f6bb10ba37d5d2c1ff0c5",
+      "Verifier": "0x409db2fbd19e1499cd78a4f25c5ab9b4a1d61371"
     },
-    "deployedAt": "2026-05-18T16:28:00.000Z"
+    "deployedAt": "2026-05-19T14:09:27.368Z"
   }
 }

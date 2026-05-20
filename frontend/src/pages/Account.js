@@ -25,8 +25,9 @@ import {
   Tabs,
   Tab,
 } from '@mui/material';
-import { signWithSM2, getSM2KeyPair, generateSM2KeyPair, saveSM2KeyPair, generateSignatureData } from '../utils/sm2Utils';
+import { signWithSM2, getSM2KeyPairWithAesKey, generateSM2KeyPair, saveSM2KeyPair, generateSignatureData } from '../utils/sm2Utils';
 import { get, post } from '../utils/apiUtils';
+import { useAesKey } from '../App';
 import { 
   LineChart, 
   Line, 
@@ -44,6 +45,7 @@ import {
 } from 'recharts';
 
 const Account = ({ user }) => {
+  const aesKey = useAesKey();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -295,10 +297,10 @@ const Account = ({ user }) => {
 
     try {
       // 检查是否有SM2密钥对，如果没有则生成
-      let keyPair = getSM2KeyPair();
+      let keyPair = await getSM2KeyPairWithAesKey(aesKey);
       if (!keyPair) {
         keyPair = generateSM2KeyPair();
-        saveSM2KeyPair(keyPair);
+        await saveSM2KeyPair(keyPair, aesKey);
       }
       
       // 准备签名数据
@@ -607,73 +609,6 @@ const Account = ({ user }) => {
                     {transactions.filter(t => t.type === 'invest').length === 0 && (
                       <TableRow>
                         <TableCell colSpan={6} align="center">
-                          暂无出资记录
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </Paper>
-          </Grid>
-
-          {/* 出资记录 */}
-          <Grid item xs={12}>
-            <Paper sx={{ p: 3 }}>
-              <Typography variant="h5" gutterBottom>
-                个人出资记录
-              </Typography>
-              <TableContainer>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>时间</TableCell>
-                      <TableCell>本金</TableCell>
-                      <TableCell>利率</TableCell>
-                      <TableCell>到期总额</TableCell>
-                      <TableCell>到期时间</TableCell>
-                      <TableCell>状态</TableCell>
-                      <TableCell>操作</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {transactions
-                      .filter(t => t.type === 'lend')
-                      .map((transaction) => (
-                        <TableRow key={transaction.id}>
-                          <TableCell>
-                            {new Date(transaction.created_at || transaction.timestamp).toLocaleString()}
-                          </TableCell>
-                          <TableCell>{(Number(transaction.amount) || 0).toFixed(2)} 元</TableCell>
-                          <TableCell>{transaction.interestRate || 0}%</TableCell>
-                          <TableCell>{(Number(transaction.totalAmount) || 0).toFixed(2)} 元</TableCell>
-                          <TableCell>
-                            {(transaction.due_date || transaction.dueDate) ? new Date(transaction.due_date || transaction.dueDate).toLocaleString() : '暂无'}
-                          </TableCell>
-                          <TableCell>
-                            <Chip 
-                              label={transaction.status === 'pending' ? '进行中' : '已完成'}
-                              color={transaction.status === 'pending' ? 'warning' : 'success'}
-                              size="small"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            {transaction.status === 'pending' && (
-                              <Button
-                                variant="contained"
-                                color="primary"
-                                size="small"
-                                onClick={() => handleCollect(transaction)}
-                              >
-                                收回
-                              </Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    {transactions.filter(t => t.type === 'lend').length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={7} align="center">
                           暂无出资记录
                         </TableCell>
                       </TableRow>

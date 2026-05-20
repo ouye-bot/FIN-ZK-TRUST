@@ -181,45 +181,37 @@ exports.verifyProof = async (proof, publicSignals) => {
           const proofId = crypto.randomUUID();
           const proofData = { proof, publicSignals };
           const proofHash = generateSM3Hash(JSON.stringify(proofData));
-          
-          blockchainService.recordZKPResult(
-            proofId,
-            true,
-            proofHash
-          ).then(result => {
-            if (result.success) {
-              logger.info('ZKP验证结果上链存证成功', {
-                proofId,
-                blockchainTxHash: result.blockchainTxHash
-              });
-            } else if (!result.skipped) {
-              logger.warning('ZKP验证结果上链存证失败', {
-                proofId,
-                error: result.error
-              });
-            }
-          }).catch(err => {
-            logger.error('ZKP验证结果上链存证异常', {
-              error: err.message
-            });
-          });
 
           const userAddress = '0x0000000000000000000000000000000000000000';
           const sm3Hash = proofHash;
 
-          blockchainService.verifyZKPOnChain(proof, publicSignals, userAddress, sm3Hash)
-            .then(async (result) => {
-              if (result.success) {
-                logger.info('链上 ZKP 验证完成', { proofId, blockchainTxHash: result.blockchainTxHash });
+          // 先记录 proofResult，再做链上验证和状态更新
+          blockchainService.recordZKPResult(proofId, true, proofHash)
+            .then(async (recordResult) => {
+              if (recordResult.success) {
+                logger.info('ZKP验证结果上链存证成功', {
+                  proofId,
+                  blockchainTxHash: recordResult.blockchainTxHash
+                });
+              } else if (!recordResult.skipped) {
+                logger.warning('ZKP验证结果上链存证失败', {
+                  proofId,
+                  error: recordResult.error
+                });
+              }
+
+              // recordProofResult 完成后，执行链上验证
+              const verifyResult = await blockchainService.verifyZKPOnChain(proof, publicSignals, userAddress, sm3Hash);
+              if (verifyResult.success) {
+                logger.info('链上 ZKP 验证完成', { proofId, blockchainTxHash: verifyResult.blockchainTxHash });
                 await blockchainService.updateZKPChainStatus(proofId, true);
               } else {
-                logger.warn('链上 ZKP 验证失败', { proofId, error: result.error });
+                logger.warning('链上 ZKP 验证失败', { proofId, error: verifyResult.error });
                 await blockchainService.updateZKPChainStatus(proofId, false);
               }
             })
-            .catch(async (err) => {
-              logger.warn('链上 ZKP 验证调用异常（非阻塞）', { error: err.message });
-              await blockchainService.updateZKPChainStatus(proofId, false);
+            .catch(err => {
+              logger.error('ZKP 上链流程异常', { error: err.message });
             });
         } catch (zkError) {
           logger.error('处理ZKP上链存证失败', {

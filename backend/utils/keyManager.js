@@ -68,6 +68,25 @@ function validateKeys() {
     }
   }
 
+  // 校验 JWT_REFRESH_SECRET
+  const jwtRefreshSecret = process.env.JWT_REFRESH_SECRET;
+  if (!jwtRefreshSecret) {
+    errors.push('JWT_REFRESH_SECRET 未配置');
+  } else {
+    if (jwtRefreshSecret.length < 32) {
+      errors.push('JWT_REFRESH_SECRET 长度至少需要32个字符');
+    }
+    if (jwtRefreshSecret === jwtSecret) {
+      errors.push('JWT_REFRESH_SECRET 不能等于 JWT_SECRET');
+    }
+  }
+
+  // 校验 DB_PASSWORD
+  const dbPassword = process.env.DB_PASSWORD;
+  if (dbPassword === '123456') {
+    errors.push('DB_PASSWORD 不能使用默认弱密码 123456');
+  }
+
   if (errors.length > 0) {
     const errMsg = '密钥校验失败：' + errors.join('; ');
     logger.error(errMsg);

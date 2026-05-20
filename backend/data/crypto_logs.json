@@ -2,33 +2,4655 @@
   {
     "id": 1,
     "index": 1,
-    "userId": "test_user",
-    "operationType": "SM2??",
-    "description": "????1",
+    "userId": 1777750216931,
+    "operationType": "SM2签名",
+    "description": "赎回发起",
     "data": {
+      "status": "待验证",
+      "detail": "申请赎回金额: 200元",
       "correlationInfo": {
-        "userId": "test_user",
-        "amount": "100"
+        "userId": 1777750216931,
+        "amount": 200
       }
     },
-    "timestamp": "2026-04-26T16:06:49.813Z",
+    "timestamp": "2026-05-17T18:05:09.013Z",
     "prevHash": "",
-    "currentHash": "ff9d0abe722fabdd1b296a0fd478c38d043dbae8097732756e47a6e3a2b61c6a"
+    "currentHash": "222be3448e3b77b5ff8c92e901bcf98c95665388de067a5e41c42a53bab5ab90"
   },
   {
     "id": 2,
     "index": 2,
-    "userId": "test_user",
-    "operationType": "SM2??",
-    "description": "????2",
+    "userId": 1777750216931,
+    "operationType": "SM3哈希",
+    "description": "赎回记录哈希",
     "data": {
+      "status": "成功",
+      "detail": "生成赎回记录SM3哈希: 未知",
       "correlationInfo": {
-        "userId": "test_user",
-        "amount": "200"
+        "userId": 1777750216931
       }
     },
-    "timestamp": "2026-04-26T16:07:02.362Z",
-    "prevHash": "ff9d0abe722fabdd1b296a0fd478c38d043dbae8097732756e47a6e3a2b61c6a",
-    "currentHash": "42b8faa30d506181df7b773f2750c4496c04d027b85166f0dd4f52fc17b28f75"
+    "timestamp": "2026-05-17T18:05:09.287Z",
+    "prevHash": "222be3448e3b77b5ff8c92e901bcf98c95665388de067a5e41c42a53bab5ab90",
+    "currentHash": "cb0ee78aee2b75cfac4979b7789aa83252e85f33b17ce1f14386b8e6a32c53d1"
+  },
+  {
+    "id": 3,
+    "index": 3,
+    "userId": 1777750216931,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "发起",
+      "detail": "准备生成信用证明SM2签名",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-17T18:14:51.459Z",
+    "prevHash": "cb0ee78aee2b75cfac4979b7789aa83252e85f33b17ce1f14386b8e6a32c53d1",
+    "currentHash": "2da0e2a4c03f939f9d4388706689e29d2237b9fe06310c5a558d492944ada49d"
+  },
+  {
+    "id": 4,
+    "index": 4,
+    "userId": 1777750216931,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "成功",
+      "detail": "生成SM2签名并获取验证码: code_1779041692572_d4hf5smnh",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-17T18:14:52.635Z",
+    "prevHash": "2da0e2a4c03f939f9d4388706689e29d2237b9fe06310c5a558d492944ada49d",
+    "currentHash": "ec3e560f8c2fb25cdb77259ef73162fec5ae9001a923a119d252f70db8f4529f"
+  },
+  {
+    "id": 5,
+    "index": 5,
+    "userId": 1777750216931,
+    "operationType": "ZKP",
+    "description": "零知识证明",
+    "data": {
+      "status": "成功",
+      "detail": "端侧ZKP证明生成成功",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-17T18:14:52.642Z",
+    "prevHash": "ec3e560f8c2fb25cdb77259ef73162fec5ae9001a923a119d252f70db8f4529f",
+    "currentHash": "2e8d1ebd1b01a5ab11777e0020522f4c2412bcf042301fac2f7eeac3b2782948"
+  },
+  {
+    "id": 6,
+    "index": 6,
+    "userId": 1777750216931,
+    "operationType": "SM3哈希",
+    "description": "信用证明哈希",
+    "data": {
+      "status": "成功",
+      "detail": "信用证明数据已生成SM3哈希并存储",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-17T18:14:52.645Z",
+    "prevHash": "2e8d1ebd1b01a5ab11777e0020522f4c2412bcf042301fac2f7eeac3b2782948",
+    "currentHash": "b8a3736157b9512ff4d4ba8d2059c1f10113fe2b843b464c0f5bc25c53649fa5"
+  },
+  {
+    "id": 7,
+    "index": 7,
+    "userId": 1777750216931,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "发起",
+      "detail": "准备验证信用证明签名和哈希",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-17T18:14:53.294Z",
+    "prevHash": "b8a3736157b9512ff4d4ba8d2059c1f10113fe2b843b464c0f5bc25c53649fa5",
+    "currentHash": "589eeeb9b4c85cc269f34452fb3b8beed1786af8b0bece98a63d3eff6a1ebf93"
+  },
+  {
+    "id": 8,
+    "index": 8,
+    "userId": 1777750216931,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "成功",
+      "detail": "SM2签名验证通过，SM3哈希匹配",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-17T18:14:53.467Z",
+    "prevHash": "589eeeb9b4c85cc269f34452fb3b8beed1786af8b0bece98a63d3eff6a1ebf93",
+    "currentHash": "ea6fc592c0d21331d17f2bca04bd8eb37139fa2b4711626c48e015b402664061"
+  },
+  {
+    "id": 9,
+    "index": 9,
+    "userId": 1777750216931,
+    "operationType": "SM2签名",
+    "description": "借款发起",
+    "data": {
+      "status": "待验证",
+      "detail": "申请借款金额: 200元，期限: 30天",
+      "correlationInfo": {
+        "userId": 1777750216931,
+        "amount": 200,
+        "term": 30
+      }
+    },
+    "timestamp": "2026-05-17T18:15:03.876Z",
+    "prevHash": "ea6fc592c0d21331d17f2bca04bd8eb37139fa2b4711626c48e015b402664061",
+    "currentHash": "d2ced97760cc01d880e172f373528a2bb99c228ff1ce8770f940c614e5c91079"
+  },
+  {
+    "id": 10,
+    "index": 10,
+    "userId": 1777750216931,
+    "operationType": "SM2签名",
+    "description": "借款通过",
+    "data": {
+      "status": "成功",
+      "detail": "后端用SM2公钥验证签名通过",
+      "correlationInfo": {
+        "userId": 1777750216931,
+        "amount": 200
+      }
+    },
+    "timestamp": "2026-05-17T18:15:04.483Z",
+    "prevHash": "d2ced97760cc01d880e172f373528a2bb99c228ff1ce8770f940c614e5c91079",
+    "currentHash": "15bbaed09b2b75430cd075d82a0a0cc13f8f04c658ed458815085321d27de92f"
+  },
+  {
+    "id": 11,
+    "index": 11,
+    "userId": 1777750216931,
+    "operationType": "SM3哈希",
+    "description": "借款记录哈希",
+    "data": {
+      "status": "成功",
+      "detail": "生成借款记录SM3哈希: 未知",
+      "correlationInfo": {
+        "userId": 1777750216931
+      }
+    },
+    "timestamp": "2026-05-17T18:15:04.490Z",
+    "prevHash": "15bbaed09b2b75430cd075d82a0a0cc13f8f04c658ed458815085321d27de92f",
+    "currentHash": "6b83c5af14173139c7543ef8205ebf55e86ded1c2c1dad36f26474f87a34ef25"
+  },
+  {
+    "id": 12,
+    "index": 12,
+    "userId": 1777750216931,
+    "operationType": "SM2签名",
+    "description": "出资发起",
+    "data": {
+      "status": "待验证",
+      "detail": "申请出资金额: 300元，期限: 30天",
+      "correlationInfo": {
+        "userId": 1777750216931,
+        "amount": 300,
+        "term": 30
+      }
+    },
+    "timestamp": "2026-05-17T18:15:13.162Z",
+    "prevHash": "6b83c5af14173139c7543ef8205ebf55e86ded1c2c1dad36f26474f87a34ef25",
+    "currentHash": "d5fc6af4aac6e2890e30a4308f3a916bddb474233669ffd567b7511429950486"
+  },
+  {
+    "id": 13,
+    "index": 13,
+    "userId": 1777750216931,
+    "operationType": "SM3哈希",
+    "description": "出资关联哈希",
+    "data": {
+      "status": "成功",
+      "detail": "关联借款记录SM3哈希: 未知",
+      "correlationInfo": {
+        "userId": 1777750216931
+      }
+    },
+    "timestamp": "2026-05-17T18:15:13.434Z",
+    "prevHash": "d5fc6af4aac6e2890e30a4308f3a916bddb474233669ffd567b7511429950486",
+    "currentHash": "56defd8876ad7ae23472cfcc10dfbbcf1031f2dbbc19c64ff597ddb9f5a1672e"
+  },
+  {
+    "id": 14,
+    "index": 14,
+    "userId": 1777750216931,
+    "operationType": "哈希链",
+    "description": "哈希链存证",
+    "data": {
+      "status": "成功",
+      "detail": "出资记录与借款记录形成哈希链，存证完成",
+      "correlationInfo": {
+        "userId": 1777750216931
+      }
+    },
+    "timestamp": "2026-05-17T18:15:13.442Z",
+    "prevHash": "56defd8876ad7ae23472cfcc10dfbbcf1031f2dbbc19c64ff597ddb9f5a1672e",
+    "currentHash": "57a4cda65ee05e927c0bc5495f3c786837d0faa66efec62fbb63e057c1d27fdd"
+  },
+  {
+    "id": 15,
+    "index": 15,
+    "userId": 1777750216931,
+    "operationType": "SM2签名",
+    "description": "出资签名",
+    "data": {
+      "status": "成功",
+      "detail": "生成出资请求SM2签名并验证通过",
+      "correlationInfo": {
+        "userId": 1777750216931
+      }
+    },
+    "timestamp": "2026-05-17T18:15:13.459Z",
+    "prevHash": "57a4cda65ee05e927c0bc5495f3c786837d0faa66efec62fbb63e057c1d27fdd",
+    "currentHash": "e5d7d0b29cdc855af432c91f0b32e38bc3999809043087d32c1c58e262b33011"
+  },
+  {
+    "id": 16,
+    "index": 16,
+    "userId": 1777750216931,
+    "operationType": "SM2签名",
+    "description": "赎回发起",
+    "data": {
+      "status": "待验证",
+      "detail": "申请赎回金额: 200元",
+      "correlationInfo": {
+        "userId": 1777750216931,
+        "amount": 200
+      }
+    },
+    "timestamp": "2026-05-17T18:15:20.941Z",
+    "prevHash": "e5d7d0b29cdc855af432c91f0b32e38bc3999809043087d32c1c58e262b33011",
+    "currentHash": "7de5dbb0663c8d7a98f6943f1f00b517e6272154eb314be5d6eb94c29150ed36"
+  },
+  {
+    "id": 17,
+    "index": 17,
+    "userId": 1777750216931,
+    "operationType": "SM2签名",
+    "description": "赎回验证",
+    "data": {
+      "status": "成功",
+      "detail": "后端用SM2公钥验证赎回签名通过",
+      "correlationInfo": {
+        "userId": 1777750216931,
+        "amount": 200
+      }
+    },
+    "timestamp": "2026-05-17T18:15:21.205Z",
+    "prevHash": "7de5dbb0663c8d7a98f6943f1f00b517e6272154eb314be5d6eb94c29150ed36",
+    "currentHash": "3efb0c80b7fada9432dbb2b0fcca7b3c91e069b6a619870107a882015f2653b5"
+  },
+  {
+    "id": 18,
+    "index": 18,
+    "userId": 1777750216931,
+    "operationType": "哈希链",
+    "description": "哈希链更新",
+    "data": {
+      "status": "成功",
+      "detail": "赎回记录已添加到哈希链，资金安全返还",
+      "correlationInfo": {
+        "userId": 1777750216931
+      }
+    },
+    "timestamp": "2026-05-17T18:15:21.215Z",
+    "prevHash": "3efb0c80b7fada9432dbb2b0fcca7b3c91e069b6a619870107a882015f2653b5",
+    "currentHash": "435a73e375d8526dedd7860e09831e57b9554e278469ddca3d8c22e77923e618"
+  },
+  {
+    "id": 19,
+    "index": 19,
+    "userId": 1777750216931,
+    "operationType": "SM3哈希",
+    "description": "赎回记录哈希",
+    "data": {
+      "status": "成功",
+      "detail": "生成赎回记录SM3哈希: 未知",
+      "correlationInfo": {
+        "userId": 1777750216931
+      }
+    },
+    "timestamp": "2026-05-17T18:15:21.220Z",
+    "prevHash": "435a73e375d8526dedd7860e09831e57b9554e278469ddca3d8c22e77923e618",
+    "currentHash": "ecec560db8fdc4b31f60b3e8c1e79d9b10c406e584c43323adea92b655bfae81"
+  },
+  {
+    "id": 20,
+    "index": 20,
+    "userId": 1777750216931,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "发起",
+      "detail": "准备生成信用证明SM2签名",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-17T18:15:37.359Z",
+    "prevHash": "ecec560db8fdc4b31f60b3e8c1e79d9b10c406e584c43323adea92b655bfae81",
+    "currentHash": "3a240bd825076bbaf96a70f57e07839e726fce5af6754a95284bed53378918d6"
+  },
+  {
+    "id": 21,
+    "index": 21,
+    "userId": 1777750216931,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "成功",
+      "detail": "生成SM2签名并获取验证码: code_1779041737938_hh253g23b",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-17T18:15:38.000Z",
+    "prevHash": "3a240bd825076bbaf96a70f57e07839e726fce5af6754a95284bed53378918d6",
+    "currentHash": "c464f64893406c77eabbba0385908e7b4e4e8784951487ab955183aadb5e9f81"
+  },
+  {
+    "id": 22,
+    "index": 22,
+    "userId": 1777750216931,
+    "operationType": "ZKP",
+    "description": "零知识证明",
+    "data": {
+      "status": "成功",
+      "detail": "端侧ZKP证明生成成功",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-17T18:15:38.004Z",
+    "prevHash": "c464f64893406c77eabbba0385908e7b4e4e8784951487ab955183aadb5e9f81",
+    "currentHash": "f82c5da037c5a9f7482a5205cf54bec4863a59b0408df60887b9cad0b25e1320"
+  },
+  {
+    "id": 23,
+    "index": 23,
+    "userId": 1777750216931,
+    "operationType": "SM3哈希",
+    "description": "信用证明哈希",
+    "data": {
+      "status": "成功",
+      "detail": "信用证明数据已生成SM3哈希并存储",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-17T18:15:38.008Z",
+    "prevHash": "f82c5da037c5a9f7482a5205cf54bec4863a59b0408df60887b9cad0b25e1320",
+    "currentHash": "ecfa99021af1f9fe453745c0b1769d9113f34e2f5d0c1aa124d56839ccdb5a32"
+  },
+  {
+    "id": 24,
+    "index": 24,
+    "userId": 1777750216931,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "发起",
+      "detail": "准备生成信用证明SM2签名",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-17T18:15:45.950Z",
+    "prevHash": "ecfa99021af1f9fe453745c0b1769d9113f34e2f5d0c1aa124d56839ccdb5a32",
+    "currentHash": "91a0848aa4096f7a33e52bd632fac4f1a1aaed9e3d77c2c466f217c598d070a6"
+  },
+  {
+    "id": 25,
+    "index": 25,
+    "userId": 1777750216931,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "成功",
+      "detail": "生成SM2签名并获取验证码: code_1779041746278_hgvf19yec",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-17T18:15:46.332Z",
+    "prevHash": "91a0848aa4096f7a33e52bd632fac4f1a1aaed9e3d77c2c466f217c598d070a6",
+    "currentHash": "0698bb775e7643af140c82970165373550b65ccf57ae8d0a4d75618ed78a7ce3"
+  },
+  {
+    "id": 26,
+    "index": 26,
+    "userId": 1777750216931,
+    "operationType": "ZKP",
+    "description": "零知识证明",
+    "data": {
+      "status": "成功",
+      "detail": "端侧ZKP证明生成成功",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-17T18:15:46.336Z",
+    "prevHash": "0698bb775e7643af140c82970165373550b65ccf57ae8d0a4d75618ed78a7ce3",
+    "currentHash": "219cefd3d1270878ff600830be7994332ebe801293e78fd8f770f88093ab3ad0"
+  },
+  {
+    "id": 27,
+    "index": 27,
+    "userId": 1777750216931,
+    "operationType": "SM3哈希",
+    "description": "信用证明哈希",
+    "data": {
+      "status": "成功",
+      "detail": "信用证明数据已生成SM3哈希并存储",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-17T18:15:46.340Z",
+    "prevHash": "219cefd3d1270878ff600830be7994332ebe801293e78fd8f770f88093ab3ad0",
+    "currentHash": "e1abc015c8031f97bcd485a9be3e711016adc467bcc3b56ae47724ee5a9bde2a"
+  },
+  {
+    "id": 28,
+    "index": 28,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "发起",
+      "detail": "准备生成信用证明SM2签名",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-18T15:17:34.934Z",
+    "prevHash": "e1abc015c8031f97bcd485a9be3e711016adc467bcc3b56ae47724ee5a9bde2a",
+    "currentHash": "6baea1e15a3b2bc12b18cf5b5642d53a3281c797409c83bbe122dfa236911158"
+  },
+  {
+    "id": 29,
+    "index": 29,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "成功",
+      "detail": "生成SM2签名并获取验证码: code_1779117456043_o45646p0v",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-18T15:17:36.080Z",
+    "prevHash": "6baea1e15a3b2bc12b18cf5b5642d53a3281c797409c83bbe122dfa236911158",
+    "currentHash": "7aed2ecf8422cac9c4d79829962c020bf18aab65bdd1487979a82cf2460e4711"
+  },
+  {
+    "id": 30,
+    "index": 30,
+    "userId": 1779107295654,
+    "operationType": "ZKP",
+    "description": "零知识证明",
+    "data": {
+      "status": "成功",
+      "detail": "端侧ZKP证明生成成功",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-18T15:17:36.085Z",
+    "prevHash": "7aed2ecf8422cac9c4d79829962c020bf18aab65bdd1487979a82cf2460e4711",
+    "currentHash": "862aa0311cc47fb9cf8ad274948dbfcded43903c827c6bd398968cb76d1f6ff7"
+  },
+  {
+    "id": 31,
+    "index": 31,
+    "userId": 1779107295654,
+    "operationType": "SM3哈希",
+    "description": "信用证明哈希",
+    "data": {
+      "status": "成功",
+      "detail": "信用证明数据已生成SM3哈希并存储",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-18T15:17:36.088Z",
+    "prevHash": "862aa0311cc47fb9cf8ad274948dbfcded43903c827c6bd398968cb76d1f6ff7",
+    "currentHash": "8d2352f82a0007e983c779a1b0f8e95c764cfd85da7d5fdfc3e5fca54cbeea5d"
+  },
+  {
+    "id": 32,
+    "index": 32,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "发起",
+      "detail": "准备验证信用证明签名和哈希",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-18T15:17:37.469Z",
+    "prevHash": "8d2352f82a0007e983c779a1b0f8e95c764cfd85da7d5fdfc3e5fca54cbeea5d",
+    "currentHash": "9935b4b90f15ac77299db98beca29c726e64f43c203cbe748ed76e2388ae7d1c"
+  },
+  {
+    "id": 33,
+    "index": 33,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "成功",
+      "detail": "SM2签名验证通过，SM3哈希匹配",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-18T15:17:37.630Z",
+    "prevHash": "9935b4b90f15ac77299db98beca29c726e64f43c203cbe748ed76e2388ae7d1c",
+    "currentHash": "5bf5953b743f02ba56bef9a08d7998db09b9dbaea6a754a6eaf05f80b40c5dbb"
+  },
+  {
+    "id": 34,
+    "index": 34,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "发起",
+      "detail": "准备生成信用证明SM2签名",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-18T15:18:30.786Z",
+    "prevHash": "5bf5953b743f02ba56bef9a08d7998db09b9dbaea6a754a6eaf05f80b40c5dbb",
+    "currentHash": "d186a6ce9aa5fde8403fdb8dba8db157828b0f562651cc4efab7ef39a89f5961"
+  },
+  {
+    "id": 35,
+    "index": 35,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "成功",
+      "detail": "生成SM2签名并获取验证码: code_1779117511393_fn7cjesb8",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-18T15:18:31.430Z",
+    "prevHash": "d186a6ce9aa5fde8403fdb8dba8db157828b0f562651cc4efab7ef39a89f5961",
+    "currentHash": "b9def312c3d4e95608afd4ae45a1feaa093c6cc1f59f2dd441ab3df286d01640"
+  },
+  {
+    "id": 36,
+    "index": 36,
+    "userId": 1779107295654,
+    "operationType": "SM3哈希",
+    "description": "信用证明哈希",
+    "data": {
+      "status": "成功",
+      "detail": "信用证明数据已生成SM3哈希并存储",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-18T15:18:31.433Z",
+    "prevHash": "b9def312c3d4e95608afd4ae45a1feaa093c6cc1f59f2dd441ab3df286d01640",
+    "currentHash": "ea058d6ef2bbd03eea18e0b88b45ceef5498eca462455698e265132c0d6ab58d"
+  },
+  {
+    "id": 37,
+    "index": 37,
+    "userId": 1779107295654,
+    "operationType": "ZKP",
+    "description": "零知识证明",
+    "data": {
+      "status": "成功",
+      "detail": "端侧ZKP证明生成成功",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-18T15:18:31.436Z",
+    "prevHash": "ea058d6ef2bbd03eea18e0b88b45ceef5498eca462455698e265132c0d6ab58d",
+    "currentHash": "d48ee2ec9adab7c4bbd8b4c3ed47797fb20c1bfa9e55a0fb267c3d820a5c5386"
+  },
+  {
+    "id": 38,
+    "index": 38,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "发起",
+      "detail": "准备验证信用证明签名和哈希",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-18T15:18:32.155Z",
+    "prevHash": "d48ee2ec9adab7c4bbd8b4c3ed47797fb20c1bfa9e55a0fb267c3d820a5c5386",
+    "currentHash": "628d453e989e602be330a9c1f43dc7ab024e6346f85a1925db36d02c456fd01f"
+  },
+  {
+    "id": 39,
+    "index": 39,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "成功",
+      "detail": "SM2签名验证通过，SM3哈希匹配",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-18T15:18:32.299Z",
+    "prevHash": "628d453e989e602be330a9c1f43dc7ab024e6346f85a1925db36d02c456fd01f",
+    "currentHash": "10e86c55174e28bf5251d0a117d6de75a043b2e754d80af71bff819707b694b6"
+  },
+  {
+    "id": 40,
+    "index": 40,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "借款发起",
+    "data": {
+      "status": "待验证",
+      "detail": "申请借款金额: 200元，期限: 30天",
+      "correlationInfo": {
+        "userId": 1779107295654,
+        "amount": 200,
+        "term": 30
+      }
+    },
+    "timestamp": "2026-05-18T15:18:48.402Z",
+    "prevHash": "10e86c55174e28bf5251d0a117d6de75a043b2e754d80af71bff819707b694b6",
+    "currentHash": "97e0cbe86b647c7f2383ee081b9272f9d4120e43978a49d3f4619aa51f34d282"
+  },
+  {
+    "id": 41,
+    "index": 41,
+    "userId": 1779107295654,
+    "operationType": "SM3哈希",
+    "description": "借款记录哈希",
+    "data": {
+      "status": "成功",
+      "detail": "生成借款记录SM3哈希: 未知",
+      "correlationInfo": {
+        "userId": 1779107295654
+      }
+    },
+    "timestamp": "2026-05-18T15:18:49.008Z",
+    "prevHash": "97e0cbe86b647c7f2383ee081b9272f9d4120e43978a49d3f4619aa51f34d282",
+    "currentHash": "e7e19223d06b948378cda014e0b17ce4c79e4c2a84981864ef4453fc955a1928"
+  },
+  {
+    "id": 42,
+    "index": 42,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "借款通过",
+    "data": {
+      "status": "成功",
+      "detail": "后端用SM2公钥验证签名通过",
+      "correlationInfo": {
+        "userId": 1779107295654,
+        "amount": 200
+      }
+    },
+    "timestamp": "2026-05-18T15:18:49.012Z",
+    "prevHash": "e7e19223d06b948378cda014e0b17ce4c79e4c2a84981864ef4453fc955a1928",
+    "currentHash": "e042abb4164b677105ba7a8df7f22b8a3f0a5f3923510c1da384b4d825818e81"
+  },
+  {
+    "id": 43,
+    "index": 43,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "出资发起",
+    "data": {
+      "status": "待验证",
+      "detail": "申请出资金额: 100元，期限: 30天",
+      "correlationInfo": {
+        "userId": 1779107295654,
+        "amount": 100,
+        "term": 30
+      }
+    },
+    "timestamp": "2026-05-18T15:18:56.810Z",
+    "prevHash": "e042abb4164b677105ba7a8df7f22b8a3f0a5f3923510c1da384b4d825818e81",
+    "currentHash": "1c044346e4242531a1b6c24c75d166ef2ad409569f760b1a44af8e137042a3f2"
+  },
+  {
+    "id": 44,
+    "index": 44,
+    "userId": 1779107295654,
+    "operationType": "SM3哈希",
+    "description": "出资关联哈希",
+    "data": {
+      "status": "成功",
+      "detail": "关联借款记录SM3哈希: 未知",
+      "correlationInfo": {
+        "userId": 1779107295654
+      }
+    },
+    "timestamp": "2026-05-18T15:18:57.122Z",
+    "prevHash": "1c044346e4242531a1b6c24c75d166ef2ad409569f760b1a44af8e137042a3f2",
+    "currentHash": "529667f7388cbfe73b5f80999f48acf5f7abe2f19d43aa503a8204f4f42600b9"
+  },
+  {
+    "id": 45,
+    "index": 45,
+    "userId": 1779107295654,
+    "operationType": "哈希链",
+    "description": "哈希链存证",
+    "data": {
+      "status": "成功",
+      "detail": "出资记录与借款记录形成哈希链，存证完成",
+      "correlationInfo": {
+        "userId": 1779107295654
+      }
+    },
+    "timestamp": "2026-05-18T15:18:57.126Z",
+    "prevHash": "529667f7388cbfe73b5f80999f48acf5f7abe2f19d43aa503a8204f4f42600b9",
+    "currentHash": "1aa9c7208871aa93ab889176ccb5502e35c3134a29020e2f695d5b30faa994d3"
+  },
+  {
+    "id": 46,
+    "index": 46,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "出资签名",
+    "data": {
+      "status": "成功",
+      "detail": "生成出资请求SM2签名并验证通过",
+      "correlationInfo": {
+        "userId": 1779107295654
+      }
+    },
+    "timestamp": "2026-05-18T15:18:57.130Z",
+    "prevHash": "1aa9c7208871aa93ab889176ccb5502e35c3134a29020e2f695d5b30faa994d3",
+    "currentHash": "80d2e16010a79e11b4c9fb710f37dc01e05fa451484f02bb44410e35686f924e"
+  },
+  {
+    "id": 47,
+    "index": 47,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "发起",
+      "detail": "准备生成信用证明SM2签名",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-18T15:33:55.708Z",
+    "prevHash": "80d2e16010a79e11b4c9fb710f37dc01e05fa451484f02bb44410e35686f924e",
+    "currentHash": "8fd50af67136eaabd9b711456ddc92ac55bbd0415779da0e1408353260b6570e"
+  },
+  {
+    "id": 48,
+    "index": 48,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "成功",
+      "detail": "生成SM2签名并获取验证码: code_1779118436769_hkp5p7s7k",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-18T15:33:56.804Z",
+    "prevHash": "8fd50af67136eaabd9b711456ddc92ac55bbd0415779da0e1408353260b6570e",
+    "currentHash": "8782fe9940a97f68ab4f68e5e2c9eb320cf0a8d17c9b2c5fd481203fc1c009da"
+  },
+  {
+    "id": 49,
+    "index": 49,
+    "userId": 1779107295654,
+    "operationType": "ZKP",
+    "description": "零知识证明",
+    "data": {
+      "status": "成功",
+      "detail": "端侧ZKP证明生成成功",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-18T15:33:56.807Z",
+    "prevHash": "8782fe9940a97f68ab4f68e5e2c9eb320cf0a8d17c9b2c5fd481203fc1c009da",
+    "currentHash": "21f3d1fa5668f42c452951f412edb0798076ddd0cce99e343a706ba2ddd79485"
+  },
+  {
+    "id": 50,
+    "index": 50,
+    "userId": 1779107295654,
+    "operationType": "SM3哈希",
+    "description": "信用证明哈希",
+    "data": {
+      "status": "成功",
+      "detail": "信用证明数据已生成SM3哈希并存储",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-18T15:33:56.810Z",
+    "prevHash": "21f3d1fa5668f42c452951f412edb0798076ddd0cce99e343a706ba2ddd79485",
+    "currentHash": "9f6d0a655e17e8790e93953b42b19007ca94b4ae56adeb7f980f02d08e27bbaa"
+  },
+  {
+    "id": 51,
+    "index": 51,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "发起",
+      "detail": "准备验证信用证明签名和哈希",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-18T15:33:57.198Z",
+    "prevHash": "9f6d0a655e17e8790e93953b42b19007ca94b4ae56adeb7f980f02d08e27bbaa",
+    "currentHash": "c8f2346b52feafe42cfaba0313b38518853206493bdcabbb34218ca2ff8c7886"
+  },
+  {
+    "id": 52,
+    "index": 52,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "成功",
+      "detail": "SM2签名验证通过，SM3哈希匹配",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-18T15:33:57.337Z",
+    "prevHash": "c8f2346b52feafe42cfaba0313b38518853206493bdcabbb34218ca2ff8c7886",
+    "currentHash": "3bec1519287d5b42f6070f65724c0470e04441b4910ed7608ea409ebc1a80749"
+  },
+  {
+    "id": 53,
+    "index": 53,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "发起",
+      "detail": "准备生成信用证明SM2签名",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T13:59:01.752Z",
+    "prevHash": "3bec1519287d5b42f6070f65724c0470e04441b4910ed7608ea409ebc1a80749",
+    "currentHash": "80410bdf54ee2e275d71d21bd139f6c8c04b3f82c1ae87d8e40926f2aeece5ea"
+  },
+  {
+    "id": 54,
+    "index": 54,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "失败",
+      "detail": "生成信用证明失败: 零知识证明验证失败",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T13:59:02.893Z",
+    "prevHash": "80410bdf54ee2e275d71d21bd139f6c8c04b3f82c1ae87d8e40926f2aeece5ea",
+    "currentHash": "503e9cbabaaccd0fbbca906d2872ac71ee15e16eae1f9d706f038ef3d4eb768f"
+  },
+  {
+    "id": 55,
+    "index": 55,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "发起",
+      "detail": "准备生成信用证明SM2签名",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T13:59:48.412Z",
+    "prevHash": "503e9cbabaaccd0fbbca906d2872ac71ee15e16eae1f9d706f038ef3d4eb768f",
+    "currentHash": "adaf33f44cf2f5e35453c97c199f0e68b130652d560c1284b1518dc2eadb091e"
+  },
+  {
+    "id": 56,
+    "index": 56,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "失败",
+      "detail": "生成信用证明失败: 零知识证明验证失败",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T13:59:48.892Z",
+    "prevHash": "adaf33f44cf2f5e35453c97c199f0e68b130652d560c1284b1518dc2eadb091e",
+    "currentHash": "872284bee0b0377114a0df081fe26aedcb474b54dba988d6c8892c4af1c6a020"
+  },
+  {
+    "id": 57,
+    "index": 57,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "发起",
+      "detail": "准备生成信用证明SM2签名",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T13:59:53.486Z",
+    "prevHash": "872284bee0b0377114a0df081fe26aedcb474b54dba988d6c8892c4af1c6a020",
+    "currentHash": "8916f28f5b9b562d975f353310f4f826906a5d120bda0bbd1c1276eb3ca013e6"
+  },
+  {
+    "id": 58,
+    "index": 58,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "失败",
+      "detail": "生成信用证明失败: 零知识证明验证失败",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T13:59:54.016Z",
+    "prevHash": "8916f28f5b9b562d975f353310f4f826906a5d120bda0bbd1c1276eb3ca013e6",
+    "currentHash": "8b95b0471d2179463f62ef4ba58f5eac6198c557456e28f79cae24381be40a18"
+  },
+  {
+    "id": 59,
+    "index": 59,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "发起",
+      "detail": "准备生成信用证明SM2签名",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T14:48:53.727Z",
+    "prevHash": "8b95b0471d2179463f62ef4ba58f5eac6198c557456e28f79cae24381be40a18",
+    "currentHash": "af339472c425503c88370d9a1f2dd25d2a455aebcb724a7800a405c2eab320d4"
+  },
+  {
+    "id": 60,
+    "index": 60,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "成功",
+      "detail": "生成SM2签名并获取验证码: code_1779202135418_b8rh9eqxl",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T14:48:55.540Z",
+    "prevHash": "af339472c425503c88370d9a1f2dd25d2a455aebcb724a7800a405c2eab320d4",
+    "currentHash": "b0861a192933cc6f51fb56fa5d94a6abd8ec9a908083510b116515756ffbfe67"
+  },
+  {
+    "id": 61,
+    "index": 61,
+    "userId": 1779107295654,
+    "operationType": "SM3哈希",
+    "description": "信用证明哈希",
+    "data": {
+      "status": "成功",
+      "detail": "信用证明数据已生成SM3哈希并存储",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T14:48:55.545Z",
+    "prevHash": "b0861a192933cc6f51fb56fa5d94a6abd8ec9a908083510b116515756ffbfe67",
+    "currentHash": "b3f4a5a0d8ea4041ddc7127604d65f3c87161da8c97c08d514cf2054246a64a4"
+  },
+  {
+    "id": 62,
+    "index": 62,
+    "userId": 1779107295654,
+    "operationType": "ZKP",
+    "description": "零知识证明",
+    "data": {
+      "status": "成功",
+      "detail": "端侧ZKP证明生成成功",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T14:48:55.550Z",
+    "prevHash": "b3f4a5a0d8ea4041ddc7127604d65f3c87161da8c97c08d514cf2054246a64a4",
+    "currentHash": "bbbbb4336b7eaf100b11273535d6d606473ed6e6dc75f2fab464ab6b9b37cd4f"
+  },
+  {
+    "id": 63,
+    "index": 63,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "发起",
+      "detail": "准备验证信用证明签名和哈希",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T14:48:56.777Z",
+    "prevHash": "bbbbb4336b7eaf100b11273535d6d606473ed6e6dc75f2fab464ab6b9b37cd4f",
+    "currentHash": "8f8f83198edf1ab158d7815a6ba6a99d8c5b2ba906083d2be414ac17cdc57de7"
+  },
+  {
+    "id": 64,
+    "index": 64,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "成功",
+      "detail": "SM2签名验证通过，SM3哈希匹配",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T14:48:57.145Z",
+    "prevHash": "8f8f83198edf1ab158d7815a6ba6a99d8c5b2ba906083d2be414ac17cdc57de7",
+    "currentHash": "e53d824e1e62c833af7a8e33d1fb1ea7c6c41e421c36fc2d6132493416740e7c"
+  },
+  {
+    "id": 65,
+    "index": 65,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "借款发起",
+    "data": {
+      "status": "待验证",
+      "detail": "申请借款金额: 200元，期限: 30天",
+      "correlationInfo": {
+        "userId": 1779107295654,
+        "amount": 200,
+        "term": 30
+      }
+    },
+    "timestamp": "2026-05-19T14:49:05.820Z",
+    "prevHash": "e53d824e1e62c833af7a8e33d1fb1ea7c6c41e421c36fc2d6132493416740e7c",
+    "currentHash": "327c16fcc83ba654b96054084f3157c8015911559bf2c9566f492a8cf757a64d"
+  },
+  {
+    "id": 66,
+    "index": 66,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "借款发起",
+    "data": {
+      "status": "待验证",
+      "detail": "申请借款金额: 200元，期限: 30天",
+      "correlationInfo": {
+        "userId": 1779107295654,
+        "amount": 200,
+        "term": 30
+      }
+    },
+    "timestamp": "2026-05-19T14:49:41.149Z",
+    "prevHash": "327c16fcc83ba654b96054084f3157c8015911559bf2c9566f492a8cf757a64d",
+    "currentHash": "5729e1c3ac254dd9096fe751fd3f66b86b055ac039b798c58a33584f0e3fa39b"
+  },
+  {
+    "id": 67,
+    "index": 67,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "借款失败",
+    "data": {
+      "status": "失败",
+      "detail": "零知识证明验证失败",
+      "correlationInfo": {
+        "userId": 1779107295654,
+        "amount": 200
+      }
+    },
+    "timestamp": "2026-05-19T14:49:41.944Z",
+    "prevHash": "5729e1c3ac254dd9096fe751fd3f66b86b055ac039b798c58a33584f0e3fa39b",
+    "currentHash": "0c46fcaa9016c33023e9b5e29bd3a152185c7978d3fa0c206e5ece94efc60721"
+  },
+  {
+    "id": 68,
+    "index": 68,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "借款失败",
+    "data": {
+      "status": "失败",
+      "detail": "借款失败",
+      "correlationInfo": {
+        "userId": 1779107295654,
+        "amount": 200
+      }
+    },
+    "timestamp": "2026-05-19T14:49:56.966Z",
+    "prevHash": "0c46fcaa9016c33023e9b5e29bd3a152185c7978d3fa0c206e5ece94efc60721",
+    "currentHash": "9fbc83e4e2de33f5851a740c238e7d56824eac0f76ad508e7d587a45eb293e80"
+  },
+  {
+    "id": 69,
+    "index": 69,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "发起",
+      "detail": "准备生成信用证明SM2签名",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T14:50:11.382Z",
+    "prevHash": "9fbc83e4e2de33f5851a740c238e7d56824eac0f76ad508e7d587a45eb293e80",
+    "currentHash": "4024fed49f98d2da4e9dcffef65b20f7de1f531f09dd237c23bd7e61dacbf423"
+  },
+  {
+    "id": 70,
+    "index": 70,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "成功",
+      "detail": "生成SM2签名并获取验证码: code_1779202212498_zj32q7toe",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T14:50:12.563Z",
+    "prevHash": "4024fed49f98d2da4e9dcffef65b20f7de1f531f09dd237c23bd7e61dacbf423",
+    "currentHash": "58852b8a0dcbfb02f6fb7047087172dd815308bc25d223b56beb023f83fbd691"
+  },
+  {
+    "id": 71,
+    "index": 71,
+    "userId": 1779107295654,
+    "operationType": "ZKP",
+    "description": "零知识证明",
+    "data": {
+      "status": "成功",
+      "detail": "端侧ZKP证明生成成功",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T14:50:12.570Z",
+    "prevHash": "58852b8a0dcbfb02f6fb7047087172dd815308bc25d223b56beb023f83fbd691",
+    "currentHash": "41cae574ad2787ce12b07a309d732c5260ed52b8337cf68704f2a3f72ad6dee8"
+  },
+  {
+    "id": 72,
+    "index": 72,
+    "userId": 1779107295654,
+    "operationType": "SM3哈希",
+    "description": "信用证明哈希",
+    "data": {
+      "status": "成功",
+      "detail": "信用证明数据已生成SM3哈希并存储",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T14:50:12.575Z",
+    "prevHash": "41cae574ad2787ce12b07a309d732c5260ed52b8337cf68704f2a3f72ad6dee8",
+    "currentHash": "8bf2b2b389528b26fad78ab4273f65ce6ac178fe43e202af63e58fd6319d7e17"
+  },
+  {
+    "id": 73,
+    "index": 73,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "发起",
+      "detail": "准备验证信用证明签名和哈希",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T14:50:13.479Z",
+    "prevHash": "8bf2b2b389528b26fad78ab4273f65ce6ac178fe43e202af63e58fd6319d7e17",
+    "currentHash": "021fab3de4aaa1037251a6ffb100d2c829bbcb76c3f3d02983a41e9f16e46546"
+  },
+  {
+    "id": 74,
+    "index": 74,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "成功",
+      "detail": "SM2签名验证通过，SM3哈希匹配",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T14:50:13.819Z",
+    "prevHash": "021fab3de4aaa1037251a6ffb100d2c829bbcb76c3f3d02983a41e9f16e46546",
+    "currentHash": "21a27b4cb2ef92d8bb00203ac212b2e05dbc556138dc3b64de9066092a7bf7b5"
+  },
+  {
+    "id": 75,
+    "index": 75,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "发起",
+      "detail": "准备生成信用证明SM2签名",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T14:59:00.256Z",
+    "prevHash": "21a27b4cb2ef92d8bb00203ac212b2e05dbc556138dc3b64de9066092a7bf7b5",
+    "currentHash": "4b8a270f9d87dbb7c7a1ff74a1ef630545c87476f07f0325d004a378e3f07f10"
+  },
+  {
+    "id": 76,
+    "index": 76,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "成功",
+      "detail": "生成SM2签名并获取验证码: code_1779202741489_cxyc430w0",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T14:59:01.609Z",
+    "prevHash": "4b8a270f9d87dbb7c7a1ff74a1ef630545c87476f07f0325d004a378e3f07f10",
+    "currentHash": "ffd433ef01aa8824b8747f4ddbcb4ef9ff9fed6c8a3429930078855b888e79ff"
+  },
+  {
+    "id": 77,
+    "index": 77,
+    "userId": 1779107295654,
+    "operationType": "ZKP",
+    "description": "零知识证明",
+    "data": {
+      "status": "成功",
+      "detail": "端侧ZKP证明生成成功",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T14:59:01.615Z",
+    "prevHash": "ffd433ef01aa8824b8747f4ddbcb4ef9ff9fed6c8a3429930078855b888e79ff",
+    "currentHash": "3dc395e54ae75f24afc921fe6cd881b8da49833e747045d08831f54730f7fa42"
+  },
+  {
+    "id": 78,
+    "index": 78,
+    "userId": 1779107295654,
+    "operationType": "SM3哈希",
+    "description": "信用证明哈希",
+    "data": {
+      "status": "成功",
+      "detail": "信用证明数据已生成SM3哈希并存储",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T14:59:01.620Z",
+    "prevHash": "3dc395e54ae75f24afc921fe6cd881b8da49833e747045d08831f54730f7fa42",
+    "currentHash": "bfdf70d0a46cde1674f57743f26e17774bf3396f137767f63847abd261d99612"
+  },
+  {
+    "id": 79,
+    "index": 79,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "发起",
+      "detail": "准备验证信用证明签名和哈希",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T14:59:02.628Z",
+    "prevHash": "bfdf70d0a46cde1674f57743f26e17774bf3396f137767f63847abd261d99612",
+    "currentHash": "3f03be73f956987c974a8259fb53e92d8943cbe90384c36b149549336ef778fe"
+  },
+  {
+    "id": 80,
+    "index": 80,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "成功",
+      "detail": "SM2签名验证通过，SM3哈希匹配",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T14:59:02.786Z",
+    "prevHash": "3f03be73f956987c974a8259fb53e92d8943cbe90384c36b149549336ef778fe",
+    "currentHash": "de4b2c1f49a7d235190725088c440237ee8b43ddce66904515f366e928a2b7eb"
+  },
+  {
+    "id": 81,
+    "index": 81,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "借款发起",
+    "data": {
+      "status": "待验证",
+      "detail": "申请借款金额: 200元，期限: 30天",
+      "correlationInfo": {
+        "userId": 1779107295654,
+        "amount": 200,
+        "term": 30
+      }
+    },
+    "timestamp": "2026-05-19T14:59:13.167Z",
+    "prevHash": "de4b2c1f49a7d235190725088c440237ee8b43ddce66904515f366e928a2b7eb",
+    "currentHash": "7d09c08e9cfefaa882a566c1b1468782ea2873d864ae3dbcfdf5b8544c229365"
+  },
+  {
+    "id": 82,
+    "index": 82,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "借款发起",
+    "data": {
+      "status": "待验证",
+      "detail": "申请借款金额: 200元，期限: 30天",
+      "correlationInfo": {
+        "userId": 1779107295654,
+        "amount": 200,
+        "term": 30
+      }
+    },
+    "timestamp": "2026-05-19T14:59:44.046Z",
+    "prevHash": "7d09c08e9cfefaa882a566c1b1468782ea2873d864ae3dbcfdf5b8544c229365",
+    "currentHash": "8d12c31780268f67677d8fa0d863b456a4f2304350c1b197878e85b1de475495"
+  },
+  {
+    "id": 83,
+    "index": 83,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "借款失败",
+    "data": {
+      "status": "失败",
+      "detail": "借款失败",
+      "correlationInfo": {
+        "userId": 1779107295654,
+        "amount": 200
+      }
+    },
+    "timestamp": "2026-05-19T15:00:03.786Z",
+    "prevHash": "8d12c31780268f67677d8fa0d863b456a4f2304350c1b197878e85b1de475495",
+    "currentHash": "1d49413ed2bf928bb9ed8f38141cf2c88ed85a1a710688c0cd305bd3f399171c"
+  },
+  {
+    "id": 84,
+    "index": 84,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "借款异常",
+    "data": {
+      "status": "失败",
+      "detail": "NetworkError when attempting to fetch resource.",
+      "correlationInfo": {
+        "userId": 1779107295654,
+        "amount": 200
+      }
+    },
+    "timestamp": "2026-05-19T15:00:21.550Z",
+    "prevHash": "1d49413ed2bf928bb9ed8f38141cf2c88ed85a1a710688c0cd305bd3f399171c",
+    "currentHash": "de753e041f770abd8bfaa94a27c7eb5b5d5979ab24716961a332e5ab68003aad"
+  },
+  {
+    "id": 85,
+    "index": 85,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "发起",
+      "detail": "准备生成信用证明SM2签名",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:10:44.654Z",
+    "prevHash": "de753e041f770abd8bfaa94a27c7eb5b5d5979ab24716961a332e5ab68003aad",
+    "currentHash": "0b5949043a5df9169c8902cfb1441c2dd446122637f581f176195bfa46e17500"
+  },
+  {
+    "id": 86,
+    "index": 86,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "成功",
+      "detail": "生成SM2签名并获取验证码: code_1779203445816_59rbglms6",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:10:46.227Z",
+    "prevHash": "0b5949043a5df9169c8902cfb1441c2dd446122637f581f176195bfa46e17500",
+    "currentHash": "bb41a64ae38e60f9b7814d648a0eb20584b353d0a3ed8049ee6e6df4f341eaaa"
+  },
+  {
+    "id": 87,
+    "index": 87,
+    "userId": 1779107295654,
+    "operationType": "ZKP",
+    "description": "零知识证明",
+    "data": {
+      "status": "成功",
+      "detail": "端侧ZKP证明生成成功",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:10:46.235Z",
+    "prevHash": "bb41a64ae38e60f9b7814d648a0eb20584b353d0a3ed8049ee6e6df4f341eaaa",
+    "currentHash": "cf9ebe9a22fe1b0f18005ce23ac17cd3ff74a08569f42932470b5e4c6364d918"
+  },
+  {
+    "id": 88,
+    "index": 88,
+    "userId": 1779107295654,
+    "operationType": "SM3哈希",
+    "description": "信用证明哈希",
+    "data": {
+      "status": "成功",
+      "detail": "信用证明数据已生成SM3哈希并存储",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:10:46.239Z",
+    "prevHash": "cf9ebe9a22fe1b0f18005ce23ac17cd3ff74a08569f42932470b5e4c6364d918",
+    "currentHash": "cbb759445b76bb36a6595e8f86426d3fb294be9a352922bfd6df14d4d3bdd86f"
+  },
+  {
+    "id": 89,
+    "index": 89,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "发起",
+      "detail": "准备验证信用证明签名和哈希",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:10:47.487Z",
+    "prevHash": "cbb759445b76bb36a6595e8f86426d3fb294be9a352922bfd6df14d4d3bdd86f",
+    "currentHash": "c06e00dd36e86d296738df13ffab573037961f9aad94e2b6f96239867eabcc31"
+  },
+  {
+    "id": 90,
+    "index": 90,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "成功",
+      "detail": "SM2签名验证通过，SM3哈希匹配",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:10:47.630Z",
+    "prevHash": "c06e00dd36e86d296738df13ffab573037961f9aad94e2b6f96239867eabcc31",
+    "currentHash": "c14976427d4cfeb7e52266655ff6789d73d9cd7530cd908ada11d6641d9ca10c"
+  },
+  {
+    "id": 91,
+    "index": 91,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "借款发起",
+    "data": {
+      "status": "待验证",
+      "detail": "申请借款金额: 200元，期限: 30天",
+      "correlationInfo": {
+        "userId": 1779107295654,
+        "amount": 200,
+        "term": 30
+      }
+    },
+    "timestamp": "2026-05-19T15:10:54.215Z",
+    "prevHash": "c14976427d4cfeb7e52266655ff6789d73d9cd7530cd908ada11d6641d9ca10c",
+    "currentHash": "b2840570db8b9d932e02f2ed53b340a40c7c0ad991b07f95fddda95fa12b35c7"
+  },
+  {
+    "id": 92,
+    "index": 92,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "借款异常",
+    "data": {
+      "status": "失败",
+      "detail": "NetworkError when attempting to fetch resource.",
+      "correlationInfo": {
+        "userId": 1779107295654,
+        "amount": 200
+      }
+    },
+    "timestamp": "2026-05-19T15:11:06.879Z",
+    "prevHash": "b2840570db8b9d932e02f2ed53b340a40c7c0ad991b07f95fddda95fa12b35c7",
+    "currentHash": "e4b344ddb86c51ac52504c6be812995fc22474c89b5a6d5bbcb7a5b958ca8af6"
+  },
+  {
+    "id": 93,
+    "index": 93,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "失败",
+      "detail": "生成信用证明失败: AES密钥不存在，请重新登录",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:11:24.203Z",
+    "prevHash": "e4b344ddb86c51ac52504c6be812995fc22474c89b5a6d5bbcb7a5b958ca8af6",
+    "currentHash": "1126251c87ca19eb8fc45c7c9697d6f7c095ca2bbf16e1a795c57513073d66c1"
+  },
+  {
+    "id": 94,
+    "index": 94,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "失败",
+      "detail": "生成信用证明失败: AES密钥不存在，请重新登录",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:11:25.857Z",
+    "prevHash": "1126251c87ca19eb8fc45c7c9697d6f7c095ca2bbf16e1a795c57513073d66c1",
+    "currentHash": "18c7aea03cc0870016aea46b02b997b4130261588d5d1949bcfded1404322412"
+  },
+  {
+    "id": 95,
+    "index": 95,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "失败",
+      "detail": "生成信用证明失败: AES密钥不存在，请重新登录",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:11:34.682Z",
+    "prevHash": "18c7aea03cc0870016aea46b02b997b4130261588d5d1949bcfded1404322412",
+    "currentHash": "b7061fb1b9f205abe9c53ffde67e4ef4f3186d39d330c1a67cb5359e61f52d20"
+  },
+  {
+    "id": 96,
+    "index": 96,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "失败",
+      "detail": "生成信用证明失败: AES密钥不存在，请重新登录",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:11:44.613Z",
+    "prevHash": "b7061fb1b9f205abe9c53ffde67e4ef4f3186d39d330c1a67cb5359e61f52d20",
+    "currentHash": "185f64a03af653ce7dd61fa02f8e2fb6b60ad5dad42e6971e0dcdf10a72fa832"
+  },
+  {
+    "id": 97,
+    "index": 97,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "发起",
+      "detail": "准备生成信用证明SM2签名",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:11:52.717Z",
+    "prevHash": "185f64a03af653ce7dd61fa02f8e2fb6b60ad5dad42e6971e0dcdf10a72fa832",
+    "currentHash": "4774fb096ad297412a6ca816cbe9abe219b518fca1ef0866cd8e9220c80456bb"
+  },
+  {
+    "id": 98,
+    "index": 98,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "成功",
+      "detail": "生成SM2签名并获取验证码: code_1779203513304_yfjzvk5ru",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:11:53.344Z",
+    "prevHash": "4774fb096ad297412a6ca816cbe9abe219b518fca1ef0866cd8e9220c80456bb",
+    "currentHash": "d1358f79ee07e020a65bc3e56fca32d98da8e956c440e9f0bfdbb24927562b32"
+  },
+  {
+    "id": 99,
+    "index": 99,
+    "userId": 1779107295654,
+    "operationType": "ZKP",
+    "description": "零知识证明",
+    "data": {
+      "status": "成功",
+      "detail": "端侧ZKP证明生成成功",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:11:53.348Z",
+    "prevHash": "d1358f79ee07e020a65bc3e56fca32d98da8e956c440e9f0bfdbb24927562b32",
+    "currentHash": "4ebffc64425a00765997af3246e8aca87d2d16b043e185456ba9122064e7c5e2"
+  },
+  {
+    "id": 100,
+    "index": 100,
+    "userId": 1779107295654,
+    "operationType": "SM3哈希",
+    "description": "信用证明哈希",
+    "data": {
+      "status": "成功",
+      "detail": "信用证明数据已生成SM3哈希并存储",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:11:53.352Z",
+    "prevHash": "4ebffc64425a00765997af3246e8aca87d2d16b043e185456ba9122064e7c5e2",
+    "currentHash": "b98684ea4a56e8774b7a183e84b8e332a680c859cc2021212c971e885526fbca"
+  },
+  {
+    "id": 101,
+    "index": 101,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "发起",
+      "detail": "准备验证信用证明签名和哈希",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:11:54.338Z",
+    "prevHash": "b98684ea4a56e8774b7a183e84b8e332a680c859cc2021212c971e885526fbca",
+    "currentHash": "f8294fe56b02d53d09bf07d91c7d990ba2ff4b206994c8c005cf8151110335ed"
+  },
+  {
+    "id": 102,
+    "index": 102,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "成功",
+      "detail": "SM2签名验证通过，SM3哈希匹配",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:11:54.471Z",
+    "prevHash": "f8294fe56b02d53d09bf07d91c7d990ba2ff4b206994c8c005cf8151110335ed",
+    "currentHash": "4e09241d2ad0557bf64498f16dc5c217a94ae9c9a4342327896efd95300a6e73"
+  },
+  {
+    "id": 103,
+    "index": 103,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "发起",
+      "detail": "准备生成信用证明SM2签名",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:13:01.474Z",
+    "prevHash": "4e09241d2ad0557bf64498f16dc5c217a94ae9c9a4342327896efd95300a6e73",
+    "currentHash": "bd08a628ad0f2ad9e734fc3dd38ecf70aa932dea3dc6d1b41db2302280c1796d"
+  },
+  {
+    "id": 104,
+    "index": 104,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "成功",
+      "detail": "生成SM2签名并获取验证码: code_1779203582107_czkkz9fdx",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:13:02.168Z",
+    "prevHash": "bd08a628ad0f2ad9e734fc3dd38ecf70aa932dea3dc6d1b41db2302280c1796d",
+    "currentHash": "96fd92f50f0fd7b31625fddd31edc6ba7154b06f096d2ca07f3653cc5518d0b6"
+  },
+  {
+    "id": 105,
+    "index": 105,
+    "userId": 1779107295654,
+    "operationType": "ZKP",
+    "description": "零知识证明",
+    "data": {
+      "status": "成功",
+      "detail": "端侧ZKP证明生成成功",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:13:02.172Z",
+    "prevHash": "96fd92f50f0fd7b31625fddd31edc6ba7154b06f096d2ca07f3653cc5518d0b6",
+    "currentHash": "f5bae0c693a96cfcbf2d003917394cca764f72d467e25d58ca68c14738416a91"
+  },
+  {
+    "id": 106,
+    "index": 106,
+    "userId": 1779107295654,
+    "operationType": "SM3哈希",
+    "description": "信用证明哈希",
+    "data": {
+      "status": "成功",
+      "detail": "信用证明数据已生成SM3哈希并存储",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:13:02.177Z",
+    "prevHash": "f5bae0c693a96cfcbf2d003917394cca764f72d467e25d58ca68c14738416a91",
+    "currentHash": "ee9f992f9a290173a52c0ab8da4e8a86dda2af94572eb68679f0c8245b684dab"
+  },
+  {
+    "id": 107,
+    "index": 107,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "发起",
+      "detail": "准备验证信用证明签名和哈希",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:13:03.210Z",
+    "prevHash": "ee9f992f9a290173a52c0ab8da4e8a86dda2af94572eb68679f0c8245b684dab",
+    "currentHash": "5421ffd3b35f7516487f5a1cac2f94597af9252ceb18f5c51abc78eb6e164d98"
+  },
+  {
+    "id": 108,
+    "index": 108,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "成功",
+      "detail": "SM2签名验证通过，SM3哈希匹配",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:13:03.381Z",
+    "prevHash": "5421ffd3b35f7516487f5a1cac2f94597af9252ceb18f5c51abc78eb6e164d98",
+    "currentHash": "91c80c26182e36bb94de655a847b26b99f75d1154bb4691856f457771aeb90d2"
+  },
+  {
+    "id": 109,
+    "index": 109,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "借款发起",
+    "data": {
+      "status": "待验证",
+      "detail": "申请借款金额: 200元，期限: 30天",
+      "correlationInfo": {
+        "userId": 1779107295654,
+        "amount": 200,
+        "term": 30
+      }
+    },
+    "timestamp": "2026-05-19T15:13:10.996Z",
+    "prevHash": "91c80c26182e36bb94de655a847b26b99f75d1154bb4691856f457771aeb90d2",
+    "currentHash": "a89674b3eb806b4a74eec72165374d78a75d04f9a0bf1a59f187c66842942832"
+  },
+  {
+    "id": 110,
+    "index": 110,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "发起",
+      "detail": "准备生成信用证明SM2签名",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:13:50.020Z",
+    "prevHash": "a89674b3eb806b4a74eec72165374d78a75d04f9a0bf1a59f187c66842942832",
+    "currentHash": "302e380023726e294768bb8ad0a02d16a17dcb037c7e5a6f1041da2c18ca9134"
+  },
+  {
+    "id": 111,
+    "index": 111,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "借款失败",
+    "data": {
+      "status": "失败",
+      "detail": "借款失败",
+      "correlationInfo": {
+        "userId": 1779107295654,
+        "amount": 200
+      }
+    },
+    "timestamp": "2026-05-19T15:14:01.828Z",
+    "prevHash": "302e380023726e294768bb8ad0a02d16a17dcb037c7e5a6f1041da2c18ca9134",
+    "currentHash": "bd06bd99724ac7d2aefe0ef7a0b000446d2bb91fc9a3bf76917ab5fd485ab573"
+  },
+  {
+    "id": 112,
+    "index": 112,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "成功",
+      "detail": "生成SM2签名并获取验证码: code_1779203630688_8bhlu3kt3",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:14:01.896Z",
+    "prevHash": "bd06bd99724ac7d2aefe0ef7a0b000446d2bb91fc9a3bf76917ab5fd485ab573",
+    "currentHash": "fbd485ba6e3967845d78fdf4829863957f40c2326913ba77dea13b772e81843d"
+  },
+  {
+    "id": 113,
+    "index": 113,
+    "userId": 1779107295654,
+    "operationType": "ZKP",
+    "description": "零知识证明",
+    "data": {
+      "status": "成功",
+      "detail": "端侧ZKP证明生成成功",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:14:01.900Z",
+    "prevHash": "fbd485ba6e3967845d78fdf4829863957f40c2326913ba77dea13b772e81843d",
+    "currentHash": "8ea6a31ca7f146a934abf16b430d193c2fb7602002fba6de7bec5e9e2462c8b7"
+  },
+  {
+    "id": 114,
+    "index": 114,
+    "userId": 1779107295654,
+    "operationType": "SM3哈希",
+    "description": "信用证明哈希",
+    "data": {
+      "status": "成功",
+      "detail": "信用证明数据已生成SM3哈希并存储",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:14:01.905Z",
+    "prevHash": "8ea6a31ca7f146a934abf16b430d193c2fb7602002fba6de7bec5e9e2462c8b7",
+    "currentHash": "fd82d29cb4bf1a33c6a646ecbc256548580e5dbe7b6d17fb8d2deaea934244ab"
+  },
+  {
+    "id": 115,
+    "index": 115,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "发起",
+      "detail": "准备生成信用证明SM2签名",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:14:04.636Z",
+    "prevHash": "fd82d29cb4bf1a33c6a646ecbc256548580e5dbe7b6d17fb8d2deaea934244ab",
+    "currentHash": "f25adb234ab5bcb02a502b1b8f3a42f81143b0aff1e2206cd0334daeac97f2ec"
+  },
+  {
+    "id": 116,
+    "index": 116,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "成功",
+      "detail": "生成SM2签名并获取验证码: code_1779203645230_k1ur1hgny",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:14:05.284Z",
+    "prevHash": "f25adb234ab5bcb02a502b1b8f3a42f81143b0aff1e2206cd0334daeac97f2ec",
+    "currentHash": "a0af45e9c32d277a6fb5c9cded4dd03cfd06eff5b375f4d6031af564e5dd6b33"
+  },
+  {
+    "id": 117,
+    "index": 117,
+    "userId": 1779107295654,
+    "operationType": "ZKP",
+    "description": "零知识证明",
+    "data": {
+      "status": "成功",
+      "detail": "端侧ZKP证明生成成功",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:14:05.288Z",
+    "prevHash": "a0af45e9c32d277a6fb5c9cded4dd03cfd06eff5b375f4d6031af564e5dd6b33",
+    "currentHash": "ae612cab6e1165f5a6f991c1d609d80a4bbae8a7e9de096580e338423604aaad"
+  },
+  {
+    "id": 118,
+    "index": 118,
+    "userId": 1779107295654,
+    "operationType": "SM3哈希",
+    "description": "信用证明哈希",
+    "data": {
+      "status": "成功",
+      "detail": "信用证明数据已生成SM3哈希并存储",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:14:05.292Z",
+    "prevHash": "ae612cab6e1165f5a6f991c1d609d80a4bbae8a7e9de096580e338423604aaad",
+    "currentHash": "c6307cb39e06e82455c2d8c52761f56141b65345f021d6cff30335d71f7fa000"
+  },
+  {
+    "id": 119,
+    "index": 119,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "发起",
+      "detail": "准备验证信用证明签名和哈希",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:14:06.289Z",
+    "prevHash": "c6307cb39e06e82455c2d8c52761f56141b65345f021d6cff30335d71f7fa000",
+    "currentHash": "1615b67193d6c3c287cc3127614b34df6a49bc024d7b761740c5fc717761b0ea"
+  },
+  {
+    "id": 120,
+    "index": 120,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "成功",
+      "detail": "SM2签名验证通过，SM3哈希匹配",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:14:06.456Z",
+    "prevHash": "1615b67193d6c3c287cc3127614b34df6a49bc024d7b761740c5fc717761b0ea",
+    "currentHash": "acb5419078ca68c7276a3593c978e6b2b87ef2bba688b167946dc95713b028ed"
+  },
+  {
+    "id": 121,
+    "index": 121,
+    "userId": "1779107295654",
+    "operationType": "test",
+    "description": "test log",
+    "data": {},
+    "timestamp": "2026-05-19T15:37:06.995Z",
+    "prevHash": "acb5419078ca68c7276a3593c978e6b2b87ef2bba688b167946dc95713b028ed",
+    "currentHash": "946532d8f0a5777e36076450fdd920d9273952e87a38e864d9d1e2eb4c3a5465"
+  },
+  {
+    "id": 122,
+    "index": 122,
+    "userId": "anonymous",
+    "operationType": "密码验证",
+    "description": "用户登录验证",
+    "data": {
+      "status": "发起",
+      "detail": "用户名: cyb",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:44:39.165Z",
+    "prevHash": "946532d8f0a5777e36076450fdd920d9273952e87a38e864d9d1e2eb4c3a5465",
+    "currentHash": "b3d9697c0ec245178427f303de90573a85cd2b25490a147e67e2a52893442efd"
+  },
+  {
+    "id": 123,
+    "index": 123,
+    "userId": "anonymous",
+    "operationType": "密码验证",
+    "description": "用户登录验证",
+    "data": {
+      "status": "发起",
+      "detail": "用户名: cyb",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:44:39.175Z",
+    "prevHash": "b3d9697c0ec245178427f303de90573a85cd2b25490a147e67e2a52893442efd",
+    "currentHash": "9e3fa4e022df597d0a336470cc80ce9bc3f5cec94f669cab0766db09d64b8e39"
+  },
+  {
+    "id": 124,
+    "index": 124,
+    "userId": "anonymous",
+    "operationType": "密码验证",
+    "description": "用户登录验证",
+    "data": {
+      "status": "失败",
+      "detail": "登录失败: cyb",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:44:39.392Z",
+    "prevHash": "9e3fa4e022df597d0a336470cc80ce9bc3f5cec94f669cab0766db09d64b8e39",
+    "currentHash": "419fa2c0247cb2faa9294c82a831fdc8267aa4dcf9613e3b27c98257c0609ac0"
+  },
+  {
+    "id": 125,
+    "index": 125,
+    "userId": "anonymous",
+    "operationType": "密码验证",
+    "description": "用户登录验证",
+    "data": {
+      "status": "失败",
+      "detail": "登录失败: cyb",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:44:39.398Z",
+    "prevHash": "419fa2c0247cb2faa9294c82a831fdc8267aa4dcf9613e3b27c98257c0609ac0",
+    "currentHash": "52289d25ce89a89cc70927d0abc31563b976977e352f88cd98e2b49f935b5883"
+  },
+  {
+    "id": 126,
+    "index": 126,
+    "userId": "anonymous",
+    "operationType": "密码验证",
+    "description": "用户登录验证",
+    "data": {
+      "status": "发起",
+      "detail": "用户名: cyb",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:44:42.111Z",
+    "prevHash": "52289d25ce89a89cc70927d0abc31563b976977e352f88cd98e2b49f935b5883",
+    "currentHash": "7ae939ab72b76dba557554a1f38f2facc44c84cfb787722339418560186c5e8c"
+  },
+  {
+    "id": 127,
+    "index": 127,
+    "userId": "anonymous",
+    "operationType": "密码验证",
+    "description": "用户登录验证",
+    "data": {
+      "status": "成功",
+      "detail": "登录成功: cyb",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:44:42.535Z",
+    "prevHash": "7ae939ab72b76dba557554a1f38f2facc44c84cfb787722339418560186c5e8c",
+    "currentHash": "d9492d81a3d7bf67d44880a3ee571676597b60694e7e9346857b2fa9cf01782e"
+  },
+  {
+    "id": 128,
+    "index": 128,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "发起",
+      "detail": "准备生成信用证明SM2签名",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:44:53.512Z",
+    "prevHash": "d9492d81a3d7bf67d44880a3ee571676597b60694e7e9346857b2fa9cf01782e",
+    "currentHash": "df021c1c9ed30548782b478398771a100b7c89a0d75e16baf2fa2094560632a7"
+  },
+  {
+    "id": 129,
+    "index": 129,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "成功",
+      "detail": "生成SM2签名并获取验证码: code_1779205494946_lqc7hwq1r",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:44:55.095Z",
+    "prevHash": "df021c1c9ed30548782b478398771a100b7c89a0d75e16baf2fa2094560632a7",
+    "currentHash": "e7f3aa2ba05f077db7407c48735b162fe6703f252fc4d812cdc61b3c4274dcd3"
+  },
+  {
+    "id": 130,
+    "index": 130,
+    "userId": 1779107295654,
+    "operationType": "ZKP",
+    "description": "零知识证明",
+    "data": {
+      "status": "成功",
+      "detail": "端侧ZKP证明生成成功",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:44:55.101Z",
+    "prevHash": "e7f3aa2ba05f077db7407c48735b162fe6703f252fc4d812cdc61b3c4274dcd3",
+    "currentHash": "77024fdecc4f0294b6a72a679f2701ea04426fafccc99e9a88be0a0827eee8a8"
+  },
+  {
+    "id": 131,
+    "index": 131,
+    "userId": 1779107295654,
+    "operationType": "SM3哈希",
+    "description": "信用证明哈希",
+    "data": {
+      "status": "成功",
+      "detail": "信用证明数据已生成SM3哈希并存储",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:44:55.107Z",
+    "prevHash": "77024fdecc4f0294b6a72a679f2701ea04426fafccc99e9a88be0a0827eee8a8",
+    "currentHash": "aef5444431af8cdb7eb5080fc3ab604f0dfe3a4ca5f8b7f1c6c5e8bf352db56e"
+  },
+  {
+    "id": 132,
+    "index": 132,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "发起",
+      "detail": "准备验证信用证明签名和哈希",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:44:55.847Z",
+    "prevHash": "aef5444431af8cdb7eb5080fc3ab604f0dfe3a4ca5f8b7f1c6c5e8bf352db56e",
+    "currentHash": "411afd446b09e29062b8c32dded3b02cab1794a5d5625f9b94164c1099a005cd"
+  },
+  {
+    "id": 133,
+    "index": 133,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "成功",
+      "detail": "SM2签名验证通过，SM3哈希匹配",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:44:56.101Z",
+    "prevHash": "411afd446b09e29062b8c32dded3b02cab1794a5d5625f9b94164c1099a005cd",
+    "currentHash": "b83e60bb424f933a915e532639242381d1153afa305a2b1ce93e46103c5e7ee8"
+  },
+  {
+    "id": 134,
+    "index": 134,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "借款发起",
+    "data": {
+      "status": "待验证",
+      "detail": "申请借款金额: 200元，期限: 30天",
+      "correlationInfo": {
+        "userId": 1779107295654,
+        "amount": 200,
+        "term": 30
+      }
+    },
+    "timestamp": "2026-05-19T15:45:03.959Z",
+    "prevHash": "b83e60bb424f933a915e532639242381d1153afa305a2b1ce93e46103c5e7ee8",
+    "currentHash": "6fd3dcae20d917dbbfc69c1e7336599f59e785f36721700ac9c4a65801321298"
+  },
+  {
+    "id": 135,
+    "index": 135,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "发起",
+      "detail": "准备生成信用证明SM2签名",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:45:50.014Z",
+    "prevHash": "6fd3dcae20d917dbbfc69c1e7336599f59e785f36721700ac9c4a65801321298",
+    "currentHash": "57b22527cc4a56ed3d7961dcd55b4482d04176929e26bfc5173d50abb9617c3b"
+  },
+  {
+    "id": 136,
+    "index": 136,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "借款失败",
+    "data": {
+      "status": "失败",
+      "detail": "借款失败",
+      "correlationInfo": {
+        "userId": 1779107295654,
+        "amount": 200
+      }
+    },
+    "timestamp": "2026-05-19T15:45:54.996Z",
+    "prevHash": "57b22527cc4a56ed3d7961dcd55b4482d04176929e26bfc5173d50abb9617c3b",
+    "currentHash": "5c488c271357c0a2f54ed3d555ac706b8d047d1b21c58231c4564c7347cc5423"
+  },
+  {
+    "id": 137,
+    "index": 137,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "成功",
+      "detail": "生成SM2签名并获取验证码: code_1779205550907_qf0c0rhp4",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:45:55.093Z",
+    "prevHash": "5c488c271357c0a2f54ed3d555ac706b8d047d1b21c58231c4564c7347cc5423",
+    "currentHash": "4e28946390de1dedcac7468332aa3c719b85a4667a3a31cacabec549ae90176b"
+  },
+  {
+    "id": 138,
+    "index": 138,
+    "userId": 1779107295654,
+    "operationType": "ZKP",
+    "description": "零知识证明",
+    "data": {
+      "status": "成功",
+      "detail": "端侧ZKP证明生成成功",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:45:55.098Z",
+    "prevHash": "4e28946390de1dedcac7468332aa3c719b85a4667a3a31cacabec549ae90176b",
+    "currentHash": "e435e302507a3d5d5178da20c022ce184abb06ecc6f18f19b51e31cffd1555eb"
+  },
+  {
+    "id": 139,
+    "index": 139,
+    "userId": 1779107295654,
+    "operationType": "SM3哈希",
+    "description": "信用证明哈希",
+    "data": {
+      "status": "成功",
+      "detail": "信用证明数据已生成SM3哈希并存储",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:45:55.103Z",
+    "prevHash": "e435e302507a3d5d5178da20c022ce184abb06ecc6f18f19b51e31cffd1555eb",
+    "currentHash": "b5bd0354642cd0790dda83076b9ebfc2bf2307d537a4a35b934d43557910ac88"
+  },
+  {
+    "id": 140,
+    "index": 140,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "发起",
+      "detail": "准备验证信用证明签名和哈希",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:45:57.091Z",
+    "prevHash": "b5bd0354642cd0790dda83076b9ebfc2bf2307d537a4a35b934d43557910ac88",
+    "currentHash": "0667276b1c152a67841ae9341818e66ca833940b5b7d1b84f795855ef5b9bc95"
+  },
+  {
+    "id": 141,
+    "index": 141,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "成功",
+      "detail": "SM2签名验证通过，SM3哈希匹配",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:45:57.470Z",
+    "prevHash": "0667276b1c152a67841ae9341818e66ca833940b5b7d1b84f795855ef5b9bc95",
+    "currentHash": "f2ffcbd92dd804ebf52660363cc2efe597d80bd85fb590e00f40330415b6ac56"
+  },
+  {
+    "id": 142,
+    "index": 142,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "发起",
+      "detail": "准备生成信用证明SM2签名",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:46:03.370Z",
+    "prevHash": "f2ffcbd92dd804ebf52660363cc2efe597d80bd85fb590e00f40330415b6ac56",
+    "currentHash": "b06752f118524781c637f7dcdd502d50f465c6cf584acea96192edf9cbce678a"
+  },
+  {
+    "id": 143,
+    "index": 143,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "成功",
+      "detail": "生成SM2签名并获取验证码: code_1779205564272_gwecjs0z6",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:46:04.324Z",
+    "prevHash": "b06752f118524781c637f7dcdd502d50f465c6cf584acea96192edf9cbce678a",
+    "currentHash": "aa93d7bbd312eac9f9dbde8abc71fa367bcab8c3ef6731c7a873ba35e51cd8bf"
+  },
+  {
+    "id": 144,
+    "index": 144,
+    "userId": 1779107295654,
+    "operationType": "ZKP",
+    "description": "零知识证明",
+    "data": {
+      "status": "成功",
+      "detail": "端侧ZKP证明生成成功",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:46:04.329Z",
+    "prevHash": "aa93d7bbd312eac9f9dbde8abc71fa367bcab8c3ef6731c7a873ba35e51cd8bf",
+    "currentHash": "eb868217d9bc822326bb3a77c696f1235ad12464b98ffd5b60f7ab7d5227b771"
+  },
+  {
+    "id": 145,
+    "index": 145,
+    "userId": 1779107295654,
+    "operationType": "SM3哈希",
+    "description": "信用证明哈希",
+    "data": {
+      "status": "成功",
+      "detail": "信用证明数据已生成SM3哈希并存储",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:46:04.335Z",
+    "prevHash": "eb868217d9bc822326bb3a77c696f1235ad12464b98ffd5b60f7ab7d5227b771",
+    "currentHash": "b05b0d4feb783a1ceaf70bed8605fad819e77b9a549469682b8f3317e6d6d978"
+  },
+  {
+    "id": 146,
+    "index": 146,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "借款发起",
+    "data": {
+      "status": "待验证",
+      "detail": "申请借款金额: 200元，期限: 30天",
+      "correlationInfo": {
+        "userId": 1779107295654,
+        "amount": 200,
+        "term": 30
+      }
+    },
+    "timestamp": "2026-05-19T15:46:13.668Z",
+    "prevHash": "b05b0d4feb783a1ceaf70bed8605fad819e77b9a549469682b8f3317e6d6d978",
+    "currentHash": "4a4c4a173990b718e93ee8cfd027e71b04968fcbfa14a9345fe3e899d216b7ce"
+  },
+  {
+    "id": 147,
+    "index": 147,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "借款失败",
+    "data": {
+      "status": "失败",
+      "detail": "借款失败",
+      "correlationInfo": {
+        "userId": 1779107295654,
+        "amount": 200
+      }
+    },
+    "timestamp": "2026-05-19T15:47:04.821Z",
+    "prevHash": "4a4c4a173990b718e93ee8cfd027e71b04968fcbfa14a9345fe3e899d216b7ce",
+    "currentHash": "fbdb4bc4b4b92c56e030bacc7553a515c93a9b56b589eaa417e5e68399942af6"
+  },
+  {
+    "id": 148,
+    "index": 148,
+    "userId": "anonymous",
+    "operationType": "密码验证",
+    "description": "用户登录验证",
+    "data": {
+      "status": "发起",
+      "detail": "用户名: cyb",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:52:19.467Z",
+    "prevHash": "fbdb4bc4b4b92c56e030bacc7553a515c93a9b56b589eaa417e5e68399942af6",
+    "currentHash": "3f177775fbc9725e89b17b79be4648175f727b2c3c97a5f1f99961f91f8d9e8c"
+  },
+  {
+    "id": 149,
+    "index": 149,
+    "userId": "anonymous",
+    "operationType": "密码验证",
+    "description": "用户登录验证",
+    "data": {
+      "status": "成功",
+      "detail": "登录成功: cyb",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:52:20.112Z",
+    "prevHash": "3f177775fbc9725e89b17b79be4648175f727b2c3c97a5f1f99961f91f8d9e8c",
+    "currentHash": "25f480fdd08dca2be6b783fdc8407cf6ffeb6a288889074c1abe135b939f7933"
+  },
+  {
+    "id": 150,
+    "index": 150,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "发起",
+      "detail": "准备生成信用证明SM2签名",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:53:36.011Z",
+    "prevHash": "25f480fdd08dca2be6b783fdc8407cf6ffeb6a288889074c1abe135b939f7933",
+    "currentHash": "9e782e1df23cca6a4342d50e603c835229a8a85dea9a4f3e81521b26e5a2caa1"
+  },
+  {
+    "id": 151,
+    "index": 151,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "成功",
+      "detail": "生成SM2签名并获取验证码: code_1779206017594_dg7765k2k",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:53:37.743Z",
+    "prevHash": "9e782e1df23cca6a4342d50e603c835229a8a85dea9a4f3e81521b26e5a2caa1",
+    "currentHash": "b212565b10c0e0ad23afaac7031f00675d25f57e32fef14e1a8b179e03221c7c"
+  },
+  {
+    "id": 152,
+    "index": 152,
+    "userId": 1779107295654,
+    "operationType": "SM3哈希",
+    "description": "信用证明哈希",
+    "data": {
+      "status": "成功",
+      "detail": "信用证明数据已生成SM3哈希并存储",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:53:37.749Z",
+    "prevHash": "b212565b10c0e0ad23afaac7031f00675d25f57e32fef14e1a8b179e03221c7c",
+    "currentHash": "e1dfe47026c05eec996fd51c19c54d71528e43fecce1f9146a382e0197dd0558"
+  },
+  {
+    "id": 153,
+    "index": 153,
+    "userId": 1779107295654,
+    "operationType": "ZKP",
+    "description": "零知识证明",
+    "data": {
+      "status": "成功",
+      "detail": "端侧ZKP证明生成成功",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:53:37.755Z",
+    "prevHash": "e1dfe47026c05eec996fd51c19c54d71528e43fecce1f9146a382e0197dd0558",
+    "currentHash": "77ba927b70fe8c8c50c91441c326560bcad532d2072157576964af5026113964"
+  },
+  {
+    "id": 154,
+    "index": 154,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "发起",
+      "detail": "准备验证信用证明签名和哈希",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:53:38.923Z",
+    "prevHash": "77ba927b70fe8c8c50c91441c326560bcad532d2072157576964af5026113964",
+    "currentHash": "3bdbd30339d04e8f3ef458745c4a3ea3aec784f76c9aca0b6475cce913956687"
+  },
+  {
+    "id": 155,
+    "index": 155,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "成功",
+      "detail": "SM2签名验证通过，SM3哈希匹配",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T15:53:39.145Z",
+    "prevHash": "3bdbd30339d04e8f3ef458745c4a3ea3aec784f76c9aca0b6475cce913956687",
+    "currentHash": "447b86f2ad06329f91547e06a254e6632a56ff7ae56dd796f3f0dc066feb5ebe"
+  },
+  {
+    "id": 156,
+    "index": 156,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "借款发起",
+    "data": {
+      "status": "待验证",
+      "detail": "申请借款金额: 200元，期限: 30天",
+      "correlationInfo": {
+        "userId": 1779107295654,
+        "amount": 200,
+        "term": 30
+      }
+    },
+    "timestamp": "2026-05-19T15:53:52.361Z",
+    "prevHash": "447b86f2ad06329f91547e06a254e6632a56ff7ae56dd796f3f0dc066feb5ebe",
+    "currentHash": "8a1c66a6ee9f2d7f168f1aea6e872974d1570e315757afa816ce426dc78cb242"
+  },
+  {
+    "id": 157,
+    "index": 157,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "借款失败",
+    "data": {
+      "status": "失败",
+      "detail": "借款失败",
+      "correlationInfo": {
+        "userId": 1779107295654,
+        "amount": 200
+      }
+    },
+    "timestamp": "2026-05-19T15:54:44.094Z",
+    "prevHash": "8a1c66a6ee9f2d7f168f1aea6e872974d1570e315757afa816ce426dc78cb242",
+    "currentHash": "fb54193e10c957a299bea9b012ca861168bbc1eb32373834cf6264927073e50e"
+  },
+  {
+    "id": 158,
+    "index": 158,
+    "userId": "anonymous",
+    "operationType": "密码验证",
+    "description": "用户登录验证",
+    "data": {
+      "status": "发起",
+      "detail": "用户名: cyb",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T16:13:03.475Z",
+    "prevHash": "fb54193e10c957a299bea9b012ca861168bbc1eb32373834cf6264927073e50e",
+    "currentHash": "605d6d6fe752bd3319ebd755ac747c5d4239384db62bb75f2a7030b643b6333f"
+  },
+  {
+    "id": 159,
+    "index": 159,
+    "userId": "anonymous",
+    "operationType": "密码验证",
+    "description": "用户登录验证",
+    "data": {
+      "status": "成功",
+      "detail": "登录成功: cyb",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T16:13:04.144Z",
+    "prevHash": "605d6d6fe752bd3319ebd755ac747c5d4239384db62bb75f2a7030b643b6333f",
+    "currentHash": "8958c1d3cf030e8cfef275dd09aaef8d6cbad2741cf021a942f0fbf75ba4698a"
+  },
+  {
+    "id": 160,
+    "index": 160,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "发起",
+      "detail": "准备生成信用证明SM2签名",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T16:13:20.286Z",
+    "prevHash": "8958c1d3cf030e8cfef275dd09aaef8d6cbad2741cf021a942f0fbf75ba4698a",
+    "currentHash": "3fa0fa8d72dda489df448511d89e3ceae73cb5fa3afac519743a9b66e1df1842"
+  },
+  {
+    "id": 161,
+    "index": 161,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "成功",
+      "detail": "生成SM2签名并获取验证码: code_1779207201751_r5jy5z61e",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T16:13:21.894Z",
+    "prevHash": "3fa0fa8d72dda489df448511d89e3ceae73cb5fa3afac519743a9b66e1df1842",
+    "currentHash": "c92101f37e23110de75e4b77dbaf4e52d568f4743d351ec3d830b5a97ab5f9c0"
+  },
+  {
+    "id": 162,
+    "index": 162,
+    "userId": 1779107295654,
+    "operationType": "SM3哈希",
+    "description": "信用证明哈希",
+    "data": {
+      "status": "成功",
+      "detail": "信用证明数据已生成SM3哈希并存储",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T16:13:21.902Z",
+    "prevHash": "c92101f37e23110de75e4b77dbaf4e52d568f4743d351ec3d830b5a97ab5f9c0",
+    "currentHash": "f5b2456334267d834750df75bcb716abf68852c19f8351f3fb552331785352f5"
+  },
+  {
+    "id": 163,
+    "index": 163,
+    "userId": 1779107295654,
+    "operationType": "ZKP",
+    "description": "零知识证明",
+    "data": {
+      "status": "成功",
+      "detail": "端侧ZKP证明生成成功",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T16:13:21.909Z",
+    "prevHash": "f5b2456334267d834750df75bcb716abf68852c19f8351f3fb552331785352f5",
+    "currentHash": "c9dcc439c2a0500426c98b900c479bd8a1367c04563780ca5306e7b14d08bb92"
+  },
+  {
+    "id": 164,
+    "index": 164,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "发起",
+      "detail": "准备验证信用证明签名和哈希",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T16:13:22.600Z",
+    "prevHash": "c9dcc439c2a0500426c98b900c479bd8a1367c04563780ca5306e7b14d08bb92",
+    "currentHash": "86b089be4c5cecea800477c066e7abbd11f4e18336363aa0612b3f1e1ace548c"
+  },
+  {
+    "id": 165,
+    "index": 165,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "成功",
+      "detail": "SM2签名验证通过，SM3哈希匹配",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T16:13:22.803Z",
+    "prevHash": "86b089be4c5cecea800477c066e7abbd11f4e18336363aa0612b3f1e1ace548c",
+    "currentHash": "b57e08438ec329cc141b6ff2a76adc9a32904cc5a52f604f80f01b27c8450c50"
+  },
+  {
+    "id": 166,
+    "index": 166,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "借款发起",
+    "data": {
+      "status": "待验证",
+      "detail": "申请借款金额: 200元，期限: 30天",
+      "correlationInfo": {
+        "userId": 1779107295654,
+        "amount": 200,
+        "term": 30
+      }
+    },
+    "timestamp": "2026-05-19T16:13:30.682Z",
+    "prevHash": "b57e08438ec329cc141b6ff2a76adc9a32904cc5a52f604f80f01b27c8450c50",
+    "currentHash": "3d6e44da85305bf79de0b3ed3ab780588cf8f9e8f5e31609b8662887088f8037"
+  },
+  {
+    "id": 167,
+    "index": 167,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "借款失败",
+    "data": {
+      "status": "失败",
+      "detail": "借款失败",
+      "correlationInfo": {
+        "userId": 1779107295654,
+        "amount": 200
+      }
+    },
+    "timestamp": "2026-05-19T16:13:32.123Z",
+    "prevHash": "3d6e44da85305bf79de0b3ed3ab780588cf8f9e8f5e31609b8662887088f8037",
+    "currentHash": "cb0d3e0541ad45ef0477df4cea7011d181874eb1a520c971d7c1d27913b20163"
+  },
+  {
+    "id": 168,
+    "index": 168,
+    "userId": "anonymous",
+    "operationType": "密码验证",
+    "description": "用户登录验证",
+    "data": {
+      "status": "发起",
+      "detail": "用户名: cyb",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T16:27:32.969Z",
+    "prevHash": "cb0d3e0541ad45ef0477df4cea7011d181874eb1a520c971d7c1d27913b20163",
+    "currentHash": "f9d9b51da4e9de8d106b9b2c4400ed746825e2a7cb1727aed003e318eaddfe4e"
+  },
+  {
+    "id": 169,
+    "index": 169,
+    "userId": "anonymous",
+    "operationType": "密码验证",
+    "description": "用户登录验证",
+    "data": {
+      "status": "成功",
+      "detail": "登录成功: cyb",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T16:27:33.568Z",
+    "prevHash": "f9d9b51da4e9de8d106b9b2c4400ed746825e2a7cb1727aed003e318eaddfe4e",
+    "currentHash": "54f128f1fb3b5e7a6fef06051da19acf5274bb3f03c6854211f4cfc8ddaec765"
+  },
+  {
+    "id": 170,
+    "index": 170,
+    "userId": "anonymous",
+    "operationType": "密码验证",
+    "description": "用户登录验证",
+    "data": {
+      "status": "发起",
+      "detail": "用户名: cyb",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T16:27:49.676Z",
+    "prevHash": "54f128f1fb3b5e7a6fef06051da19acf5274bb3f03c6854211f4cfc8ddaec765",
+    "currentHash": "e871291cc78a847b1393e29abfdb143108bde0a447fc1581f62593463fc5b9ca"
+  },
+  {
+    "id": 171,
+    "index": 171,
+    "userId": "anonymous",
+    "operationType": "密码验证",
+    "description": "用户登录验证",
+    "data": {
+      "status": "成功",
+      "detail": "登录成功: cyb",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T16:27:50.255Z",
+    "prevHash": "e871291cc78a847b1393e29abfdb143108bde0a447fc1581f62593463fc5b9ca",
+    "currentHash": "27546478fad485089ffca9d21ca3282c0ee7d6a79be97655b5737441e4ecd8be"
+  },
+  {
+    "id": 172,
+    "index": 172,
+    "userId": "anonymous",
+    "operationType": "密码验证",
+    "description": "用户登录验证",
+    "data": {
+      "status": "发起",
+      "detail": "用户名: cyb",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T16:35:10.082Z",
+    "prevHash": "27546478fad485089ffca9d21ca3282c0ee7d6a79be97655b5737441e4ecd8be",
+    "currentHash": "403e1493be5138f7269e6763044d1fcd588a2f6dd0fb4cadfacb13749f119eee"
+  },
+  {
+    "id": 173,
+    "index": 173,
+    "userId": "anonymous",
+    "operationType": "密码验证",
+    "description": "用户登录验证",
+    "data": {
+      "status": "成功",
+      "detail": "登录成功: cyb",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T16:35:10.755Z",
+    "prevHash": "403e1493be5138f7269e6763044d1fcd588a2f6dd0fb4cadfacb13749f119eee",
+    "currentHash": "f1ed25fa63d580f5088df11dc0598bbc0bd076ba827e58cb5bffedeac9d48de5"
+  },
+  {
+    "id": 174,
+    "index": 174,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "发起",
+      "detail": "准备生成信用证明SM2签名",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T16:36:37.264Z",
+    "prevHash": "f1ed25fa63d580f5088df11dc0598bbc0bd076ba827e58cb5bffedeac9d48de5",
+    "currentHash": "b3e4a3e145a7bda96abaaf9fe0f83a81ee5b0c07aa262d6bedc972ad310dceaa"
+  },
+  {
+    "id": 175,
+    "index": 175,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "成功",
+      "detail": "生成SM2签名并获取验证码: code_1779208598616_rh6slrl3s",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T16:36:38.767Z",
+    "prevHash": "b3e4a3e145a7bda96abaaf9fe0f83a81ee5b0c07aa262d6bedc972ad310dceaa",
+    "currentHash": "f937e4b24ca1ebe9d4549ab2cf03dbb8a972a12c265393a35a9bc9b35122c122"
+  },
+  {
+    "id": 176,
+    "index": 176,
+    "userId": 1779107295654,
+    "operationType": "SM3哈希",
+    "description": "信用证明哈希",
+    "data": {
+      "status": "成功",
+      "detail": "信用证明数据已生成SM3哈希并存储",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T16:36:38.777Z",
+    "prevHash": "f937e4b24ca1ebe9d4549ab2cf03dbb8a972a12c265393a35a9bc9b35122c122",
+    "currentHash": "895be2e3e2131a5045263ef782ea2a411c5513f06b3797556ec1ff07ad8bdb1b"
+  },
+  {
+    "id": 177,
+    "index": 177,
+    "userId": 1779107295654,
+    "operationType": "ZKP",
+    "description": "零知识证明",
+    "data": {
+      "status": "成功",
+      "detail": "端侧ZKP证明生成成功",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T16:36:38.783Z",
+    "prevHash": "895be2e3e2131a5045263ef782ea2a411c5513f06b3797556ec1ff07ad8bdb1b",
+    "currentHash": "5ebc25a46443cf2f18dd91a6026df334c4d8d7f3ddc4eb2cf7ec17bf254a07a9"
+  },
+  {
+    "id": 178,
+    "index": 178,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "发起",
+      "detail": "准备验证信用证明签名和哈希",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T16:36:39.853Z",
+    "prevHash": "5ebc25a46443cf2f18dd91a6026df334c4d8d7f3ddc4eb2cf7ec17bf254a07a9",
+    "currentHash": "62cfe1c3bcf8b615fee7486e7474c185663e050c986895671a3247cffa1a7bde"
+  },
+  {
+    "id": 179,
+    "index": 179,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "成功",
+      "detail": "SM2签名验证通过，SM3哈希匹配",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T16:36:40.037Z",
+    "prevHash": "62cfe1c3bcf8b615fee7486e7474c185663e050c986895671a3247cffa1a7bde",
+    "currentHash": "3de731eb400aacd8cbd46cd05ef29a6aed5decbddb716d565a3ba15d87079f66"
+  },
+  {
+    "id": 180,
+    "index": 180,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "借款发起",
+    "data": {
+      "status": "待验证",
+      "detail": "申请借款金额: 200元，期限: 30天",
+      "correlationInfo": {
+        "userId": 1779107295654,
+        "amount": 200,
+        "term": 30
+      }
+    },
+    "timestamp": "2026-05-19T16:36:48.261Z",
+    "prevHash": "3de731eb400aacd8cbd46cd05ef29a6aed5decbddb716d565a3ba15d87079f66",
+    "currentHash": "81c73ea624217dc236bbd67e9f6c0c3fb57d9b5c2a61c1d9b75e17c0e89de8b7"
+  },
+  {
+    "id": 181,
+    "index": 181,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "借款通过",
+    "data": {
+      "status": "成功",
+      "detail": "后端用SM2公钥验证签名通过",
+      "correlationInfo": {
+        "userId": 1779107295654,
+        "amount": 200
+      }
+    },
+    "timestamp": "2026-05-19T16:36:49.687Z",
+    "prevHash": "81c73ea624217dc236bbd67e9f6c0c3fb57d9b5c2a61c1d9b75e17c0e89de8b7",
+    "currentHash": "ecc2e7e8eebbd908e27d73798f04a7c0364a25c0de986eaa8623e9d38f787993"
+  },
+  {
+    "id": 182,
+    "index": 182,
+    "userId": 1779107295654,
+    "operationType": "SM3哈希",
+    "description": "借款记录哈希",
+    "data": {
+      "status": "成功",
+      "detail": "生成借款记录SM3哈希: 48224237...",
+      "correlationInfo": {
+        "userId": 1779107295654
+      }
+    },
+    "timestamp": "2026-05-19T16:36:49.695Z",
+    "prevHash": "ecc2e7e8eebbd908e27d73798f04a7c0364a25c0de986eaa8623e9d38f787993",
+    "currentHash": "13140d115e1809144c62e35727ba65369ce21e05115f5fd818b25af919d558f1"
+  },
+  {
+    "id": 183,
+    "index": 183,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "借款发起",
+    "data": {
+      "status": "待验证",
+      "detail": "申请借款金额: 200元，期限: 30天",
+      "correlationInfo": {
+        "userId": 1779107295654,
+        "amount": 200,
+        "term": 30
+      }
+    },
+    "timestamp": "2026-05-19T16:37:08.997Z",
+    "prevHash": "13140d115e1809144c62e35727ba65369ce21e05115f5fd818b25af919d558f1",
+    "currentHash": "57edc45f4567ea291eae6473c8e7e3e001e8f357db6c68ec9360075a33edfc16"
+  },
+  {
+    "id": 184,
+    "index": 184,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "借款通过",
+    "data": {
+      "status": "成功",
+      "detail": "后端用SM2公钥验证签名通过",
+      "correlationInfo": {
+        "userId": 1779107295654,
+        "amount": 200
+      }
+    },
+    "timestamp": "2026-05-19T16:37:09.786Z",
+    "prevHash": "57edc45f4567ea291eae6473c8e7e3e001e8f357db6c68ec9360075a33edfc16",
+    "currentHash": "f283544b10013dfb05e30c56d26c120e559ced28a664598cd59091a42f6ac188"
+  },
+  {
+    "id": 185,
+    "index": 185,
+    "userId": 1779107295654,
+    "operationType": "SM3哈希",
+    "description": "借款记录哈希",
+    "data": {
+      "status": "成功",
+      "detail": "生成借款记录SM3哈希: 8c2fd1b2...",
+      "correlationInfo": {
+        "userId": 1779107295654
+      }
+    },
+    "timestamp": "2026-05-19T16:37:09.792Z",
+    "prevHash": "f283544b10013dfb05e30c56d26c120e559ced28a664598cd59091a42f6ac188",
+    "currentHash": "1cc3ed056f28c9d175c1ed4bcf9f77ff8cc84bb9b20842a607f25ed980ecd321"
+  },
+  {
+    "id": 186,
+    "index": 186,
+    "userId": "anonymous",
+    "operationType": "密码验证",
+    "description": "用户登录验证",
+    "data": {
+      "status": "发起",
+      "detail": "用户名: cyb",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T16:54:06.793Z",
+    "prevHash": "1cc3ed056f28c9d175c1ed4bcf9f77ff8cc84bb9b20842a607f25ed980ecd321",
+    "currentHash": "10a56cead6992112ae0a8ead56279a5321027b1cd470e8c897bc83310353f9f7"
+  },
+  {
+    "id": 187,
+    "index": 187,
+    "userId": "anonymous",
+    "operationType": "密码验证",
+    "description": "用户登录验证",
+    "data": {
+      "status": "成功",
+      "detail": "登录成功: cyb",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T16:54:07.055Z",
+    "prevHash": "10a56cead6992112ae0a8ead56279a5321027b1cd470e8c897bc83310353f9f7",
+    "currentHash": "5261b97a3fbaa6a0f76e5f3c166fec1bda145bafb2090f56739edb0803c212cd"
+  },
+  {
+    "id": 188,
+    "index": 188,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "发起",
+      "detail": "准备生成信用证明SM2签名",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T16:54:10.795Z",
+    "prevHash": "5261b97a3fbaa6a0f76e5f3c166fec1bda145bafb2090f56739edb0803c212cd",
+    "currentHash": "046f4ef4db0b89351769e889f99276dd75dc65a07012388cbde464fc22f2c05c"
+  },
+  {
+    "id": 189,
+    "index": 189,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "成功",
+      "detail": "生成SM2签名并获取验证码: code_1779209652152_jwzoe5e3n",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T16:54:12.309Z",
+    "prevHash": "046f4ef4db0b89351769e889f99276dd75dc65a07012388cbde464fc22f2c05c",
+    "currentHash": "1948ebe47934b6eb79f63e5dab2f35fe5b896420db3bc49f101bce8022e56360"
+  },
+  {
+    "id": 190,
+    "index": 190,
+    "userId": 1779107295654,
+    "operationType": "ZKP",
+    "description": "零知识证明",
+    "data": {
+      "status": "成功",
+      "detail": "端侧ZKP证明生成成功",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T16:54:12.316Z",
+    "prevHash": "1948ebe47934b6eb79f63e5dab2f35fe5b896420db3bc49f101bce8022e56360",
+    "currentHash": "6dc337f648d501267b52763d0153965bd964b2b742e88c69d119074883cc9293"
+  },
+  {
+    "id": 191,
+    "index": 191,
+    "userId": 1779107295654,
+    "operationType": "SM3哈希",
+    "description": "信用证明哈希",
+    "data": {
+      "status": "成功",
+      "detail": "信用证明数据已生成SM3哈希并存储",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T16:54:12.322Z",
+    "prevHash": "6dc337f648d501267b52763d0153965bd964b2b742e88c69d119074883cc9293",
+    "currentHash": "8327cd707cd77575995751f4299fc16a7ad5721d851cbde1c28e878a801ac58c"
+  },
+  {
+    "id": 192,
+    "index": 192,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "发起",
+      "detail": "准备验证信用证明签名和哈希",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T16:54:12.765Z",
+    "prevHash": "8327cd707cd77575995751f4299fc16a7ad5721d851cbde1c28e878a801ac58c",
+    "currentHash": "2787d0fdd3547944f8990d43e481e19a4f0400657052000d4079b6eb1722fb5b"
+  },
+  {
+    "id": 193,
+    "index": 193,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "成功",
+      "detail": "SM2签名验证通过，SM3哈希匹配",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T16:54:12.946Z",
+    "prevHash": "2787d0fdd3547944f8990d43e481e19a4f0400657052000d4079b6eb1722fb5b",
+    "currentHash": "60d282bc43fd16b6f4ffea29e7298db0dec6b9544540855ae77cc395925af858"
+  },
+  {
+    "id": 194,
+    "index": 194,
+    "userId": "anonymous",
+    "operationType": "密码验证",
+    "description": "用户登录验证",
+    "data": {
+      "status": "发起",
+      "detail": "用户名: cyb",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T16:55:47.366Z",
+    "prevHash": "60d282bc43fd16b6f4ffea29e7298db0dec6b9544540855ae77cc395925af858",
+    "currentHash": "a5804b44ac770c2d95863f3e2e55de542b326149ce8c9e56a131ae355bd88929"
+  },
+  {
+    "id": 195,
+    "index": 195,
+    "userId": "anonymous",
+    "operationType": "密码验证",
+    "description": "用户登录验证",
+    "data": {
+      "status": "成功",
+      "detail": "登录成功: cyb",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T16:55:47.807Z",
+    "prevHash": "a5804b44ac770c2d95863f3e2e55de542b326149ce8c9e56a131ae355bd88929",
+    "currentHash": "9052d1e691138b076afcb89e40b525fbcda3f39760c9f146c764e4761e32ba9d"
+  },
+  {
+    "id": 196,
+    "index": 196,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "发起",
+      "detail": "准备生成信用证明SM2签名",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T16:55:52.838Z",
+    "prevHash": "9052d1e691138b076afcb89e40b525fbcda3f39760c9f146c764e4761e32ba9d",
+    "currentHash": "9cd357274d6e28af70c62f9fde5ea82a33670d431005ae11492dda3e266f317f"
+  },
+  {
+    "id": 197,
+    "index": 197,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "成功",
+      "detail": "生成SM2签名并获取验证码: code_1779209754042_9rr4zbau9",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T16:55:54.097Z",
+    "prevHash": "9cd357274d6e28af70c62f9fde5ea82a33670d431005ae11492dda3e266f317f",
+    "currentHash": "644602e811193ad9f4bc9b0e9feeba4e343e692f8604d798670b4099e02f48f6"
+  },
+  {
+    "id": 198,
+    "index": 198,
+    "userId": 1779107295654,
+    "operationType": "ZKP",
+    "description": "零知识证明",
+    "data": {
+      "status": "成功",
+      "detail": "端侧ZKP证明生成成功",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T16:55:54.103Z",
+    "prevHash": "644602e811193ad9f4bc9b0e9feeba4e343e692f8604d798670b4099e02f48f6",
+    "currentHash": "84b3fba6b394351ef69a2793be33f67835501b81ed8e51700824aa15517dd870"
+  },
+  {
+    "id": 199,
+    "index": 199,
+    "userId": 1779107295654,
+    "operationType": "SM3哈希",
+    "description": "信用证明哈希",
+    "data": {
+      "status": "成功",
+      "detail": "信用证明数据已生成SM3哈希并存储",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T16:55:54.110Z",
+    "prevHash": "84b3fba6b394351ef69a2793be33f67835501b81ed8e51700824aa15517dd870",
+    "currentHash": "4ce65fa2bf97f66bfcd163744dcd5eb2da2cfb4671aa7731fec9c08655cfaa10"
+  },
+  {
+    "id": 200,
+    "index": 200,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "发起",
+      "detail": "准备验证信用证明签名和哈希",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T16:55:54.482Z",
+    "prevHash": "4ce65fa2bf97f66bfcd163744dcd5eb2da2cfb4671aa7731fec9c08655cfaa10",
+    "currentHash": "14ee2d31e93fd706169d208908fd9bbbd6ba276dc95b3bce56671df8c7ac890e"
+  },
+  {
+    "id": 201,
+    "index": 201,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "成功",
+      "detail": "SM2签名验证通过，SM3哈希匹配",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T16:55:54.656Z",
+    "prevHash": "14ee2d31e93fd706169d208908fd9bbbd6ba276dc95b3bce56671df8c7ac890e",
+    "currentHash": "220f81a4513ac01ec1339f3382e42829916c13076b1ed793cee5406e404b3c5b"
+  },
+  {
+    "id": 202,
+    "index": 202,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "还款发起",
+    "data": {
+      "status": "待验证",
+      "detail": "申请还款，交易ID: 150",
+      "correlationInfo": {
+        "userId": 1779107295654,
+        "transactionId": 150
+      }
+    },
+    "timestamp": "2026-05-19T16:56:04.243Z",
+    "prevHash": "220f81a4513ac01ec1339f3382e42829916c13076b1ed793cee5406e404b3c5b",
+    "currentHash": "519fa051baac2b3ec170f3795b00a038eda5b994a33667f4883f4cdc8915c95b"
+  },
+  {
+    "id": 203,
+    "index": 203,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "还款成功",
+    "data": {
+      "status": "成功",
+      "detail": "后端用SM2公钥验证签名通过",
+      "correlationInfo": {
+        "userId": 1779107295654,
+        "transactionId": 150
+      }
+    },
+    "timestamp": "2026-05-19T16:56:04.625Z",
+    "prevHash": "519fa051baac2b3ec170f3795b00a038eda5b994a33667f4883f4cdc8915c95b",
+    "currentHash": "e9fd5f68d34185c585ee1981ad81224e426d1aed4dffa22cb78895dbae3be77e"
+  },
+  {
+    "id": 204,
+    "index": 204,
+    "userId": 1779107295654,
+    "operationType": "SM3哈希",
+    "description": "还款记录哈希",
+    "data": {
+      "status": "成功",
+      "detail": "生成还款记录SM3哈希: 5cb9eee1...",
+      "correlationInfo": {
+        "userId": 1779107295654,
+        "transactionId": 150
+      }
+    },
+    "timestamp": "2026-05-19T16:56:04.631Z",
+    "prevHash": "e9fd5f68d34185c585ee1981ad81224e426d1aed4dffa22cb78895dbae3be77e",
+    "currentHash": "d4486183ff354f250cf2df93d2aaa889992a98bf822bf12c3bb0128d476ab894"
+  },
+  {
+    "id": 205,
+    "index": 205,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "借款发起",
+    "data": {
+      "status": "待验证",
+      "detail": "申请借款金额: 200元，期限: 30天",
+      "correlationInfo": {
+        "userId": 1779107295654,
+        "amount": 200,
+        "term": 30
+      }
+    },
+    "timestamp": "2026-05-19T16:56:27.156Z",
+    "prevHash": "d4486183ff354f250cf2df93d2aaa889992a98bf822bf12c3bb0128d476ab894",
+    "currentHash": "9732e063cf1bf21fa38e4062f22b8714fcb26ad50afdd109c5b790ec76b1dd2b"
+  },
+  {
+    "id": 206,
+    "index": 206,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "借款通过",
+    "data": {
+      "status": "成功",
+      "detail": "后端用SM2公钥验证签名通过",
+      "correlationInfo": {
+        "userId": 1779107295654,
+        "amount": 200
+      }
+    },
+    "timestamp": "2026-05-19T16:56:28.608Z",
+    "prevHash": "9732e063cf1bf21fa38e4062f22b8714fcb26ad50afdd109c5b790ec76b1dd2b",
+    "currentHash": "3591718139ed4fa9d0dcd4a99b48d1732bbe30702dd9de8136665b07c1103b86"
+  },
+  {
+    "id": 207,
+    "index": 207,
+    "userId": 1779107295654,
+    "operationType": "SM3哈希",
+    "description": "借款记录哈希",
+    "data": {
+      "status": "成功",
+      "detail": "生成借款记录SM3哈希: 275af596...",
+      "correlationInfo": {
+        "userId": 1779107295654
+      }
+    },
+    "timestamp": "2026-05-19T16:56:28.614Z",
+    "prevHash": "3591718139ed4fa9d0dcd4a99b48d1732bbe30702dd9de8136665b07c1103b86",
+    "currentHash": "f71f680444c2940aee1cdebf50aae89de059dbb38069f52170f166a1cba83784"
+  },
+  {
+    "id": 208,
+    "index": 208,
+    "userId": "anonymous",
+    "operationType": "密码验证",
+    "description": "用户登录验证",
+    "data": {
+      "status": "发起",
+      "detail": "用户名: cyb",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:31:24.870Z",
+    "prevHash": "f71f680444c2940aee1cdebf50aae89de059dbb38069f52170f166a1cba83784",
+    "currentHash": "d02569138a7c0013f7bf4181cb003b9172eee6bbf59304c94e65f1d30b344976"
+  },
+  {
+    "id": 209,
+    "index": 209,
+    "userId": "anonymous",
+    "operationType": "密码验证",
+    "description": "用户登录验证",
+    "data": {
+      "status": "成功",
+      "detail": "登录成功: cyb",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:31:25.291Z",
+    "prevHash": "d02569138a7c0013f7bf4181cb003b9172eee6bbf59304c94e65f1d30b344976",
+    "currentHash": "42ee59059e9df2fb7c60cc8036751a8677d6d46ae3f852b743051b966ba51cca"
+  },
+  {
+    "id": 210,
+    "index": 210,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "发起",
+      "detail": "准备生成信用证明SM2签名",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:31:32.105Z",
+    "prevHash": "42ee59059e9df2fb7c60cc8036751a8677d6d46ae3f852b743051b966ba51cca",
+    "currentHash": "570105bad859f65e4502a0b5e4ab402de61745491cc98940c5f568a47b934ed9"
+  },
+  {
+    "id": 211,
+    "index": 211,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "成功",
+      "detail": "生成SM2签名并获取验证码: code_1779211893276_9gfewqlxg",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:31:33.355Z",
+    "prevHash": "570105bad859f65e4502a0b5e4ab402de61745491cc98940c5f568a47b934ed9",
+    "currentHash": "a3908f65751a60a0c95023e87df6671eb8f24760899a6a2e2fe2afe6340b4994"
+  },
+  {
+    "id": 212,
+    "index": 212,
+    "userId": 1779107295654,
+    "operationType": "ZKP",
+    "description": "零知识证明",
+    "data": {
+      "status": "成功",
+      "detail": "端侧ZKP证明生成成功",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:31:33.361Z",
+    "prevHash": "a3908f65751a60a0c95023e87df6671eb8f24760899a6a2e2fe2afe6340b4994",
+    "currentHash": "f79ebc5c857ec0ec9fd6b5dc6d46a93dbb4459cbda5c568892514102050fa96a"
+  },
+  {
+    "id": 213,
+    "index": 213,
+    "userId": 1779107295654,
+    "operationType": "SM3哈希",
+    "description": "信用证明哈希",
+    "data": {
+      "status": "成功",
+      "detail": "信用证明数据已生成SM3哈希并存储",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:31:33.382Z",
+    "prevHash": "f79ebc5c857ec0ec9fd6b5dc6d46a93dbb4459cbda5c568892514102050fa96a",
+    "currentHash": "ca6c6f6d130692181fb4a5a56af6bbc7bdad25bc6a7db27d6a30b9f1dff312c0"
+  },
+  {
+    "id": 214,
+    "index": 214,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "发起",
+      "detail": "准备验证信用证明签名和哈希",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:31:34.040Z",
+    "prevHash": "ca6c6f6d130692181fb4a5a56af6bbc7bdad25bc6a7db27d6a30b9f1dff312c0",
+    "currentHash": "dd25289fff06ece281392fb2264f82fa06edf4f738dabe6738ef78af27e15655"
+  },
+  {
+    "id": 215,
+    "index": 215,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "成功",
+      "detail": "SM2签名验证通过，SM3哈希匹配",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:31:34.172Z",
+    "prevHash": "dd25289fff06ece281392fb2264f82fa06edf4f738dabe6738ef78af27e15655",
+    "currentHash": "eefc0077f7a23493a6b7bc114802f0f39d9d078eec4b14dcab023a1ddc6b24dc"
+  },
+  {
+    "id": 216,
+    "index": 216,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "发起",
+      "detail": "准备生成信用证明SM2签名",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:32:24.257Z",
+    "prevHash": "eefc0077f7a23493a6b7bc114802f0f39d9d078eec4b14dcab023a1ddc6b24dc",
+    "currentHash": "63690118acaaefa4d3cbbfe3e3b1f042ce5fc0bfccafac23ceba475ea94ca047"
+  },
+  {
+    "id": 217,
+    "index": 217,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "成功",
+      "detail": "生成SM2签名并获取验证码: code_1779211944878_czxn8dsmi",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:32:24.937Z",
+    "prevHash": "63690118acaaefa4d3cbbfe3e3b1f042ce5fc0bfccafac23ceba475ea94ca047",
+    "currentHash": "014039538174d8aaf47f2141e9010c390c77915e8a9e3673ffdf3e55a37a4699"
+  },
+  {
+    "id": 218,
+    "index": 218,
+    "userId": 1779107295654,
+    "operationType": "ZKP",
+    "description": "零知识证明",
+    "data": {
+      "status": "成功",
+      "detail": "端侧ZKP证明生成成功",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:32:24.943Z",
+    "prevHash": "014039538174d8aaf47f2141e9010c390c77915e8a9e3673ffdf3e55a37a4699",
+    "currentHash": "7e72f5af39359067230b1855033cf34bd7b450c671a20521cb9b5303d8020e7a"
+  },
+  {
+    "id": 219,
+    "index": 219,
+    "userId": 1779107295654,
+    "operationType": "SM3哈希",
+    "description": "信用证明哈希",
+    "data": {
+      "status": "成功",
+      "detail": "信用证明数据已生成SM3哈希并存储",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:32:24.948Z",
+    "prevHash": "7e72f5af39359067230b1855033cf34bd7b450c671a20521cb9b5303d8020e7a",
+    "currentHash": "1494dd348f1b3a6bc5874f49ca3483430de3b13ba4ce1fcc283d57c54df32361"
+  },
+  {
+    "id": 220,
+    "index": 220,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "发起",
+      "detail": "准备验证信用证明签名和哈希",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:32:25.683Z",
+    "prevHash": "1494dd348f1b3a6bc5874f49ca3483430de3b13ba4ce1fcc283d57c54df32361",
+    "currentHash": "39b1e92f9f3b661f1db6eda8e86253a1a399476f1076ef7494fc16bfbdc1c1b6"
+  },
+  {
+    "id": 221,
+    "index": 221,
+    "userId": 1779107295654,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "成功",
+      "detail": "SM2签名验证通过，SM3哈希匹配",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:32:25.832Z",
+    "prevHash": "39b1e92f9f3b661f1db6eda8e86253a1a399476f1076ef7494fc16bfbdc1c1b6",
+    "currentHash": "5240512a7b541a3551663bdcf0bbe69fc18f58125535309556e7d90788427cc8"
+  },
+  {
+    "id": 222,
+    "index": 222,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "还款发起",
+    "data": {
+      "status": "待验证",
+      "detail": "申请还款，交易ID: 151",
+      "correlationInfo": {
+        "userId": 1779107295654,
+        "transactionId": 151
+      }
+    },
+    "timestamp": "2026-05-19T17:32:36.954Z",
+    "prevHash": "5240512a7b541a3551663bdcf0bbe69fc18f58125535309556e7d90788427cc8",
+    "currentHash": "ab9d956ada458fa58a40a5746249f0ebd2367f73241fb2883980a05649d05770"
+  },
+  {
+    "id": 223,
+    "index": 223,
+    "userId": 1779107295654,
+    "operationType": "SM2签名",
+    "description": "还款成功",
+    "data": {
+      "status": "成功",
+      "detail": "后端用SM2公钥验证签名通过",
+      "correlationInfo": {
+        "userId": 1779107295654,
+        "transactionId": 151
+      }
+    },
+    "timestamp": "2026-05-19T17:32:37.233Z",
+    "prevHash": "ab9d956ada458fa58a40a5746249f0ebd2367f73241fb2883980a05649d05770",
+    "currentHash": "9d7d098dc9abdbfcc5498469e26ff5d28b7f5e6f8e4e35c3dee5cd2d7483e7e5"
+  },
+  {
+    "id": 224,
+    "index": 224,
+    "userId": 1779107295654,
+    "operationType": "SM3哈希",
+    "description": "还款记录哈希",
+    "data": {
+      "status": "成功",
+      "detail": "生成还款记录SM3哈希: eeb66229...",
+      "correlationInfo": {
+        "userId": 1779107295654,
+        "transactionId": 151
+      }
+    },
+    "timestamp": "2026-05-19T17:32:37.238Z",
+    "prevHash": "9d7d098dc9abdbfcc5498469e26ff5d28b7f5e6f8e4e35c3dee5cd2d7483e7e5",
+    "currentHash": "5876f0e42a963fb1d4d9a09e38d0c620a2be7529dff2593b18573178e2be2cc8"
+  },
+  {
+    "id": 225,
+    "index": 225,
+    "userId": "anonymous",
+    "operationType": "密码操作",
+    "description": "用户注册",
+    "data": {
+      "status": "发起",
+      "detail": "用户名: cai",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:33:57.341Z",
+    "prevHash": "5876f0e42a963fb1d4d9a09e38d0c620a2be7529dff2593b18573178e2be2cc8",
+    "currentHash": "48c3e8b622ab4f55e1ce258e8eb2dc61f68ea878a41fcf090c974ba768eb98f5"
+  },
+  {
+    "id": 226,
+    "index": 226,
+    "userId": "anonymous",
+    "operationType": "密码操作",
+    "description": "用户注册",
+    "data": {
+      "status": "成功",
+      "detail": "注册成功: cai",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:33:57.578Z",
+    "prevHash": "48c3e8b622ab4f55e1ce258e8eb2dc61f68ea878a41fcf090c974ba768eb98f5",
+    "currentHash": "a1b76fb211debfb9142c68309069de7f41d8790c770fcb3d48cab93ac99ac1bc"
+  },
+  {
+    "id": 227,
+    "index": 227,
+    "userId": "anonymous",
+    "operationType": "密码验证",
+    "description": "用户登录验证",
+    "data": {
+      "status": "发起",
+      "detail": "用户名: cai",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:33:58.882Z",
+    "prevHash": "a1b76fb211debfb9142c68309069de7f41d8790c770fcb3d48cab93ac99ac1bc",
+    "currentHash": "72d782ae8ad129934a4e3d5e6bc3ffb10aa9ceec4924cc8c3e8986966967b62e"
+  },
+  {
+    "id": 228,
+    "index": 228,
+    "userId": "anonymous",
+    "operationType": "密码验证",
+    "description": "用户登录验证",
+    "data": {
+      "status": "成功",
+      "detail": "登录成功: cai",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:33:59.142Z",
+    "prevHash": "72d782ae8ad129934a4e3d5e6bc3ffb10aa9ceec4924cc8c3e8986966967b62e",
+    "currentHash": "7b8b9cc51619f91e2d5473904b9f4dbfa2384c7f17100b699d6ee72c5a269dfe"
+  },
+  {
+    "id": 229,
+    "index": 229,
+    "userId": 1779107295671,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "发起",
+      "detail": "准备生成信用证明SM2签名",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:34:07.799Z",
+    "prevHash": "7b8b9cc51619f91e2d5473904b9f4dbfa2384c7f17100b699d6ee72c5a269dfe",
+    "currentHash": "48d7efe1b88ef0f706a84a5aedcd4ad8a9555d83ec3ad8397bae3563b4e97ff0"
+  },
+  {
+    "id": 230,
+    "index": 230,
+    "userId": 1779107295671,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "成功",
+      "detail": "生成SM2签名并获取验证码: code_1779212048358_fviyckmqw",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:34:08.410Z",
+    "prevHash": "48d7efe1b88ef0f706a84a5aedcd4ad8a9555d83ec3ad8397bae3563b4e97ff0",
+    "currentHash": "6f4f212ab6d38daeb2a9bea92f96ff0601e963f95c61314d8b800b335946f7f4"
+  },
+  {
+    "id": 231,
+    "index": 231,
+    "userId": 1779107295671,
+    "operationType": "SM3哈希",
+    "description": "信用证明哈希",
+    "data": {
+      "status": "成功",
+      "detail": "信用证明数据已生成SM3哈希并存储",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:34:08.416Z",
+    "prevHash": "6f4f212ab6d38daeb2a9bea92f96ff0601e963f95c61314d8b800b335946f7f4",
+    "currentHash": "e38b6d2233d8ce9127d671fd033b57a01ddee856e1dab0402afae3ea9f296c46"
+  },
+  {
+    "id": 232,
+    "index": 232,
+    "userId": 1779107295671,
+    "operationType": "ZKP",
+    "description": "零知识证明",
+    "data": {
+      "status": "成功",
+      "detail": "端侧ZKP证明生成成功",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:34:08.421Z",
+    "prevHash": "e38b6d2233d8ce9127d671fd033b57a01ddee856e1dab0402afae3ea9f296c46",
+    "currentHash": "ce502840c700b1d4d3b7e337c1839b00587a27bfb39332c660ad17ead250c25f"
+  },
+  {
+    "id": 233,
+    "index": 233,
+    "userId": 1779107295671,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "发起",
+      "detail": "准备验证信用证明签名和哈希",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:34:09.624Z",
+    "prevHash": "ce502840c700b1d4d3b7e337c1839b00587a27bfb39332c660ad17ead250c25f",
+    "currentHash": "2ffa04dc27df1eb79df4148ad5efa8cf95d484de7ac246016d37ac708650daea"
+  },
+  {
+    "id": 234,
+    "index": 234,
+    "userId": 1779107295671,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "成功",
+      "detail": "SM2签名验证通过，SM3哈希匹配",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:34:09.762Z",
+    "prevHash": "2ffa04dc27df1eb79df4148ad5efa8cf95d484de7ac246016d37ac708650daea",
+    "currentHash": "7e6ac4a9962a62b7ca9b8b354acb834f56585c7aba2487e2c2a3ab0507ec6896"
+  },
+  {
+    "id": 235,
+    "index": 235,
+    "userId": 1779107295671,
+    "operationType": "SM2签名",
+    "description": "借款发起",
+    "data": {
+      "status": "待验证",
+      "detail": "申请借款金额: 200元，期限: 30天",
+      "correlationInfo": {
+        "userId": 1779107295671,
+        "amount": 200,
+        "term": 30
+      }
+    },
+    "timestamp": "2026-05-19T17:34:18.755Z",
+    "prevHash": "7e6ac4a9962a62b7ca9b8b354acb834f56585c7aba2487e2c2a3ab0507ec6896",
+    "currentHash": "c59e5701e0867a26f2587c38e377a1b6b0966be70d33ee8b9ba8ff9de0eac127"
+  },
+  {
+    "id": 236,
+    "index": 236,
+    "userId": 1779107295671,
+    "operationType": "SM2签名",
+    "description": "借款失败",
+    "data": {
+      "status": "失败",
+      "detail": "借款失败",
+      "correlationInfo": {
+        "userId": 1779107295671,
+        "amount": 200
+      }
+    },
+    "timestamp": "2026-05-19T17:34:19.986Z",
+    "prevHash": "c59e5701e0867a26f2587c38e377a1b6b0966be70d33ee8b9ba8ff9de0eac127",
+    "currentHash": "d389180e34758e1904114d1453ab2e94fa5f4c65570bd2d579afd3e61f3e0f14"
+  },
+  {
+    "id": 237,
+    "index": 237,
+    "userId": 1779107295671,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "发起",
+      "detail": "准备生成信用证明SM2签名",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:34:53.882Z",
+    "prevHash": "d389180e34758e1904114d1453ab2e94fa5f4c65570bd2d579afd3e61f3e0f14",
+    "currentHash": "7e9d134ded620bb9b3f67537b58b188b90f30dc1b1e1e0b37b5b903cffd924d2"
+  },
+  {
+    "id": 238,
+    "index": 238,
+    "userId": 1779107295671,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "成功",
+      "detail": "生成SM2签名并获取验证码: code_1779212094492_iug09wr4q",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:34:54.555Z",
+    "prevHash": "7e9d134ded620bb9b3f67537b58b188b90f30dc1b1e1e0b37b5b903cffd924d2",
+    "currentHash": "70e295d758fdef1001e1026d03d8f51886cf7f4fd5ebfbadba4fde6bdf001b6f"
+  },
+  {
+    "id": 239,
+    "index": 239,
+    "userId": 1779107295671,
+    "operationType": "ZKP",
+    "description": "零知识证明",
+    "data": {
+      "status": "成功",
+      "detail": "端侧ZKP证明生成成功",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:34:54.561Z",
+    "prevHash": "70e295d758fdef1001e1026d03d8f51886cf7f4fd5ebfbadba4fde6bdf001b6f",
+    "currentHash": "847e4e244c5d07bb4a49cfd073d4c0c1827a3fd4a8f7f656b8fc9b015be6c8b6"
+  },
+  {
+    "id": 240,
+    "index": 240,
+    "userId": 1779107295671,
+    "operationType": "SM3哈希",
+    "description": "信用证明哈希",
+    "data": {
+      "status": "成功",
+      "detail": "信用证明数据已生成SM3哈希并存储",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:34:54.566Z",
+    "prevHash": "847e4e244c5d07bb4a49cfd073d4c0c1827a3fd4a8f7f656b8fc9b015be6c8b6",
+    "currentHash": "87d29a3e9f97fc7c78c378e97a8b0c8c975a381ad91ebd668f47d89819850b95"
+  },
+  {
+    "id": 241,
+    "index": 241,
+    "userId": 1779107295671,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "发起",
+      "detail": "准备验证信用证明签名和哈希",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:34:55.363Z",
+    "prevHash": "87d29a3e9f97fc7c78c378e97a8b0c8c975a381ad91ebd668f47d89819850b95",
+    "currentHash": "fa4b783b7e63e0b8e12426b26aa4532e5510fe1ffddc006121f3c2501d4fa3dd"
+  },
+  {
+    "id": 242,
+    "index": 242,
+    "userId": 1779107295671,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "成功",
+      "detail": "SM2签名验证通过，SM3哈希匹配",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:34:55.527Z",
+    "prevHash": "fa4b783b7e63e0b8e12426b26aa4532e5510fe1ffddc006121f3c2501d4fa3dd",
+    "currentHash": "133f65031048d362d741894b2fdf210ac84e44f51fff1cf51ef1e3aea611c225"
+  },
+  {
+    "id": 243,
+    "index": 243,
+    "userId": 1779107295671,
+    "operationType": "SM2签名",
+    "description": "借款发起",
+    "data": {
+      "status": "待验证",
+      "detail": "申请借款金额: 200元，期限: 30天",
+      "correlationInfo": {
+        "userId": 1779107295671,
+        "amount": 200,
+        "term": 30
+      }
+    },
+    "timestamp": "2026-05-19T17:35:04.699Z",
+    "prevHash": "133f65031048d362d741894b2fdf210ac84e44f51fff1cf51ef1e3aea611c225",
+    "currentHash": "6fd15c0214d552f9fd4f1af1304429c66995055c186d70968baf4c67afa426fb"
+  },
+  {
+    "id": 244,
+    "index": 244,
+    "userId": 1779107295671,
+    "operationType": "SM2签名",
+    "description": "借款失败",
+    "data": {
+      "status": "失败",
+      "detail": "借款失败",
+      "correlationInfo": {
+        "userId": 1779107295671,
+        "amount": 200
+      }
+    },
+    "timestamp": "2026-05-19T17:35:05.244Z",
+    "prevHash": "6fd15c0214d552f9fd4f1af1304429c66995055c186d70968baf4c67afa426fb",
+    "currentHash": "699e9978d52e453c9e5e858e27ffa1f9f41f61c40f6c5c4305440fd263939053"
+  },
+  {
+    "id": 245,
+    "index": 245,
+    "userId": "anonymous",
+    "operationType": "密码验证",
+    "description": "用户登录验证",
+    "data": {
+      "status": "发起",
+      "detail": "用户名: cai",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:41:16.040Z",
+    "prevHash": "699e9978d52e453c9e5e858e27ffa1f9f41f61c40f6c5c4305440fd263939053",
+    "currentHash": "816532c8c7170be093016477379771e740699b0d38561cd1f5f09f261c54ec05"
+  },
+  {
+    "id": 246,
+    "index": 246,
+    "userId": "anonymous",
+    "operationType": "密码验证",
+    "description": "用户登录验证",
+    "data": {
+      "status": "成功",
+      "detail": "登录成功: cai",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:41:16.311Z",
+    "prevHash": "816532c8c7170be093016477379771e740699b0d38561cd1f5f09f261c54ec05",
+    "currentHash": "655d86fb3e642418ebe712b95b05a95c3cc4b33795eb5e021a2c4e4ee08c23e9"
+  },
+  {
+    "id": 247,
+    "index": 247,
+    "userId": 1779107295671,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "发起",
+      "detail": "准备生成信用证明SM2签名",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:41:20.047Z",
+    "prevHash": "655d86fb3e642418ebe712b95b05a95c3cc4b33795eb5e021a2c4e4ee08c23e9",
+    "currentHash": "c86f8542dde67cea7ee06d5595945926b31b407861c0ddec163d47f60b85b2fa"
+  },
+  {
+    "id": 248,
+    "index": 248,
+    "userId": 1779107295671,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "成功",
+      "detail": "生成SM2签名并获取验证码: code_1779212481132_2c8z055mn",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:41:21.203Z",
+    "prevHash": "c86f8542dde67cea7ee06d5595945926b31b407861c0ddec163d47f60b85b2fa",
+    "currentHash": "afceae1c2f11e92f962e5e35c73fd26cd1e92979e5c97d05bdc17013fb14ba5e"
+  },
+  {
+    "id": 249,
+    "index": 249,
+    "userId": 1779107295671,
+    "operationType": "ZKP",
+    "description": "零知识证明",
+    "data": {
+      "status": "成功",
+      "detail": "端侧ZKP证明生成成功",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:41:21.232Z",
+    "prevHash": "afceae1c2f11e92f962e5e35c73fd26cd1e92979e5c97d05bdc17013fb14ba5e",
+    "currentHash": "4c49b20136d7aa020804a9d1b9be46472555fd31a4508568538ade68dffe5ee9"
+  },
+  {
+    "id": 250,
+    "index": 250,
+    "userId": 1779107295671,
+    "operationType": "SM3哈希",
+    "description": "信用证明哈希",
+    "data": {
+      "status": "成功",
+      "detail": "信用证明数据已生成SM3哈希并存储",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:41:21.243Z",
+    "prevHash": "4c49b20136d7aa020804a9d1b9be46472555fd31a4508568538ade68dffe5ee9",
+    "currentHash": "fbf13756b064192b28cea8cacbea532105ad2727349c0b60fb47a0b0a62ee4be"
+  },
+  {
+    "id": 251,
+    "index": 251,
+    "userId": 1779107295671,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "发起",
+      "detail": "准备验证信用证明签名和哈希",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:41:21.847Z",
+    "prevHash": "fbf13756b064192b28cea8cacbea532105ad2727349c0b60fb47a0b0a62ee4be",
+    "currentHash": "93582e39d04bb8dffa0361657839686d0c00b3b9c33b0e13540cec526495bb1d"
+  },
+  {
+    "id": 252,
+    "index": 252,
+    "userId": 1779107295671,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "成功",
+      "detail": "SM2签名验证通过，SM3哈希匹配",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:41:21.997Z",
+    "prevHash": "93582e39d04bb8dffa0361657839686d0c00b3b9c33b0e13540cec526495bb1d",
+    "currentHash": "4408e91a84d4c11f4abfa9667fecd4fdb18c0336ff0904bfbba00c9bb42fed90"
+  },
+  {
+    "id": 253,
+    "index": 253,
+    "userId": 1779107295671,
+    "operationType": "SM2签名",
+    "description": "借款发起",
+    "data": {
+      "status": "待验证",
+      "detail": "申请借款金额: 200元，期限: 30天",
+      "correlationInfo": {
+        "userId": 1779107295671,
+        "amount": 200,
+        "term": 30
+      }
+    },
+    "timestamp": "2026-05-19T17:41:31.487Z",
+    "prevHash": "4408e91a84d4c11f4abfa9667fecd4fdb18c0336ff0904bfbba00c9bb42fed90",
+    "currentHash": "116e2dead3e263e3ba83ed85692b8067bdcd940f0beb5d8b5c4040f74617b6b5"
+  },
+  {
+    "id": 254,
+    "index": 254,
+    "userId": 1779107295671,
+    "operationType": "SM2签名",
+    "description": "借款通过",
+    "data": {
+      "status": "成功",
+      "detail": "后端用SM2公钥验证签名通过",
+      "correlationInfo": {
+        "userId": 1779107295671,
+        "amount": 200
+      }
+    },
+    "timestamp": "2026-05-19T17:41:32.484Z",
+    "prevHash": "116e2dead3e263e3ba83ed85692b8067bdcd940f0beb5d8b5c4040f74617b6b5",
+    "currentHash": "4a8622d53b36d5dec973615cb5c36508f47906f2bfc9879920e216a43024951a"
+  },
+  {
+    "id": 255,
+    "index": 255,
+    "userId": 1779107295671,
+    "operationType": "SM3哈希",
+    "description": "借款记录哈希",
+    "data": {
+      "status": "成功",
+      "detail": "生成借款记录SM3哈希: 06f2c05a...",
+      "correlationInfo": {
+        "userId": 1779107295671
+      }
+    },
+    "timestamp": "2026-05-19T17:41:32.490Z",
+    "prevHash": "4a8622d53b36d5dec973615cb5c36508f47906f2bfc9879920e216a43024951a",
+    "currentHash": "cf498a9877a309e568525f903f937a72746432a3cbf35333743da5e8fc50e23f"
+  },
+  {
+    "id": 256,
+    "index": 256,
+    "userId": 1779107295671,
+    "operationType": "SM2签名",
+    "description": "借款发起",
+    "data": {
+      "status": "待验证",
+      "detail": "申请借款金额: 200元，期限: 30天",
+      "correlationInfo": {
+        "userId": 1779107295671,
+        "amount": 200,
+        "term": 30
+      }
+    },
+    "timestamp": "2026-05-19T17:41:39.488Z",
+    "prevHash": "cf498a9877a309e568525f903f937a72746432a3cbf35333743da5e8fc50e23f",
+    "currentHash": "00397dea8240c147066c720897acdebf6b9fb3d3a4511625d9e45ce44fcdca99"
+  },
+  {
+    "id": 257,
+    "index": 257,
+    "userId": 1779107295671,
+    "operationType": "SM2签名",
+    "description": "借款通过",
+    "data": {
+      "status": "成功",
+      "detail": "后端用SM2公钥验证签名通过",
+      "correlationInfo": {
+        "userId": 1779107295671,
+        "amount": 200
+      }
+    },
+    "timestamp": "2026-05-19T17:41:39.989Z",
+    "prevHash": "00397dea8240c147066c720897acdebf6b9fb3d3a4511625d9e45ce44fcdca99",
+    "currentHash": "9717020d941063d39f4bdcdfa6259a4561cd1d948dfcefa38ab36ee427bb1050"
+  },
+  {
+    "id": 258,
+    "index": 258,
+    "userId": 1779107295671,
+    "operationType": "SM3哈希",
+    "description": "借款记录哈希",
+    "data": {
+      "status": "成功",
+      "detail": "生成借款记录SM3哈希: 26c20573...",
+      "correlationInfo": {
+        "userId": 1779107295671
+      }
+    },
+    "timestamp": "2026-05-19T17:41:39.994Z",
+    "prevHash": "9717020d941063d39f4bdcdfa6259a4561cd1d948dfcefa38ab36ee427bb1050",
+    "currentHash": "089250a10ba0b660ef4e770693a4b834e862555a120fdd5a551c0a108142c057"
+  },
+  {
+    "id": 259,
+    "index": 259,
+    "userId": 1779107295671,
+    "operationType": "SM2签名",
+    "description": "还款发起",
+    "data": {
+      "status": "待验证",
+      "detail": "申请还款，交易ID: 153",
+      "correlationInfo": {
+        "userId": 1779107295671,
+        "transactionId": 153
+      }
+    },
+    "timestamp": "2026-05-19T17:41:46.504Z",
+    "prevHash": "089250a10ba0b660ef4e770693a4b834e862555a120fdd5a551c0a108142c057",
+    "currentHash": "d0c88ff30361c68bb0af392f632bcb713efcfc3768e2c9c3be7883b637c920ab"
+  },
+  {
+    "id": 260,
+    "index": 260,
+    "userId": 1779107295671,
+    "operationType": "SM2签名",
+    "description": "还款成功",
+    "data": {
+      "status": "成功",
+      "detail": "后端用SM2公钥验证签名通过",
+      "correlationInfo": {
+        "userId": 1779107295671,
+        "transactionId": 153
+      }
+    },
+    "timestamp": "2026-05-19T17:41:46.755Z",
+    "prevHash": "d0c88ff30361c68bb0af392f632bcb713efcfc3768e2c9c3be7883b637c920ab",
+    "currentHash": "e5a3a1aafb25d0aaa428ca9d5895949583d8fc1f2be04c82a4d128beb71f265d"
+  },
+  {
+    "id": 261,
+    "index": 261,
+    "userId": 1779107295671,
+    "operationType": "SM3哈希",
+    "description": "还款记录哈希",
+    "data": {
+      "status": "成功",
+      "detail": "生成还款记录SM3哈希: d9c05fbb...",
+      "correlationInfo": {
+        "userId": 1779107295671,
+        "transactionId": 153
+      }
+    },
+    "timestamp": "2026-05-19T17:41:46.759Z",
+    "prevHash": "e5a3a1aafb25d0aaa428ca9d5895949583d8fc1f2be04c82a4d128beb71f265d",
+    "currentHash": "f94330cde824e9cbc8b3d8662c023975891b03346aeeb6b0a6e00b3d2f8f4fdd"
+  },
+  {
+    "id": 262,
+    "index": 262,
+    "userId": 1779107295671,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "发起",
+      "detail": "准备生成信用证明SM2签名",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:43:32.123Z",
+    "prevHash": "f94330cde824e9cbc8b3d8662c023975891b03346aeeb6b0a6e00b3d2f8f4fdd",
+    "currentHash": "6cea8bfcaf67cb7efbd3b5a02d5064b3d3ca7c154ed606e4dbc60a4cc6bc985a"
+  },
+  {
+    "id": 263,
+    "index": 263,
+    "userId": 1779107295671,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "成功",
+      "detail": "生成SM2签名并获取验证码: code_1779212612740_fq3hd4tm6",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:43:32.788Z",
+    "prevHash": "6cea8bfcaf67cb7efbd3b5a02d5064b3d3ca7c154ed606e4dbc60a4cc6bc985a",
+    "currentHash": "4ab83594067ca3916486341adf4691c92ffb0656be020f3a402b527b65d76d64"
+  },
+  {
+    "id": 264,
+    "index": 264,
+    "userId": 1779107295671,
+    "operationType": "ZKP",
+    "description": "零知识证明",
+    "data": {
+      "status": "成功",
+      "detail": "端侧ZKP证明生成成功",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:43:32.793Z",
+    "prevHash": "4ab83594067ca3916486341adf4691c92ffb0656be020f3a402b527b65d76d64",
+    "currentHash": "dfffa64fbb7cee3f2965e3a76182e131b755f81bee47bb6b6dcb2306faf907dd"
+  },
+  {
+    "id": 265,
+    "index": 265,
+    "userId": 1779107295671,
+    "operationType": "SM3哈希",
+    "description": "信用证明哈希",
+    "data": {
+      "status": "成功",
+      "detail": "信用证明数据已生成SM3哈希并存储",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:43:32.799Z",
+    "prevHash": "dfffa64fbb7cee3f2965e3a76182e131b755f81bee47bb6b6dcb2306faf907dd",
+    "currentHash": "61c6c8f748c33c20452b6f16670e135c39e67abf1fe666833745506d388f8f89"
+  },
+  {
+    "id": 266,
+    "index": 266,
+    "userId": 1779107295671,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "发起",
+      "detail": "准备验证信用证明签名和哈希",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:43:33.606Z",
+    "prevHash": "61c6c8f748c33c20452b6f16670e135c39e67abf1fe666833745506d388f8f89",
+    "currentHash": "dbcc7cc260ae8a714370841091decf3bbefbeda7c4e41fbdead5499905e8881d"
+  },
+  {
+    "id": 267,
+    "index": 267,
+    "userId": 1779107295671,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "成功",
+      "detail": "SM2签名验证通过，SM3哈希匹配",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T17:43:33.756Z",
+    "prevHash": "dbcc7cc260ae8a714370841091decf3bbefbeda7c4e41fbdead5499905e8881d",
+    "currentHash": "953758abe8b9150afc1c8a0028eeb0eeccd97edc4483fc42f1f4225b4d9a8bce"
+  },
+  {
+    "id": 268,
+    "index": 268,
+    "userId": "anonymous",
+    "operationType": "密码验证",
+    "description": "用户登录验证",
+    "data": {
+      "status": "发起",
+      "detail": "用户名: cai",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T18:10:09.518Z",
+    "prevHash": "953758abe8b9150afc1c8a0028eeb0eeccd97edc4483fc42f1f4225b4d9a8bce",
+    "currentHash": "ac6c66575e9ce79f382ef68d27aa77fcbcda39599ad5f248d119ed244b9b7420"
+  },
+  {
+    "id": 269,
+    "index": 269,
+    "userId": "anonymous",
+    "operationType": "密码验证",
+    "description": "用户登录验证",
+    "data": {
+      "status": "成功",
+      "detail": "登录成功: cai",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T18:10:09.737Z",
+    "prevHash": "ac6c66575e9ce79f382ef68d27aa77fcbcda39599ad5f248d119ed244b9b7420",
+    "currentHash": "f7398570b20215a73094b64693daa119338cb10e06cd1fd852fcac73ab1ec636"
+  },
+  {
+    "id": 270,
+    "index": 270,
+    "userId": 1779107295671,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "发起",
+      "detail": "准备生成信用证明SM2签名",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T18:10:19.561Z",
+    "prevHash": "f7398570b20215a73094b64693daa119338cb10e06cd1fd852fcac73ab1ec636",
+    "currentHash": "093f94a54becd450b2ff485876a5452cbdaa7f410055b957401ef0e4c054f69e"
+  },
+  {
+    "id": 271,
+    "index": 271,
+    "userId": 1779107295671,
+    "operationType": "SM2签名",
+    "description": "信用证明生成",
+    "data": {
+      "status": "成功",
+      "detail": "生成SM2签名并获取验证码: code_1779214220713_1yrb8dhyq",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T18:10:20.760Z",
+    "prevHash": "093f94a54becd450b2ff485876a5452cbdaa7f410055b957401ef0e4c054f69e",
+    "currentHash": "afe2c718189b616dac281634bcdea201e00fbe6348e5578fe5c3903a742083e7"
+  },
+  {
+    "id": 272,
+    "index": 272,
+    "userId": 1779107295671,
+    "operationType": "ZKP",
+    "description": "零知识证明",
+    "data": {
+      "status": "成功",
+      "detail": "端侧ZKP证明生成成功",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T18:10:20.766Z",
+    "prevHash": "afe2c718189b616dac281634bcdea201e00fbe6348e5578fe5c3903a742083e7",
+    "currentHash": "aff69bf1cbe5f01fe35571defb63a18c72469a653e834f377b296f3faaf3596b"
+  },
+  {
+    "id": 273,
+    "index": 273,
+    "userId": 1779107295671,
+    "operationType": "SM3哈希",
+    "description": "信用证明哈希",
+    "data": {
+      "status": "成功",
+      "detail": "信用证明数据已生成SM3哈希并存储",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T18:10:20.772Z",
+    "prevHash": "aff69bf1cbe5f01fe35571defb63a18c72469a653e834f377b296f3faaf3596b",
+    "currentHash": "ad3ff85a841008f51317735b5960a8312c01e97c99bca936c4dca88ffeff0071"
+  },
+  {
+    "id": 274,
+    "index": 274,
+    "userId": 1779107295671,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "发起",
+      "detail": "准备验证信用证明签名和哈希",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T18:10:21.460Z",
+    "prevHash": "ad3ff85a841008f51317735b5960a8312c01e97c99bca936c4dca88ffeff0071",
+    "currentHash": "62bc0e95d89404aaee5a1e824c7d83f85f506e22865ab44fd8194d6496ebc82a"
+  },
+  {
+    "id": 275,
+    "index": 275,
+    "userId": 1779107295671,
+    "operationType": "验证",
+    "description": "信用证明验证",
+    "data": {
+      "status": "成功",
+      "detail": "SM2签名验证通过，SM3哈希匹配",
+      "correlationInfo": null
+    },
+    "timestamp": "2026-05-19T18:10:21.622Z",
+    "prevHash": "62bc0e95d89404aaee5a1e824c7d83f85f506e22865ab44fd8194d6496ebc82a",
+    "currentHash": "34919c180a4f297893bf4d55e15b03bf79b6ddea4377d3a1837d43d2b196bfdb"
+  },
+  {
+    "id": 276,
+    "index": 276,
+    "userId": 1779107295671,
+    "operationType": "SM2签名",
+    "description": "还款发起",
+    "data": {
+      "status": "待验证",
+      "detail": "申请还款，交易ID: 152",
+      "correlationInfo": {
+        "userId": 1779107295671,
+        "transactionId": 152
+      }
+    },
+    "timestamp": "2026-05-19T18:10:40.698Z",
+    "prevHash": "34919c180a4f297893bf4d55e15b03bf79b6ddea4377d3a1837d43d2b196bfdb",
+    "currentHash": "cb5cb4913a9e1ac14217b071986cdf1e99360c5527f3631ba7e6d5bc2e9ab824"
+  },
+  {
+    "id": 277,
+    "index": 277,
+    "userId": 1779107295671,
+    "operationType": "SM2签名",
+    "description": "还款成功",
+    "data": {
+      "status": "成功",
+      "detail": "后端用SM2公钥验证签名通过",
+      "correlationInfo": {
+        "userId": 1779107295671,
+        "transactionId": 152
+      }
+    },
+    "timestamp": "2026-05-19T18:10:40.926Z",
+    "prevHash": "cb5cb4913a9e1ac14217b071986cdf1e99360c5527f3631ba7e6d5bc2e9ab824",
+    "currentHash": "94f6a6654c8efc4fb8fa3b528c17ec29b4248bb6655b6312e740cbbf9f2dd3bc"
+  },
+  {
+    "id": 278,
+    "index": 278,
+    "userId": 1779107295671,
+    "operationType": "SM3哈希",
+    "description": "还款记录哈希",
+    "data": {
+      "status": "成功",
+      "detail": "生成还款记录SM3哈希: 未知",
+      "correlationInfo": {
+        "userId": 1779107295671,
+        "transactionId": 152
+      }
+    },
+    "timestamp": "2026-05-19T18:10:40.932Z",
+    "prevHash": "94f6a6654c8efc4fb8fa3b528c17ec29b4248bb6655b6312e740cbbf9f2dd3bc",
+    "currentHash": "d5aae2c79dd9ff0f89c662d6cb56589b4d061ef5b4e0689d3a80332ea85cbbef"
+  },
+  {
+    "id": 279,
+    "index": 279,
+    "userId": 1779107295671,
+    "operationType": "SM2签名",
+    "description": "借款发起",
+    "data": {
+      "status": "待验证",
+      "detail": "申请借款金额: 300元，期限: 30天",
+      "correlationInfo": {
+        "userId": 1779107295671,
+        "amount": 300,
+        "term": 30
+      }
+    },
+    "timestamp": "2026-05-19T18:10:52.511Z",
+    "prevHash": "d5aae2c79dd9ff0f89c662d6cb56589b4d061ef5b4e0689d3a80332ea85cbbef",
+    "currentHash": "904c569da1d0f36946fbfdea0403659f7cae716e81c35ba947fe5510bb8f3a8b"
+  },
+  {
+    "id": 280,
+    "index": 280,
+    "userId": 1779107295671,
+    "operationType": "SM2签名",
+    "description": "借款通过",
+    "data": {
+      "status": "成功",
+      "detail": "后端用SM2公钥验证签名通过",
+      "correlationInfo": {
+        "userId": 1779107295671,
+        "amount": 300
+      }
+    },
+    "timestamp": "2026-05-19T18:10:53.477Z",
+    "prevHash": "904c569da1d0f36946fbfdea0403659f7cae716e81c35ba947fe5510bb8f3a8b",
+    "currentHash": "adc22b77cc96d06936ada58d63743f9d9b6eb50a87adf3660f40ef82b786d8a7"
+  },
+  {
+    "id": 281,
+    "index": 281,
+    "userId": 1779107295671,
+    "operationType": "SM3哈希",
+    "description": "借款记录哈希",
+    "data": {
+      "status": "成功",
+      "detail": "生成借款记录SM3哈希: 22264bb0...",
+      "correlationInfo": {
+        "userId": 1779107295671
+      }
+    },
+    "timestamp": "2026-05-19T18:10:53.484Z",
+    "prevHash": "adc22b77cc96d06936ada58d63743f9d9b6eb50a87adf3660f40ef82b786d8a7",
+    "currentHash": "106248c875eab0f25a05dc7487444891f2f6189351d6ecfab4f19a2ea0b7a6ad"
+  },
+  {
+    "id": 282,
+    "index": 282,
+    "userId": 1779107295671,
+    "operationType": "SM2签名",
+    "description": "还款发起",
+    "data": {
+      "status": "待验证",
+      "detail": "申请还款，交易ID: 154",
+      "correlationInfo": {
+        "userId": 1779107295671,
+        "transactionId": 154
+      }
+    },
+    "timestamp": "2026-05-19T18:11:11.037Z",
+    "prevHash": "106248c875eab0f25a05dc7487444891f2f6189351d6ecfab4f19a2ea0b7a6ad",
+    "currentHash": "c57eb5d3108729687a1040b7dd632836b3b581a5141e3a6a4e29b38dc30ad711"
+  },
+  {
+    "id": 283,
+    "index": 283,
+    "userId": 1779107295671,
+    "operationType": "SM2签名",
+    "description": "还款成功",
+    "data": {
+      "status": "成功",
+      "detail": "后端用SM2公钥验证签名通过",
+      "correlationInfo": {
+        "userId": 1779107295671,
+        "transactionId": 154
+      }
+    },
+    "timestamp": "2026-05-19T18:11:11.450Z",
+    "prevHash": "c57eb5d3108729687a1040b7dd632836b3b581a5141e3a6a4e29b38dc30ad711",
+    "currentHash": "5732e93ab3d6e9c68c22c38b520226d6c8a13fd5914b7c2ce45da6111bb44c78"
+  },
+  {
+    "id": 284,
+    "index": 284,
+    "userId": 1779107295671,
+    "operationType": "SM3哈希",
+    "description": "还款记录哈希",
+    "data": {
+      "status": "成功",
+      "detail": "生成还款记录SM3哈希: 未知",
+      "correlationInfo": {
+        "userId": 1779107295671,
+        "transactionId": 154
+      }
+    },
+    "timestamp": "2026-05-19T18:11:11.458Z",
+    "prevHash": "5732e93ab3d6e9c68c22c38b520226d6c8a13fd5914b7c2ce45da6111bb44c78",
+    "currentHash": "1014a9a63eee1446e9430effd6de5b4f2e52c3e25ca41ee30212aa1c8d93c5ea"
+  },
+  {
+    "id": 285,
+    "index": 285,
+    "userId": 1779107295671,
+    "operationType": "SM2签名",
+    "description": "借款发起",
+    "data": {
+      "status": "待验证",
+      "detail": "申请借款金额: 200元，期限: 30天",
+      "correlationInfo": {
+        "userId": 1779107295671,
+        "amount": 200,
+        "term": 30
+      }
+    },
+    "timestamp": "2026-05-19T18:11:52.967Z",
+    "prevHash": "1014a9a63eee1446e9430effd6de5b4f2e52c3e25ca41ee30212aa1c8d93c5ea",
+    "currentHash": "8ea2e768a4131abc717df3c571771f330fa607bda88e52855fec817bbfaebabf"
+  },
+  {
+    "id": 286,
+    "index": 286,
+    "userId": 1779107295671,
+    "operationType": "SM2签名",
+    "description": "借款通过",
+    "data": {
+      "status": "成功",
+      "detail": "后端用SM2公钥验证签名通过",
+      "correlationInfo": {
+        "userId": 1779107295671,
+        "amount": 200
+      }
+    },
+    "timestamp": "2026-05-19T18:11:53.510Z",
+    "prevHash": "8ea2e768a4131abc717df3c571771f330fa607bda88e52855fec817bbfaebabf",
+    "currentHash": "39c06300f02b646184eebd14a5b7dc6697274ad019d8a97e4ea4e6c549974876"
+  },
+  {
+    "id": 287,
+    "index": 287,
+    "userId": 1779107295671,
+    "operationType": "SM3哈希",
+    "description": "借款记录哈希",
+    "data": {
+      "status": "成功",
+      "detail": "生成借款记录SM3哈希: 2a8452c8...",
+      "correlationInfo": {
+        "userId": 1779107295671
+      }
+    },
+    "timestamp": "2026-05-19T18:11:53.516Z",
+    "prevHash": "39c06300f02b646184eebd14a5b7dc6697274ad019d8a97e4ea4e6c549974876",
+    "currentHash": "8d713b5bfb4f369aada16ba55c5dc2edd251e648c8fe51b584228c3cddf9cbae"
+  },
+  {
+    "id": 288,
+    "index": 288,
+    "userId": 1779107295671,
+    "operationType": "SM2签名",
+    "description": "借款发起",
+    "data": {
+      "status": "待验证",
+      "detail": "申请借款金额: 200元，期限: 30天",
+      "correlationInfo": {
+        "userId": 1779107295671,
+        "amount": 200,
+        "term": 30
+      }
+    },
+    "timestamp": "2026-05-19T18:14:19.271Z",
+    "prevHash": "8d713b5bfb4f369aada16ba55c5dc2edd251e648c8fe51b584228c3cddf9cbae",
+    "currentHash": "6116592277abfacd72d7e3c80a8d8d106df5925512364afd2a3242c361af3389"
+  },
+  {
+    "id": 289,
+    "index": 289,
+    "userId": 1779107295671,
+    "operationType": "SM2签名",
+    "description": "借款通过",
+    "data": {
+      "status": "成功",
+      "detail": "后端用SM2公钥验证签名通过",
+      "correlationInfo": {
+        "userId": 1779107295671,
+        "amount": 200
+      }
+    },
+    "timestamp": "2026-05-19T18:14:19.829Z",
+    "prevHash": "6116592277abfacd72d7e3c80a8d8d106df5925512364afd2a3242c361af3389",
+    "currentHash": "dd87aa400608d3c914c1d12f9af1c37458fe09f49d94ec71fc09130512b73900"
+  },
+  {
+    "id": 290,
+    "index": 290,
+    "userId": 1779107295671,
+    "operationType": "SM3哈希",
+    "description": "借款记录哈希",
+    "data": {
+      "status": "成功",
+      "detail": "生成借款记录SM3哈希: 045776ab...",
+      "correlationInfo": {
+        "userId": 1779107295671
+      }
+    },
+    "timestamp": "2026-05-19T18:14:19.836Z",
+    "prevHash": "dd87aa400608d3c914c1d12f9af1c37458fe09f49d94ec71fc09130512b73900",
+    "currentHash": "7b887b38b03369dba29e68ea0f16bd42aba1dc695deeaf937aba63cae187fb64"
+  },
+  {
+    "id": 291,
+    "index": 291,
+    "userId": 1779107295671,
+    "operationType": "SM2签名",
+    "description": "还款发起",
+    "data": {
+      "status": "待验证",
+      "detail": "申请还款，交易ID: 155",
+      "correlationInfo": {
+        "userId": 1779107295671,
+        "transactionId": 155
+      }
+    },
+    "timestamp": "2026-05-19T18:14:27.111Z",
+    "prevHash": "7b887b38b03369dba29e68ea0f16bd42aba1dc695deeaf937aba63cae187fb64",
+    "currentHash": "351b30ae876302da12ac0753ad5a69691bb961134b759f9009ae53891bc08385"
+  },
+  {
+    "id": 292,
+    "index": 292,
+    "userId": 1779107295671,
+    "operationType": "SM2签名",
+    "description": "还款成功",
+    "data": {
+      "status": "成功",
+      "detail": "后端用SM2公钥验证签名通过",
+      "correlationInfo": {
+        "userId": 1779107295671,
+        "transactionId": 155
+      }
+    },
+    "timestamp": "2026-05-19T18:14:27.373Z",
+    "prevHash": "351b30ae876302da12ac0753ad5a69691bb961134b759f9009ae53891bc08385",
+    "currentHash": "36ee6c3a36a24cca15baa20ce835612b58195e5e67b4b8cf2089195d4063a01d"
+  },
+  {
+    "id": 293,
+    "index": 293,
+    "userId": 1779107295671,
+    "operationType": "SM3哈希",
+    "description": "还款记录哈希",
+    "data": {
+      "status": "成功",
+      "detail": "生成还款记录SM3哈希: add3ebb1...",
+      "correlationInfo": {
+        "userId": 1779107295671,
+        "transactionId": 155
+      }
+    },
+    "timestamp": "2026-05-19T18:14:27.379Z",
+    "prevHash": "36ee6c3a36a24cca15baa20ce835612b58195e5e67b4b8cf2089195d4063a01d",
+    "currentHash": "e42fb12213cf4685c301612919847f2de11c9445368e692d246361ea0c458165"
   }
 ]

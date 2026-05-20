@@ -1,21 +1,11 @@
-const EventEmitter = require('events');
 const crypto = require('crypto');
-const snarkjs = require('snarkjs');
-const { generateSM3Hash } = require('../utils/cryptoUtils');
 const logger = require('../utils/logger');
 
-class ZKQueue extends EventEmitter {
+class ZKQueue {
   constructor() {
-    super();
-    this.tasks = new Map(); // taskId -> { status, result, error, createdAt, retryCount }
-    this.isProcessing = false;
+    this.tasks = new Map(); // taskId -> { status, result, error, createdAt }
     this.TTL = 300000; // 300 seconds (5 minutes)
-    this.MAX_RETRIES = 2;
-    this.maxPendingTasks = 100; // 任务提交限流阈值
-
-    // 初始化事件监听器
-    this.on('newTask', this.handleNewTask.bind(this));
-    this.on('taskComplete', this.handleTaskComplete.bind(this));
+    this.maxPendingTasks = 100;
 
     // 启动定时清理任务
     this.startCleanupInterval();
@@ -35,12 +25,11 @@ class ZKQueue extends EventEmitter {
     }
   }
 
-  // 添加任务
-  addTask(input, wasmPath, zkeyPath) {
-    // 检查排队任务数是否已满
+  // 添加任务（仅记录状态，实际生成由 subprocess pool 负责）
+  addTask(input) {
     const pendingCount = this.getPendingTaskCount();
     if (pendingCount >= this.maxPendingTasks) {
-      logger.warn('ZK task queue is full, rejecting new task', { pendingCount, maxPendingTasks: this.maxPendingTasks });
+      logger.warning('ZK task queue is full, rejecting new task', { pendingCount, maxPendingTasks: this.maxPendingTasks });
       throw new Error('ZK task queue is full, max pending tasks: ' + this.maxPendingTasks);
     }
 
@@ -49,18 +38,11 @@ class ZKQueue extends EventEmitter {
       status: 'queued',
       result: null,
       error: null,
-      createdAt: Date.now(),
-      retryCount: 0,
-      input,
-      wasmPath,
-      zkeyPath
+      createdAt: Date.now()
     };
 
     this.tasks.set(taskId, task);
     logger.info('Added new ZK proof task to queue', { taskId, input });
-
-    // 触发新任务事件
-    this.emit('newTask');
 
     return taskId;
   }
@@ -117,89 +99,6 @@ class ZKQueue extends EventEmitter {
   // 获取队列长度（向后兼容别名）
   getQueueLength() {
     return this.getPendingTaskCount();
-  }
-
-  // 处理新任务
-  async handleNewTask() {
-    if (this.isProcessing) {
-      return; // 已有任务在处理，等待完成
-    }
-
-    // 找到最早的 queued 任务
-    let oldestTask = null;
-    let oldestTaskId = null;
-
-    for (const [taskId, task] of this.tasks.entries()) {
-      if (task.status === 'queued') {
-        if (!oldestTask || task.createdAt < oldestTask.createdAt) {
-          oldestTask = task;
-          oldestTaskId = taskId;
-        }
-      }
-    }
-
-    if (oldestTask && oldestTaskId) {
-      await this.processTask(oldestTaskId, oldestTask);
-    }
-  }
-
-  // 处理任务完成
-  async handleTaskComplete() {
-    // 处理下一个任务
-    await this.handleNewTask();
-  }
-
-  // 处理任务
-  async processTask(taskId, task) {
-    this.isProcessing = true;
-
-    try {
-      // 更新状态为 processing
-      task.status = 'processing';
-      this.tasks.set(taskId, task);
-      logger.info('Processing ZK proof task', { taskId, retryCount: task.retryCount });
-
-      // 执行 ZKP 证明生成
-      const { creditScore, threshold, hasNoOverdue } = task.input;
-
-      const circuitCreditScore = Number(creditScore);
-      const circuitThreshold = Number(threshold);
-      const circuitHasNoOverdue = hasNoOverdue ? 1 : 0;
-
-      // 使用 snarkjs 生成证明
-      const { proof, publicSignals } = await snarkjs.groth16.fullProve(
-        { creditScore: circuitCreditScore, threshold: circuitThreshold, hasNoOverdue: circuitHasNoOverdue },
-        task.wasmPath,
-        task.zkeyPath
-      );
-
-      // 更新状态为 completed
-      task.status = 'completed';
-      task.result = { proof, publicSignals };
-      this.tasks.set(taskId, task);
-      logger.info('ZK proof task completed successfully', { taskId, publicSignalsLength: publicSignals.length });
-
-    } catch (error) {
-      // 处理重试逻辑
-      task.retryCount = (task.retryCount || 0) + 1;
-      if (task.retryCount <= this.MAX_RETRIES) {
-        // 重置为 queued 状态重新排队
-        task.status = 'queued';
-        task.error = error.message;
-        this.tasks.set(taskId, task);
-        logger.warn('ZK proof task failed, will retry', { taskId, error: error.message, retryCount: task.retryCount });
-      } else {
-        // 超过重试次数，标记为 failed
-        task.status = 'failed';
-        task.error = error.message;
-        this.tasks.set(taskId, task);
-        logger.error('ZK proof task failed after max retries', { taskId, error: error.message, stack: error.stack });
-      }
-    } finally {
-      this.isProcessing = false;
-      // 触发任务完成事件
-      this.emit('taskComplete');
-    }
   }
 
   // 启动定时清理

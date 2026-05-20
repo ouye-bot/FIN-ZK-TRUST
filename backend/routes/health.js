@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { execute } = require('../config/database');
 const zkQueue = require('../services/zkQueue');
+const blockchainService = require('../services/blockchainService');
 const logger = require('../utils/logger');
 
 router.get('/detailed', async (req, res) => {
@@ -50,6 +51,25 @@ router.get('/detailed', async (req, res) => {
     loaded: !!sm4Key
   };
   if (!sm4Key) {
+    health.status = 'degraded';
+  }
+
+  try {
+    const blockchainStatus = blockchainService.getStatus();
+    health.components.blockchain = {
+      status: blockchainStatus.isInitialized ? 'healthy' : 'degraded',
+      network: blockchainStatus.networkName || 'unknown',
+      initialized: blockchainStatus.isInitialized,
+      contracts: blockchainStatus.contracts
+    };
+    if (!blockchainStatus.isInitialized) {
+      health.status = 'degraded';
+    }
+  } catch (bcError) {
+    health.components.blockchain = {
+      status: 'unhealthy',
+      detail: bcError.message
+    };
     health.status = 'degraded';
   }
 

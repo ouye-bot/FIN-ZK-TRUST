@@ -255,7 +255,7 @@ class BusinessLogicEnhancer {
 
         // 检查是否超过限制
         if (userRequests.length >= maxRequests) {
-          logger.warn(`速率限制触发: ${key}`);
+          logger.warning(`速率限制触发: ${key}`);
           return res.status(429).json({
             success: false,
             message: '请求过于频繁，请稍后再试',

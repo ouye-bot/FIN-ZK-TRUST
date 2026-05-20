@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const { verifySM2Signature } = require('../utils/cryptoUtils');
 const logger = require('../utils/logger');
 const userDao = require('../dao/userDao');
@@ -37,7 +38,7 @@ setInterval(async () => {
  * 生成请求ID
  */
 const generateRequestId = () => {
-  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  return crypto.randomBytes(16).toString('hex');
 };
 
 /**

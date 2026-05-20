@@ -114,19 +114,27 @@ exports.updatePoolV2 = async ({ platform_capital, user_capital, loaned_amount, t
   const available_amount = total_amount - la;
   const reserved_amount = la;
 
-  let sql = `UPDATE fund_pool SET 
-    platform_capital = ?, user_capital = ?, loaned_amount = ?, 
-    total_amount = ?, available_amount = ?, reserved_amount = ?`;
-  let params = [pc, uc, la, total_amount, available_amount, reserved_amount];
+  return await transaction(async (connection) => {
+    const [results] = await connection.execute('SELECT * FROM fund_pool WHERE id = 1 FOR UPDATE');
 
-  if (total_interest_earned !== undefined) {
-    const tie = Number(total_interest_earned);
-    sql += `, total_interest_earned = ?`;
-    params.push(tie);
-  }
+    let tie = total_interest_earned !== undefined ? Number(total_interest_earned) : Number(results[0]?.total_interest_earned || 0);
 
-  sql += ` WHERE id = 1`;
-  await execute(sql, params);
+    await connection.execute(`
+      UPDATE fund_pool
+      SET platform_capital = ?, user_capital = ?, loaned_amount = ?,
+          total_amount = ?, available_amount = ?, reserved_amount = ?, total_interest_earned = ?
+      WHERE id = 1
+    `, [pc, uc, la, total_amount, available_amount, reserved_amount, tie]);
 
-  return await exports.getPool();
+    const [updatedResults] = await connection.execute('SELECT * FROM fund_pool WHERE id = 1');
+    const pool = updatedResults[0];
+    pool.total_amount = Number(pool.total_amount);
+    pool.available_amount = Number(pool.available_amount);
+    pool.reserved_amount = Number(pool.reserved_amount);
+    pool.total_interest_earned = Number(pool.total_interest_earned || 0);
+    pool.platform_capital = Number(pool.platform_capital || 0);
+    pool.user_capital = Number(pool.user_capital || 0);
+    pool.loaned_amount = Number(pool.loaned_amount || 0);
+    return pool;
+  });
 };

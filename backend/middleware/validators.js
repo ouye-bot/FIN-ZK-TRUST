@@ -22,7 +22,8 @@ const repaySchema = Joi.object({
     id: Joi.string().required()
   }).unknown(true).required(),
   verificationCode: Joi.string().required(),
-  signature: Joi.string().min(64).max(256).required()
+  signature: Joi.string().min(64).max(256).required(),
+  partialAmount: Joi.number().positive().optional()
 });
 
 // 出资接口校验规则

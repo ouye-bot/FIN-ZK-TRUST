@@ -7,7 +7,7 @@ const processes = [];
 const taskQueue = [];
 
 for (let i = 0; i < MAX_PROCESSES; i++) {
-  const child = fork(path.join(__dirname, 'zkProcess.js'), [], { silent: true });
+  const child = fork(path.join(__dirname, 'zkProcess.js'), [], { silent: true, windowsHide: true });
   child.id = i + 1;
   child.idle = true;
 
@@ -40,7 +40,7 @@ for (let i = 0; i < MAX_PROCESSES; i++) {
     const idx = processes.indexOf(child);
     if (idx !== -1) {
       processes.splice(idx, 1);
-      const newChild = fork(path.join(__dirname, 'zkProcess.js'), [], { silent: true });
+      const newChild = fork(path.join(__dirname, 'zkProcess.js'), [], { silent: true, windowsHide: true });
       newChild.id = child.id;
       newChild.idle = true;
 

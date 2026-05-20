@@ -18,10 +18,6 @@ exports.generateToken = (user) => {
     jti
   };
   
-  if (user.username === 'perfuser') {
-    payload.bypassRateLimit = true;
-  }
-  
   return jwt.sign(payload, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN || '24h'
   });
@@ -41,7 +37,7 @@ exports.generateRefreshToken = (user) => {
     jti
   };
   
-  return jwt.sign(payload, process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET, {
+  return jwt.sign(payload, process.env.JWT_REFRESH_SECRET, {
     expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d'
   });
 };
@@ -67,7 +63,7 @@ exports.verifyToken = (token) => {
  */
 exports.verifyRefreshToken = (token) => {
   try {
-    return jwt.verify(token, process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET);
+    return jwt.verify(token, process.env.JWT_REFRESH_SECRET);
   } catch (error) {
     logger.error('Refresh token verification failed:', { error: error.message });
     return null;

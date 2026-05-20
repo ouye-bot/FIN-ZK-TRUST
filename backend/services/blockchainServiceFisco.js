@@ -18,7 +18,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
-const { exec } = require('child_process');
+const { exec, spawn } = require('child_process');
 const { generateSM3Hash } = require('../utils/cryptoUtils');
 const logger = require('../utils/logger');
 
@@ -86,16 +86,23 @@ function toRlpHex(val) {
 }
 
 function signFiscoTx(privateKey, { randomid, blockLimit, to, data, value, gasPrice, gasLimit, chainId, groupId, extraData }) {
+  const rGasPrice = toRlpHex(gasPrice);
+  const rGasLimit = toRlpHex(gasLimit);
+  const rBlockLimit = toRlpHex(blockLimit);
+  const rValue = toRlpHex(value);
+  const rChainId = toRlpHex(chainId);
+  const rGroupId = toRlpHex(groupId);
+
   const fields = [
     randomid,
-    toRlpHex(gasPrice),
-    toRlpHex(gasLimit),
-    blockLimit,
+    rGasPrice,
+    rGasLimit,
+    rBlockLimit,
     to || '0x',
-    toRlpHex(value),
+    rValue,
     data,
-    toRlpHex(chainId),
-    toRlpHex(groupId),
+    rChainId,
+    rGroupId,
     extraData || '0x'
   ];
   const signData = ethers.utils.RLP.encode(fields);
@@ -120,15 +127,30 @@ function consoleExec(groupId, command) {
       fs.writeFileSync(tmpFile, script);
 
       const wslPath = tmpFile.replace(/\\/g, '/').replace(/^([A-Z]):/i, (_, d) => `/mnt/${d.toLowerCase()}`);
-      const cmd = `wsl -e bash "${wslPath}"`;
 
-      exec(cmd, { timeout: 30000, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+      const child = spawn('wsl', ['-e', 'bash', wslPath], {
+        timeout: 30000,
+        windowsHide: true,
+        stdio: ['pipe', 'pipe', 'pipe']
+      });
+
+      let stdout = '';
+      let stderr = '';
+      child.stdout.on('data', (data) => { stdout += data.toString(); });
+      child.stderr.on('data', (data) => { stderr += data.toString(); });
+
+      child.on('close', (code) => {
         try { fs.unlinkSync(tmpFile); } catch (_) {}
-        if (error && !stdout) {
-          reject(new Error(`Console exec failed: ${error.message}`));
+        if (code !== 0 && !stdout) {
+          reject(new Error(`Console exec failed with code ${code}: ${stderr}`));
           return;
         }
         resolve(stdout || stderr);
+      });
+
+      child.on('error', (err) => {
+        try { fs.unlinkSync(tmpFile); } catch (_) {}
+        reject(new Error(`Console exec failed: ${err.message}`));
       });
     } else {
       const cmd = `cd "${consoleDir}" && printf '${command}\\nquit\\n' | java ${javaArgs} 2>&1`;
@@ -259,36 +281,54 @@ class BlockchainServiceFisco {
   }
 
   /**
-   * 通过 Console 执行合约只读调用
-   * FISCO BCOS 2.x 的 JSON-RPC call 不支持直接合约调用，统一走 Console
+   * 通过 JSON-RPC call 执行合约只读调用
+   * 使用 ethers.js 编码 ABI，通过 FISCO BCOS 2.x 的 call JSON-RPC 方法执行
    */
   async contractCall(contractName, methodName, params = []) {
     try {
       const contractAddress = this.getContractAddress(contractName);
       if (!contractAddress) throw new Error(`合约 ${contractName} 地址未配置`);
 
-      const paramStr = params.map(p => {
-        if (typeof p === 'string' && p.startsWith('0x') && p.length === 66) return `"${p}"`;
-        if (typeof p === 'boolean') return p ? 'true' : 'false';
-        if (typeof p === 'number') return String(p);
-        return `"${p}"`;
-      }).join(' ');
+      // 获取 ABI
+      const abiMap = {
+        'AuditStorage': this.auditAbi,
+        'ZKPVerifier': this.zkpVerifierAbi,
+        'Verifier': this.verifierAbi
+      };
+      const abi = abiMap[contractName];
+      if (!abi) throw new Error(`合约 ${contractName} ABI 未加载`);
 
-      const command = `call ${contractName} ${contractAddress} ${methodName} ${paramStr}`.trim();
-      logger.info('执行 FISCO BCOS Console 只读调用', { command });
+      // 使用 ethers 编码 calldata
+      const iface = new ethers.utils.Interface(abi);
+      const data = iface.encodeFunctionData(methodName, params);
 
-      const output = await consoleExec(FISCO_CONFIG.groupId, command);
+      logger.info('执行 FISCO BCOS JSON-RPC 只读调用', { contractName, methodName, dataLen: data.length });
 
-      if (output.includes('Undefined command') || output.includes('error:')) {
-        throw new Error('Console 命令执行失败: ' + output.substring(0, 200));
+      // 使用 JSON-RPC call 方法（FISCO BCOS 2.x 格式：[groupId, {from, to, data}]）
+      // from 地址用于上下文，不影响只读调用结果
+      const callFrom = this.deployerAddress || '0x6645b20a1b128e344f765016af86d332499537f5';
+      const result = await rpcCall('call', [
+        FISCO_CONFIG.groupId,
+        { from: callFrom, to: contractAddress, data }
+      ]);
+
+      if (!result || !result.output) {
+        throw new Error('RPC call 返回空结果');
       }
 
-      // 解析 Return values
-      const returnMatch = output.match(/Return values?:\s*\(?([^)\n]*)\)?/);
-      if (!returnMatch) throw new Error('无法解析返回值: ' + output.substring(0, 200));
+      // 检查是否为 revert（output 以 08c379a0 开头表示 Error(string)）
+      const output = result.output;
+      if (output.startsWith('0x08c379a0')) {
+        const revertIface = new ethers.utils.Interface(['function Error(string)']);
+        const decoded = revertIface.decodeFunctionResult('Error', output);
+        throw new Error(`合约调用 revert: ${decoded[0]}`);
+      }
 
-      const rawValue = returnMatch[1].trim();
-      return rawValue;
+      // 使用 ethers 解码返回值
+      const decoded = iface.decodeFunctionResult(methodName, output);
+      // 返回解码后的值（单值返回第一个，多值返回数组）
+      if (decoded.length === 1) return decoded[0];
+      return decoded;
     } catch (error) {
       logger.error(`合约只读调用 ${contractName}.${methodName} 失败`, { error: error.message });
       throw error;
@@ -331,7 +371,7 @@ class BlockchainServiceFisco {
     // 获取当前区块号用于 blockLimit
     const blockNumber = await rpcCall('getBlockNumber', [FISCO_CONFIG.groupId]);
     const blockLimit = '0x' + (parseInt(blockNumber) + 500).toString(16);
-    const randomid = '0x' + crypto.randomBytes(32).toString('hex');
+    const randomid = ethers.utils.hexlify(ethers.utils.randomBytes(32));
 
     // 签名
     const signedTx = signFiscoTx(this.privateKey, {
@@ -448,7 +488,7 @@ class BlockchainServiceFisco {
           throw error;
         }
         if (error.message.includes('timeout') || error.message.includes('ECONNREFUSED')) {
-          logger.warn(`交易失败，重试 ${attempt + 1}/${retries}`, { error: error.message });
+          logger.warning(`交易失败，重试 ${attempt + 1}/${retries}`, { error: error.message });
           await new Promise(r => setTimeout(r, 1000));
         } else {
           logger.error(`合约写操作 ${contractName}.${methodName} 失败`, { error: error.message });
@@ -512,7 +552,7 @@ class BlockchainServiceFisco {
     // 转为 bytes32 格式（0x 前缀 + 64 位 hex）
     const hashBytes32 = sm3Hash.startsWith('0x') ? sm3Hash : '0x' + sm3Hash;
 
-    return this.contractSend('AuditStorage', 'storeAuditHash', [
+    return this._sendRawTransaction('AuditStorage', 'storeAuditHash', [
       hashBytes32, timestamp, transactionType, userId.toString()
     ])
       .then(result => {
@@ -586,7 +626,7 @@ class BlockchainServiceFisco {
       proofHash: proofHash.substring(0, 20) + '...'
     });
 
-    return this.contractSend('ZKPVerifier', 'recordProofResult', [
+    return this._sendRawTransaction('ZKPVerifier', 'recordProofResult', [
       proofIdBytes32, isValid, proofHash
     ])
       .then(result => {
@@ -620,7 +660,7 @@ class BlockchainServiceFisco {
 
     const proofIdBytes32 = ethers.utils.formatBytes32String(proofId.toString().slice(0, 31));
 
-    return this.contractSend('ZKPVerifier', 'updateChainStatus', [proofIdBytes32, chainValid])
+    return this._sendRawTransaction('ZKPVerifier', 'updateChainStatus', [proofIdBytes32, chainValid])
       .then(result => {
         logger.info('ZKP 链上验证状态更新成功', { proofId, chainValid, blockchainTxHash: result.transactionHash });
         return { success: true, blockchainTxHash: result.transactionHash };
@@ -640,22 +680,23 @@ class BlockchainServiceFisco {
       return null;
     }
     try {
-      const proofIdBytes32 = proofId.startsWith('0x') && proofId.length === 66
-        ? proofId
-        : '0x' + Buffer.from(proofId.toString().slice(0, 31)).toString('hex').padEnd(64, '0');
+      const proofIdBytes32 = ethers.utils.formatBytes32String(proofId.toString().slice(0, 31));
       const result = await this.contractCall('ZKPVerifier', 'getProofResult', [proofIdBytes32]);
-      if (!result || result === '') return null;
-      const parts = result.split(',');
-      return {
-        isValid: parts[0] === 'true',
-        timestamp: parseInt(parts[1]) || 0,
-        submitter: parts[2] || '',
-        proofHash: parts.slice(3, parts.length - 2).join(',') || '',
-        chainVerified: parts[parts.length - 2] === 'true',
-        chainValid: parts[parts.length - 1] === 'true'
-      };
+      if (!result) return null;
+      // ethers 解码后返回数组：[bool, uint256, address, string, bool, bool]
+      if (Array.isArray(result)) {
+        return {
+          isValid: Boolean(result[0]),
+          timestamp: result[1] ? result[1].toNumber ? result[1].toNumber() : parseInt(result[1]) : 0,
+          submitter: result[2] || '',
+          proofHash: result[3] || '',
+          chainVerified: Boolean(result[4]),
+          chainValid: Boolean(result[5])
+        };
+      }
+      return null;
     } catch (error) {
-      logger.warn('查询 ZKP 验证结果失败', { error: error.message, proofId });
+      logger.warning('查询 ZKP 验证结果失败', { error: error.message, proofId });
       return null;
     }
   }
@@ -713,12 +754,25 @@ class BlockchainServiceFisco {
       const hashBytes32 = sm3Hash.startsWith('0x') ? sm3Hash : '0x' + sm3Hash;
       const result = await this.contractCall('AuditStorage', 'getRecordByHash', [hashBytes32]);
 
-      if (!result || result === '0' || result === '') {
+      if (!result) {
         return { success: true, isValid: false, reason: '链上无此记录', storedHash: sm3Hash };
       }
 
-      // FISCO BCOS Console 返回的是 tuple: (timestamp, submitter, operationType, userId)
-      // result 格式如: "1234567890,0xabc...,loan,user123"
+      // ethers 解码后返回数组：[uint256, address, string, string]
+      if (Array.isArray(result)) {
+        return {
+          success: true,
+          isValid: true,
+          storedHash: sm3Hash,
+          chainRecord: {
+            timestamp: result[0] ? result[0].toNumber ? result[0].toNumber() : parseInt(result[0]) : 0,
+            submitter: result[1] || '',
+            operationType: result[2] || '',
+            userId: result[3] || ''
+          }
+        };
+      }
+
       return {
         success: true,
         isValid: true,
@@ -740,6 +794,8 @@ class BlockchainServiceFisco {
 
     try {
       const result = await this.contractCall('AuditStorage', 'getTotalRecords');
+      // ethers 解码后返回 BigNumber
+      if (result && result.toNumber) return result.toNumber();
       return parseInt(result) || 0;
     } catch (error) {
       logger.error('获取交易总数失败 (FISCO BCOS)', { error: error.message });
@@ -755,14 +811,17 @@ class BlockchainServiceFisco {
     try {
       const hashBytes32 = sm3Hash.startsWith('0x') ? sm3Hash : '0x' + sm3Hash;
       const result = await this.contractCall('AuditStorage', 'getRecordByHash', [hashBytes32]);
-      if (!result || result === '') return null;
-      const parts = result.split(',');
-      return {
-        timestamp: parseInt(parts[0]) || 0,
-        submitter: parts[1] || '',
-        operationType: parts[2] || '',
-        userId: parts[3] || ''
-      };
+      if (!result) return null;
+      // ethers 解码后返回数组：[uint256, address, string, string]
+      if (Array.isArray(result)) {
+        return {
+          timestamp: result[0] ? result[0].toNumber ? result[0].toNumber() : parseInt(result[0]) : 0,
+          submitter: result[1] || '',
+          operationType: result[2] || '',
+          userId: result[3] || ''
+        };
+      }
+      return null;
     } catch (error) {
       return null;
     }
@@ -774,16 +833,19 @@ class BlockchainServiceFisco {
   async getRecordByIndex(index) {
     if (!this.isInitialized || !this.auditContractAddress) return null;
     try {
-      const result = await this.contractCall('AuditStorage', 'getRecordByIndex', [String(index)]);
-      if (!result || result === '') return null;
-      const parts = result.split(',');
-      return {
-        hashValue: parts[0] || '',
-        timestamp: parseInt(parts[1]) || 0,
-        submitter: parts[2] || '',
-        operationType: parts[3] || '',
-        userId: parts[4] || ''
-      };
+      const result = await this.contractCall('AuditStorage', 'getRecordByIndex', [index]);
+      if (!result) return null;
+      // ethers 解码后返回数组：[bytes32, uint256, address, string, string]
+      if (Array.isArray(result)) {
+        return {
+          hashValue: result[0] || '',
+          timestamp: result[1] ? result[1].toNumber ? result[1].toNumber() : parseInt(result[1]) : 0,
+          submitter: result[2] || '',
+          operationType: result[3] || '',
+          userId: result[4] || ''
+        };
+      }
+      return null;
     } catch (error) {
       return null;
     }

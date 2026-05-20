@@ -114,7 +114,7 @@ class MfaService {
     for (let i = 0; i < count; i++) {
       let code = '';
       for (let j = 0; j < 8; j++) {
-        code += chars.charAt(Math.floor(Math.random() * chars.length));
+        code += chars.charAt(crypto.randomInt(chars.length));
       }
       codes.push(code);
     }
@@ -123,9 +123,8 @@ class MfaService {
 
   getSm4Key() {
     const key = process.env.SM4_MASTER_KEY;
-    if (!key) {
-      logger.warning('SM4_MASTER_KEY not set, using default test key');
-      return '1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d';
+    if (!key || !/^[0-9a-fA-F]{32}$/.test(key)) {
+      throw new Error('SM4_MASTER_KEY 未配置或格式错误（需要 32 位 hex）');
     }
     return key;
   }
@@ -139,25 +138,15 @@ class MfaService {
   }
 
   decryptSecret(encryptedSecret) {
-    try {
-      // 新格式：iv:ciphertext
-      const parts = encryptedSecret.split(':');
-      if (parts.length === 2) {
-        const key = this.getSm4Key();
-        const ivHex = parts[0];
-        const ciphertextHex = parts[1];
-        const decrypted = sm4.decrypt(ciphertextHex, key, { iv: ivHex, mode: 'cbc' });
-        return Buffer.from(decrypted, 'hex').toString('utf8');
-      }
-      
-      // 旧格式：直接存储的密文，不加密或用旧方案
-      logger.warning('MFA secret in old format, returning as-is', { format: 'old' });
-      return encryptedSecret;
-    } catch (error) {
-      logger.error('MFA secret decryption failed', { error: error.message });
-      // 兼容处理：如果解密失败，尝试原样返回
-      return encryptedSecret;
+    const parts = encryptedSecret.split(':');
+    if (parts.length !== 2) {
+      throw new Error('MFA secret 格式无效（期望 iv:ciphertext 格式）');
     }
+    const key = this.getSm4Key();
+    const ivHex = parts[0];
+    const ciphertextHex = parts[1];
+    const decrypted = sm4.decrypt(ciphertextHex, key, { iv: ivHex, mode: 'cbc' });
+    return Buffer.from(decrypted, 'hex').toString('utf8');
   }
 
   hashBackupCodes(codes) {

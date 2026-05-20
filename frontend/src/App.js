@@ -325,7 +325,7 @@ function App() {
 
   const login = async (username, password) => {
     try {
-      console.log('Attempting login with:', { username, password });
+      console.log('Attempting login for user:', username);
       const response = await fetch('/api/v1/auth/login', {
         method: 'POST',
         headers: {
@@ -335,7 +335,7 @@ function App() {
       });
 
       const data = await response.json();
-      console.log('Login response:', data);
+      console.log('Login response:', { success: data.success });
 
       if (data.success) {
         if (data.requireMfa) {
@@ -454,12 +454,9 @@ function App() {
             }
           });
 
-          console.log('User response status:', userResponse.status);
           const userData = await userResponse.json();
-          console.log('User data:', userData);
 
           if (userData.success) {
-            console.log('用户完整信息:', userData.user);
 
             // 缓存用户数据
             UserDataCache.setUserData(userData.user);
