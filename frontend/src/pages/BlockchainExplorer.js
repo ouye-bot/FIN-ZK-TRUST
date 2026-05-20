@@ -25,6 +25,7 @@ async function authFetch(url, options = {}) {
 
 function BlockchainExplorer() {
   const [explorerData, setExplorerData] = useState(null);
+  const [chainStatus, setChainStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [expandedRow, setExpandedRow] = useState(null);
@@ -53,12 +54,18 @@ function BlockchainExplorer() {
     setLoading(true);
     setError(null);
     try {
-      const res = await authFetch(`${API_BASE}/api/v1/blockchain/explorer?limit=50`);
-      const data = await res.json();
-      if (data.success) {
-        setExplorerData(data.data);
+      const [explorerRes, statusRes] = await Promise.all([
+        authFetch(`${API_BASE}/api/v1/blockchain/explorer?limit=50`),
+        authFetch(`${API_BASE}/api/v1/blockchain/status`)
+      ]);
+      const [explorerData, statusData] = await Promise.all([explorerRes.json(), statusRes.json()]);
+      if (explorerData.success) {
+        setExplorerData(explorerData.data);
       } else {
-        setError(data.message || '查询失败');
+        setError(explorerData.message || '查询失败');
+      }
+      if (statusData.success) {
+        setChainStatus(statusData.data);
       }
     } catch (e) {
       setError('无法连接区块链服务: ' + e.message);
@@ -173,6 +180,32 @@ function BlockchainExplorer() {
             </Card>
           </Grid>
         </Grid>
+      )}
+
+      {chainStatus && (
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>区块链基础设施状态</Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={6} sm={3}>
+                <Typography color="text.secondary" variant="body2">网络</Typography>
+                <Typography fontWeight={600}>{chainStatus.networkName || chainStatus.network || '-'}</Typography>
+              </Grid>
+              <Grid item xs={6} sm={3}>
+                <Typography color="text.secondary" variant="body2">连接状态</Typography>
+                <Chip size="small" label={chainStatus.isConnected ? '已连接' : '未连接'} color={chainStatus.isConnected ? 'success' : 'error'} />
+              </Grid>
+              <Grid item xs={6} sm={3}>
+                <Typography color="text.secondary" variant="body2">总存证记录</Typography>
+                <Typography fontWeight={600}>{chainStatus.totalRecords ?? '-'}</Typography>
+              </Grid>
+              <Grid item xs={6} sm={3}>
+                <Typography color="text.secondary" variant="body2">合约数量</Typography>
+                <Typography fontWeight={600}>{chainStatus.contracts ? Object.keys(chainStatus.contracts).length : '-'}</Typography>
+              </Grid>
+            </Grid>
+          </CardContent>
+        </Card>
       )}
 
       <Card sx={{ mb: 3 }}>

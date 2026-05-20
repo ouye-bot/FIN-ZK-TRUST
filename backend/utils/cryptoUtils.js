@@ -325,3 +325,11 @@ exports.buildSignatureData = (params, keyOrder) => {
   }
   return `{${parts.join(',')}}`;
 };
+
+// 测试专用：暴露缓存实例供性能测试清除
+exports._signatureCache = signatureCache;
+exports._hashCache = hashCache;
+exports._test_clearCache = () => {
+  signatureCache.clear();
+  hashCache.clear();
+};

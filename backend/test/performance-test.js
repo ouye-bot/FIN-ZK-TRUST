@@ -60,6 +60,20 @@ const BASE_URL = 'http://localhost:3003/api/v1';
 const TEST_USERNAME = 'perfuser';
 const TEST_PASSWORD = 'PerfPass123!';
 
+// 性能测试前清除缓存，确保测量真实性能
+function clearCryptoCaches() {
+  try {
+    const cryptoUtils = require('../utils/cryptoUtils');
+    // 清除 SM2 签名缓存
+    if (cryptoUtils._test_clearCache) {
+      cryptoUtils._test_clearCache();
+    }
+    // 直接清除内部 LRU 缓存引用
+    if (cryptoUtils._signatureCache) cryptoUtils._signatureCache.cache.clear();
+    if (cryptoUtils._hashCache) cryptoUtils._hashCache.cache.clear();
+  } catch (e) { /* ignore */ }
+}
+
 // 性能测试报告
 let testReport = {
   timestamp: new Date().toISOString(),
@@ -84,6 +98,7 @@ async function module1ApiStressTest() {
   // 登录性能测试用户，获取 Token 以便豁免限流
   let token = null;
   try {
+    // 先尝试登录
     const loginRes = await axios.post(`${BASE_URL}/auth/login`, {
       username: TEST_USERNAME,
       password: TEST_PASSWORD
@@ -94,10 +109,33 @@ async function module1ApiStressTest() {
       globalThis.__benchUserId = loginRes.data.user?.id || loginRes.data.userId;
       console.log('  ✓ 性能测试用户登录成功，Token已存入全局变量');
     } else {
-      console.log('  ⚠ 登录失败，限流豁免将不生效');
+      console.log('  ⚠ 登录失败，尝试创建用户...');
+      throw new Error('login failed');
     }
   } catch (e) {
-    console.log('  ⚠ 登录失败:', e.message);
+    // 用户不存在则自动创建
+    try {
+      const { generateSM2KeyPair } = require('../utils/cryptoUtils');
+      const kp = generateSM2KeyPair();
+      await axios.post(`${BASE_URL}/auth/register`, {
+        username: TEST_USERNAME,
+        password: TEST_PASSWORD,
+        sm2PublicKey: kp.publicKey,
+        creditScore: 750
+      });
+      const loginRes = await axios.post(`${BASE_URL}/auth/login`, {
+        username: TEST_USERNAME,
+        password: TEST_PASSWORD
+      });
+      if (loginRes.data.success) {
+        token = loginRes.data.token;
+        globalThis.__benchToken = token;
+        globalThis.__benchUserId = loginRes.data.user?.id || loginRes.data.userId;
+        console.log('  ✓ 性能测试用户已创建并登录');
+      }
+    } catch (e2) {
+      console.log('  ⚠ 用户创建/登录失败:', e2.message);
+    }
   }
 
   console.log('\n------ 第一轮：基准测试 ------');
@@ -258,11 +296,12 @@ async function module2CryptoBenchmark() {
   console.log(`     吞吐量: ${keyGenOpsPerSec} ops/s`);
   console.log(`     内存增长: ${keyGenMemoryKB} KB`);
 
-  console.log('\n  2.2 SM2签名 (10000次)...');
+  console.log('\n  2.2 SM2签名 (10000次, 递增消息避免缓存)...');
+  clearCryptoCaches();
   const signStartTime = performance.now();
 
   for (let i = 0; i < 10000; i++) {
-    signWithSM2(testMessage, testKeyPair.privateKey);
+    signWithSM2(testMessage + '_' + i, testKeyPair.privateKey);
   }
 
   const signTime = performance.now() - signStartTime;
@@ -282,12 +321,13 @@ async function module2CryptoBenchmark() {
   const sm3Results = {};
 
   for (const size of [1024, 10240]) {
-    const data = Buffer.alloc(size, 'x').toString('hex');
+    const baseData = Buffer.alloc(size, 'x').toString('hex');
     const iterations = size === 1024 ? 10000 : 5000;
+    clearCryptoCaches();
 
     const hashStartTime = performance.now();
     for (let i = 0; i < iterations; i++) {
-      generateSM3Hash(data);
+      generateSM3Hash(baseData + '_' + i);
     }
     const hashTime = performance.now() - hashStartTime;
     const hashMB = (iterations * size / 1024 / 1024);
@@ -358,11 +398,11 @@ async function module3ZkpPerformance() {
     return { status: 'skipped', reason: 'zkService not available' };
   }
 
-  console.log('\n  3.1 ZKP证明生成 (10次)...');
+  console.log('\n  3.1 ZKP证明生成 (100次)...');
   const genTimes = [];
   let sampleProof = null;
 
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 100; i++) {
     const t1 = performance.now();
     try {
       const proofResult = await zkService.generateProof(750, 600, true);
@@ -375,11 +415,11 @@ async function module3ZkpPerformance() {
   }
 
   const genStats = calcStats(genTimes);
-  console.log(`     成功: ${genTimes.length}/10`);
+  console.log(`     成功: ${genTimes.length}/100`);
   console.log(`     延迟: avg=${genStats.avg.toFixed(2)}ms, p50=${genStats.p50.toFixed(2)}ms, p90=${genStats.p90.toFixed(2)}ms, max=${genStats.max.toFixed(2)}ms`);
 
   results.proofGen = {
-    iterations: 10,
+    iterations: 100,
     successCount: genTimes.length,
     avgMs: genStats.avg.toFixed(2),
     p50Ms: genStats.p50.toFixed(2),
@@ -387,11 +427,11 @@ async function module3ZkpPerformance() {
     maxMs: genStats.max.toFixed(2)
   };
 
-  console.log('\n  3.2 ZKP证明验证 (10次)...');
+  console.log('\n  3.2 ZKP证明验证 (100次)...');
   const verifyTimes = [];
 
   if (sampleProof) {
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 100; i++) {
       const t1 = performance.now();
       try {
         await zkService.verifyProof(sampleProof.proof, sampleProof.publicSignals);
@@ -407,7 +447,7 @@ async function module3ZkpPerformance() {
     console.log(`     延迟: avg=${verifyStats.avg.toFixed(3)}ms, p50=${verifyStats.p50.toFixed(3)}ms, p90=${verifyStats.p90.toFixed(3)}ms`);
 
     results.proofVerify = {
-      iterations: 10,
+      iterations: 100,
       successCount: verifyTimes.length,
       avgMs: verifyStats.avg.toFixed(3),
       p50Ms: verifyStats.p50.toFixed(3),
@@ -712,9 +752,9 @@ async function module7CryptoComparisonBenchmark() {
 
   const { generateSM3Hash } = require('../utils/cryptoUtils');
 
-  // 预热（JIT 编译，丢弃结果）
-  for (let i = 0; i < 1000; i++) generateSM3Hash(testData1KB);
-  for (let i = 0; i < 1000; i++) crypto.createHash('sha256').update(testData1KB).digest('hex');
+  // 预热（JIT 编译，丢弃结果）— 使用递增消息避免缓存
+  for (let i = 0; i < 1000; i++) generateSM3Hash(testData1KB + '_warmup_' + i);
+  for (let i = 0; i < 1000; i++) crypto.createHash('sha256').update(testData1KB + '_warmup_' + i).digest('hex');
 
   const ROUNDS = 3;
   const sm3Throughputs = [];
@@ -722,14 +762,15 @@ async function module7CryptoComparisonBenchmark() {
 
   for (let round = 0; round < ROUNDS; round++) {
     await collectGarbage();
+    clearCryptoCaches();
 
     const sm3Start = performance.now();
-    for (let i = 0; i < 10000; i++) generateSM3Hash(testData1KB);
+    for (let i = 0; i < 10000; i++) generateSM3Hash(testData1KB + '_r' + round + '_' + i);
     const sm3Time = performance.now() - sm3Start;
     sm3Throughputs.push((10000 * 1024 / 1024 / 1024) / (sm3Time / 1000));
 
     const sha256Start = performance.now();
-    for (let i = 0; i < 10000; i++) crypto.createHash('sha256').update(testData1KB).digest('hex');
+    for (let i = 0; i < 10000; i++) crypto.createHash('sha256').update(testData1KB + '_r' + round + '_' + i).digest('hex');
     const sha256Time = performance.now() - sha256Start;
     sha256Throughputs.push((10000 * 1024 / 1024 / 1024) / (sha256Time / 1000));
 
@@ -814,42 +855,41 @@ async function module7CryptoComparisonBenchmark() {
   console.log(`     SM4/AES-256 比率: ${encRatio}%`);
 
   // 7.3 SM2 vs ECDSA P-256 (各签名5000次, 3轮)
-  console.log('\n  7.3 SM2 vs ECDSA P-256 (各签名5000次, 3轮)');
+  console.log('\n  7.3 SM2 vs ECDSA P-256 (各签名5000次, 3轮, 递增消息避免缓存)');
   await collectGarbage();
 
   const { generateSM2KeyPair, signWithSM2 } = require('../utils/cryptoUtils');
   const sm2KeyPair = generateSM2KeyPair();
   const signMessage = 'benchmark test message for signature comparison';
 
-  // 预热
-  for (let i = 0; i < 500; i++) signWithSM2(signMessage, sm2KeyPair.privateKey);
-  {
-    const ekp = crypto.generateKeyPairSync('ec', { namedCurve: 'P-256', privateKeyEncoding: { type: 'pkcs8', format: 'pem' }, publicKeyEncoding: { type: 'spki', format: 'pem' } });
-    for (let i = 0; i < 500; i++) { const s = crypto.createSign('SHA256'); s.update(signMessage); s.sign(ekp.privateKey, 'hex'); }
-  }
+  // 预生成 ECDSA 密钥对（避免在测量循环内生成）
+  const ecdsaKeyPairPre = crypto.generateKeyPairSync('ec', {
+    namedCurve: 'P-256',
+    privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+    publicKeyEncoding: { type: 'spki', format: 'pem' }
+  });
+
+  // 预热（递增消息）
+  for (let i = 0; i < 500; i++) signWithSM2(signMessage + '_warmup_' + i, sm2KeyPair.privateKey);
+  for (let i = 0; i < 500; i++) { const s = crypto.createSign('SHA256'); s.update(signMessage + '_warmup_' + i); s.sign(ecdsaKeyPairPre.privateKey, 'hex'); }
 
   const sm2Ops = [];
   const ecdsaOps = [];
 
   for (let round = 0; round < ROUNDS; round++) {
     await collectGarbage();
+    clearCryptoCaches();
 
     const sm2SignStart = performance.now();
-    for (let i = 0; i < 5000; i++) signWithSM2(signMessage, sm2KeyPair.privateKey);
+    for (let i = 0; i < 5000; i++) signWithSM2(signMessage + '_r' + round + '_' + i, sm2KeyPair.privateKey);
     const sm2SignTime = performance.now() - sm2SignStart;
     sm2Ops.push(5000 / (sm2SignTime / 1000));
-
-    const ecdsaKeyPair = crypto.generateKeyPairSync('ec', {
-      namedCurve: 'P-256',
-      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
-      publicKeyEncoding: { type: 'spki', format: 'pem' }
-    });
 
     const ecdsaSignStart = performance.now();
     for (let i = 0; i < 5000; i++) {
       const sign = crypto.createSign('SHA256');
-      sign.update(signMessage);
-      sign.sign(ecdsaKeyPair.privateKey, 'hex');
+      sign.update(signMessage + '_r' + round + '_' + i);
+      sign.sign(ecdsaKeyPairPre.privateKey, 'hex');
     }
     const ecdsaSignTime = performance.now() - ecdsaSignStart;
     ecdsaOps.push(5000 / (ecdsaSignTime / 1000));
@@ -972,15 +1012,14 @@ async function module8EndToEndBusinessPerformance() {
       amount: 100,
       term: 7,
       creditProof: { id: proofId || 'test-proof-id', proof: proofResult.proof, publicSignals: proofResult.publicSignals },
-      verificationCode: verificationCode || '123456',
-      signature: '0'.repeat(64)
+      verificationCode: verificationCode || '123456'
     };
     const timestamp = Date.now().toString();
     const nonce = crypto.randomBytes(16).toString('hex');
     const signData = timestamp + nonce + JSON.stringify(borrowBody);
     const signature = signWithSM2(signData, keyPair.privateKey);
 
-    await axios.post(`${BASE_URL}/loan/borrow`, borrowBody, {
+    const borrowRes = await axios.post(`${BASE_URL}/loan/borrow`, borrowBody, {
       headers: {
         Authorization: `Bearer ${token}`,
         'x-request-timestamp': timestamp,
@@ -989,8 +1028,11 @@ async function module8EndToEndBusinessPerformance() {
       },
       timeout: 30000
     });
+    console.log(`     ✓ 借款提交成功: ${borrowRes.status}`);
   } catch (e) {
-    console.log(`     ⚠️ 借款提交失败: ${e.message}`);
+    const status = e.response?.status;
+    const msg = e.response?.data?.message || e.message;
+    console.log(`     ⚠️ 借款提交失败 (${status}): ${msg}`);
   }
   loanSteps.loanSubmission = (performance.now() - step4Start).toFixed(2);
   console.log(`     借款提交: ${loanSteps.loanSubmission}ms`);
@@ -1045,8 +1087,11 @@ async function module8EndToEndBusinessPerformance() {
         },
         timeout: 30000
       });
+      console.log(`     ✓ 还款提交成功`);
     } catch (e) {
-      console.log(`     ⚠️ 还款提交失败: ${e.message}`);
+      const status = e.response?.status;
+      const msg = e.response?.data?.message || e.message;
+      console.log(`     ⚠️ 还款提交失败 (${status}): ${msg}`);
     }
   }
   repaySteps.repaySubmission = (performance.now() - repayStep2Start).toFixed(2);
@@ -1395,9 +1440,9 @@ async function runBenchmark() {
     testReport.results.module3 = await module3ZkpPerformance();
     testReport.modules.zkp = { status: testReport.results.module3.status };
 
-    // 等待数据库连接池完全恢复
-    console.log('\n⏳ 等待数据库连接池恢复 (60秒)...');
-    await delay(60000);
+    // 等待数据库连接池恢复
+    console.log('\n⏳ 等待数据库连接池恢复 (10秒)...');
+    await delay(10000);
 
     // ---- 依赖数据库的业务模块 ----
     testReport.results.module5 = await module5UserInfoConcurrency();
@@ -1407,8 +1452,8 @@ async function runBenchmark() {
     testReport.modules.securityChain = { status: testReport.results.module6.status };
 
     // 再次等待，确保业务模块的连接全部释放
-    console.log('\n⏳ 等待数据库连接池完全恢复 (60秒)...');
-    await delay(60000);
+    console.log('\n⏳ 等待数据库连接池完全恢复 (10秒)...');
+    await delay(10000);
 
     // ---- 最后执行数据库压力测试（不影响前面的任何模块） ----
     testReport.results.module4 = await module4DatabasePoolStress();

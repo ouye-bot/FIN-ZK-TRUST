@@ -1,7 +1,81 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git config *)"
+      "Bash(git *)",
+      "Bash(node *)",
+      "Bash(npm *)",
+      "Bash(npx *)",
+      "Bash(pm2 *)",
+      "Bash(npx pm2 *)",
+      "Bash(npx hardhat *)",
+      "Bash(npx react-scripts *)",
+      "Bash(npx react-app-rewired *)",
+      "Bash(npx local-ssl-proxy *)",
+      "Bash(curl *)",
+      "Bash(wsl *)",
+      "Bash(MSYS_NO_PATHCONV=1 wsl *)",
+      "Bash(powershell *)",
+      "Bash(powershell.exe *)",
+      "Bash(python *)",
+      "Bash(python3 *)",
+      "Bash(mysql *)",
+      "Bash(openssl *)",
+      "Bash(circom *)",
+      "Bash(snarkjs *)",
+      "Bash(tasklist *)",
+      "Bash(taskkill *)",
+      "Bash(netstat *)",
+      "Bash(ipconfig *)",
+      "Bash(findstr *)",
+      "Bash(iconv *)",
+      "Bash(cat *)",
+      "Bash(tail *)",
+      "Bash(head *)",
+      "Bash(ls *)",
+      "Bash(dir *)",
+      "Bash(chmod *)",
+      "Bash(pkill *)",
+      "Bash(xargs *)",
+      "Bash(echo *)",
+      "Bash(disown *)",
+      "Bash(timeout *)",
+      "Bash(grep *)",
+      "Bash(awk *)",
+      "Bash(sed *)",
+      "Bash(wmic *)",
+      "Bash(lsof *)",
+      "Bash(bash *)",
+      "Bash(ssh *)",
+      "Bash(ssh-keygen *)",
+      "Bash(gh *)",
+      "Bash(cygpath *)",
+      "Bash(BLOCKCHAIN_NETWORK=* node *)",
+      "Bash(BLOCKCHAIN_NETWORK=* npm *)",
+      "Bash(BROWSER=none *)",
+      "Bash(PORT=* node *)",
+      "Bash(PM2_WINDOWS_HIDE=1 *)",
+      "Bash(set PM2_WINDOWS_HIDE=1)",
+      "Bash(export PM2_WINDOWS_HIDE=1)",
+      "Bash(DEBUG=* node *)",
+      "Bash(NODE_ENV=* node *)",
+      "WebSearch",
+      "WebFetch",
+      "Read(//tmp/**)",
+      "Read(//c/Users/**)",
+      "Skill(*)"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"systemMessage\":\"[Memory Consolidation Reminder] Task completed. Before finishing: 1) Check if any new implementation details, bug fixes, design decisions, or important context should be saved to memory files in ~/.claude/projects/*/memory/. 2) Update MEMORY.md index if new files were created. 3) Remove stale entries that no longer apply. Key files to update: project_current_status.md (system state), project_history.md (round entries), feedback_*.md (user preferences).\"}'",
+            "timeout": 5
+          }
+        ]
+      }
     ]
   }
 }
