@@ -17,7 +17,16 @@ const DEFAULTS = {
   MAX_SCORE: 850
 };
 
+let poolHealthCache = null;
+let poolHealthCacheTime = 0;
+const POOL_HEALTH_TTL = 5000;
+
 async function getPoolHealth() {
+  const now = Date.now();
+  if (poolHealthCache && (now - poolHealthCacheTime) < POOL_HEALTH_TTL) {
+    return poolHealthCache;
+  }
+
   try {
     const pool = await poolDao.getPool();
     if (!pool) {
@@ -46,7 +55,7 @@ async function getPoolHealth() {
       logger.warning('查询逾期率失败，使用默认值0', { error: e.message });
     }
 
-    return {
+    const result = {
       utilizationRate: Math.round(utilizationRate * 10000) / 10000,
       availableRatio: Math.round(availableRatio * 10000) / 10000,
       overdueRate: Math.round(overdueRate * 10000) / 10000,
@@ -54,6 +63,9 @@ async function getPoolHealth() {
       available,
       loaned
     };
+    poolHealthCache = result;
+    poolHealthCacheTime = now;
+    return result;
   } catch (error) {
     logger.error('获取池健康度失败，使用默认值', { error: error.message });
     return { utilizationRate: 0, availableRatio: 1, overdueRate: 0, totalPool: 0 };
