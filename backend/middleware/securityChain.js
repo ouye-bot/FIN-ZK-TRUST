@@ -6,32 +6,48 @@ const { anomalyDetectionMiddleware } = require('./anomalyDetection');
 const logger = require('../utils/logger');
 
 const blacklistCache = new Map();
+const validTokens = new Map();
 
 const isTokenBlacklisted = async (jti, expiresAt) => {
   const now = Date.now();
-  
+
+  // 1. Check blacklist cache (token IS blacklisted)
   if (blacklistCache.has(jti)) {
     const cachedExpiresAt = blacklistCache.get(jti);
     if (now < cachedExpiresAt) {
       return true;
     }
     blacklistCache.delete(jti);
-    return false;
   }
 
+  // 2. Check valid token cache (token confirmed NOT blacklisted)
+  if (validTokens.has(jti)) {
+    const cachedExpiry = validTokens.get(jti);
+    if (now < cachedExpiry) {
+      return false;
+    }
+    validTokens.delete(jti);
+  }
+
+  // 3. Query DB
   try {
     const results = await execute(
       'SELECT expires_at FROM token_blacklist WHERE jti = ? AND expires_at > ?',
       [jti, now]
     );
-    
+
     if (results.length > 0) {
       blacklistCache.set(jti, results[0].expires_at);
       return true;
     }
+
+    // Not blacklisted — cache as valid token (TTL = min of token expiry or 5 min)
+    const ttl = Math.min(expiresAt - now, 300000);
+    if (ttl > 0) {
+      validTokens.set(jti, now + ttl);
+    }
     return false;
   } catch (dbError) {
-    // DB查询失败时，检查缓存中是否有该JTI的记录
     if (blacklistCache.has(jti)) {
       logger.warning('Blacklist DB failed, token found in cache', { jti });
       return true;
@@ -94,6 +110,12 @@ const blacklistCleanupInterval = setInterval(async () => {
   for (const [jti, expiresAt] of blacklistCache.entries()) {
     if (now > expiresAt) {
       blacklistCache.delete(jti);
+    }
+  }
+
+  for (const [jti, expiry] of validTokens.entries()) {
+    if (now > expiry) {
+      validTokens.delete(jti);
     }
   }
 
