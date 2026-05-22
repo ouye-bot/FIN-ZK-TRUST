@@ -159,11 +159,12 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 // favicon 不需要认证
 app.get('/favicon.ico', (req, res) => res.status(204).end());
 
+// API 速率限制（通用接口，按 IP）—— 移到安全链之前，被限流的请求不再白跑5层中间件
+// 注意：generalLimiter 的 skip 函数中 x-test-mode 头部检查不依赖 req.user，可安全前置
+app.use('/api/v1', generalLimiter);
+
 // 统一安全过滤器链
 setupSecurityChain(app);
-
-// API 速率限制（通用接口，按 IP）—— 必须在 JWT 中间件之后，才能使用 req.user
-app.use('/api/v1', generalLimiter);
 
 // API 速率限制（ZKP 生成，按用户 ID，需在 JWT 解析之后）
 app.use('/api/v1/zk/generate-proof', zkLimiter);
