@@ -78,7 +78,7 @@ router.get('/detailed', async (req, res) => {
 });
 
 router.post('/csp-report', (req, res) => {
-  console.warn('[CSP] Violation Report:', JSON.stringify(req.body, null, 2));
+  logger.warning('[CSP] Violation Report', { report: req.body });
   res.status(204).end();
 });
 

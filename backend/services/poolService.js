@@ -111,8 +111,9 @@ exports.initializePool = async () => {
       });
       return true;
     }
+    const initialPlatformCapital = Number(process.env.INITIAL_PLATFORM_CAPITAL) || 30000;
     await poolDao.updatePoolV2({
-      platform_capital: 30000,
+      platform_capital: initialPlatformCapital,
       user_capital: 0,
       loaned_amount: 0,
       total_interest_earned: 0,
@@ -314,7 +315,14 @@ exports.redeem = async (userId, amount) => {
         throw new Error(`可赎回金额不足，当前可赎回 ${pool.available_amount} 元`);
       }
 
-      // 2. 查询已到期的活跃投资（在事务内）
+      // 2. 根据流动性策略筛选可赎回的活跃投资（在事务内）
+      const totalPool = Number(pool.total_amount || 0);
+      const poolAvail = Number(pool.available_amount || 0);
+      const liqRatio = totalPool > 0 ? poolAvail / totalPool : 0;
+      let earlyRedeemRatio = 0;
+      if (liqRatio >= LIQUIDITY_HIGH) earlyRedeemRatio = 1.0;
+      else if (liqRatio >= LIQUIDITY_MEDIUM) earlyRedeemRatio = 0.5;
+
       const allInvestments = await transactionDao.findByUserId(userId, { type: 'invest' }, connection);
       const now = Date.now();
       const activeInvestments = allInvestments
@@ -323,7 +331,8 @@ exports.redeem = async (userId, amount) => {
           if (inv.term && inv.term > 0) {
             const investTime = new Date(inv.created_at).getTime();
             const maturityTime = investTime + inv.term * 24 * 60 * 60 * 1000;
-            return now >= maturityTime;
+            if (now >= maturityTime) return true; // 已到期，始终可赎
+            return earlyRedeemRatio > 0; // 未到期，仅在流动性允许时可赎
           }
           return true;
         })
@@ -359,7 +368,12 @@ exports.redeem = async (userId, amount) => {
         }
       }
 
-      // 4. 校验用户利息是否足够
+      // 4. 校验投资记录是否覆盖赎回金额
+      if (remaining > 0) {
+        throw new Error(`到期投资总额不足，剩余 ${remaining} 元无法赎回`);
+      }
+
+      // 5. 校验用户利息是否足够
       const currentUserInterest = Number(pool.user_interest_earned || 0);
       const actualInterest = Math.min(totalInterestEarned, currentUserInterest);
       const interestShortfall = totalInterestEarned - actualInterest;
@@ -377,8 +391,12 @@ exports.redeem = async (userId, amount) => {
         });
       }
 
-      // 5. 更新资金池
-      const newUC = Number(pool.user_capital || 0) - amount;
+      // 5. 更新资金池（校验 UC 不变负）
+      const currentUC = Number(pool.user_capital || 0);
+      if (currentUC < amount) {
+        throw new Error(`用户池资金不足，当前 UC=${currentUC}，赎回=${amount}`);
+      }
+      const newUC = currentUC - amount;
       const newPC = Number(pool.platform_capital || 0);
       const newLA = Number(pool.loaned_amount || 0);
       const newTotal = newPC + newUC;
@@ -490,10 +508,11 @@ exports.borrowFromPool = async (userId, amount, duration = 30, loanLimit = Infin
       const borrowUserRatio = amount > 0 ? fromUserPool / amount : 0;
       const borrowPlatformRatio = amount > 0 ? fromSystemPool / amount : 0;
 
-      // 更新资金池
+      // 更新资金池（会计恒等式：total = PC + UC，available = total - LA）
+      // 借款只是资产形态变化（现金→债权），total 不变
       const newUC = poolUC - fromUserPool;
       const newPC = poolPC - fromSystemPool;
-      const newLA = poolLA + (fromUserPool + fromSystemPool);
+      const newLA = poolLA + amount;
       const newTotal = newPC + newUC;
       const newAvail = newTotal - newLA;
 

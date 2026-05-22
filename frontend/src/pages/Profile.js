@@ -27,7 +27,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { ethers } from 'ethers';
 import { useAesKey } from '../App';
-import { signWithSM2, getSM2KeyPairWithAesKey, generateSM2KeyPair, saveSM2KeyPair, generateSignatureData } from '../utils/sm2Utils';
+import { signWithSM2, getSM2KeyPairWithAesKey, generateSM2KeyPair, saveSM2KeyPair, generateSignatureDataStrict } from '../utils/sm2Utils';
 import { get, post } from '../utils/apiUtils';
 
 function TabPanel(props) {
@@ -143,12 +143,7 @@ const Profile = ({ user }) => {
   const fetchMfaStatus = async () => {
     try {
       setMfaLoading(true);
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/v1/mfa/status', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await get('/api/v1/mfa/status');
       const data = await response.json();
       if (data.success) {
         setMfaEnabled(data.enabled);
@@ -247,8 +242,9 @@ const Profile = ({ user }) => {
       };
 
       // 生成签名
-      const signatureData = generateSignatureData(transactionData);
+      const signatureData = generateSignatureDataStrict(transactionData, ['creditProofId', 'transactionId', 'userId']);
       const signature = signWithSM2(signatureData, keyPair.privateKey);
+      keyPair.privateKey = null; // 用后即焚
 
       const isPartialRepay = repayValue < totalRepayment;
 

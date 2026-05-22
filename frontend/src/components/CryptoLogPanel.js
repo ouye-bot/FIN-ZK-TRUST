@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { get } from '../utils/apiUtils';
 import {
   Box,
   Typography,
@@ -37,9 +38,7 @@ const CryptoLogPanel = ({ logs, isVisible, onToggle, user }) => {
         const url = userId
           ? `/api/v1/crypto-log?limit=200&userId=${encodeURIComponent(userId)}`
           : '/api/v1/crypto-log?limit=200';
-        const resp = await fetch(url, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const resp = await get(url);
         const data = await resp.json();
         if (data.success && data.data) {
           setAllLogs(data.data.logs || []);
@@ -61,11 +60,7 @@ const CryptoLogPanel = ({ logs, isVisible, onToggle, user }) => {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/v1/audit/verify', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await get('/api/v1/audit/verify');
 
       if (!response.ok) {
         throw new Error('验证请求失败');
@@ -209,21 +204,21 @@ const CryptoLogPanel = ({ logs, isVisible, onToggle, user }) => {
                     </Typography>
                   </Box>
                   <Box sx={{ minWidth: '80px' }}>
-                    <Chip 
-                      label={log.status} 
-                      size="small" 
-                      color={getStatusColor(log.status)}
+                    <Chip
+                      label={log.status || log.data?.status || '未知'}
+                      size="small"
+                      color={getStatusColor(log.status || log.data?.status)}
                     />
                   </Box>
                 </ListItem>
                 <Collapse in={expandedLogId === log.id} timeout="auto" unmountOnExit>
                   <Box sx={{ pl: 4, pr: 4, pb: 2 }}>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                      详细信息: {log.detail || '无'}
+                      详细信息: {log.detail || log.data?.detail || '无'}
                     </Typography>
-                    {log.correlationInfo && (
+                    {(log.correlationInfo || log.data?.correlationInfo) && (
                       <Typography variant="body2" color="text.secondary">
-                        关联信息: {JSON.stringify(log.correlationInfo)}
+                        关联信息: {JSON.stringify(log.correlationInfo || log.data?.correlationInfo)}
                       </Typography>
                     )}
                   </Box>

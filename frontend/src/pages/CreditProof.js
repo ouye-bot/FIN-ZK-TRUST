@@ -19,7 +19,7 @@ import IconButton from '@mui/material/IconButton';
 import { signWithSM2, generateSM2KeyPair } from '../utils/cryptoUtils';
 import { getSM2KeyPair, saveSM2KeyPair, getSM2KeyPairWithAesKey } from '../utils/sm2Utils';
 import { CreditProofCache } from '../utils/cacheUtils';
-import { post, get } from '../utils/apiUtils';
+import { post, get, put } from '../utils/apiUtils';
 import { syncLogToBackend } from '../utils/logUtils';
 
 const CreditProof = ({ user, cryptoLogs, setCryptoLogs }) => {
@@ -35,6 +35,7 @@ const CreditProof = ({ user, cryptoLogs, setCryptoLogs }) => {
   const [zkWorkerReady, setZkWorkerReady] = useState(false);
   const [zkStatus, setZkStatus] = useState('');
   const [hasNoOverdue, setHasNoOverdue] = useState(true); // 由系统自动判断
+  const [currentCreditScore, setCurrentCreditScore] = useState(user?.creditScore || 0); // 实时信用分
 
   // 页面加载时检查信用证明
   useEffect(() => {
@@ -47,15 +48,12 @@ const CreditProof = ({ user, cryptoLogs, setCryptoLogs }) => {
     }
   }, [user]);
 
-  // 系统自动查询用户逾期状态
+  // 系统自动查询用户逾期状态 + 实时信用分
   useEffect(() => {
     if (user) {
       const fetchOverdueStatus = async () => {
         try {
-          const token = localStorage.getItem('token');
-          const response = await fetch(`/api/v1/credit/overdue-status/${user.id}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
+          const response = await get(`/api/v1/credit/overdue-status/${user.id}`);
           const data = await response.json();
           if (data.success) {
             setHasNoOverdue(data.data.hasNoOverdue);
@@ -65,6 +63,20 @@ const CreditProof = ({ user, cryptoLogs, setCryptoLogs }) => {
         }
       };
       fetchOverdueStatus();
+
+      // 获取实时信用分（不依赖登录时缓存的 user 对象）
+      const fetchCurrentScore = async () => {
+        try {
+          const response = await get(`/api/v1/users/${user.id}`);
+          const data = await response.json();
+          if (data.success && data.user.creditScore !== undefined) {
+            setCurrentCreditScore(Number(data.user.creditScore) || 0);
+          }
+        } catch (err) {
+          console.error('获取实时信用分失败:', err);
+        }
+      };
+      fetchCurrentScore();
     }
   }, [user]);
 
@@ -183,12 +195,7 @@ const CreditProof = ({ user, cryptoLogs, setCryptoLogs }) => {
 
       let userWithPublicKey = user;
       try {
-        const token = localStorage.getItem('token');
-        const response = await fetch(`/api/v1/users/${user.id}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
+        const response = await get(`/api/v1/users/${user.id}`);
 
         const data = await response.json();
         if (data.success) {
@@ -208,15 +215,7 @@ const CreditProof = ({ user, cryptoLogs, setCryptoLogs }) => {
         keyPair = newKeyPair;
 
         try {
-          const token = localStorage.getItem('token');
-          const updateResponse = await fetch(`/api/v1/users/${user.id}/update-sm2-key`, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({ sm2PublicKey: keyPair.publicKey })
-          });
+          const updateResponse = await put(`/api/v1/users/${user.id}/update-sm2-key`, { sm2PublicKey: keyPair.publicKey });
 
           const updateData = await updateResponse.json();
           if (updateData.success) {
@@ -232,7 +231,7 @@ const CreditProof = ({ user, cryptoLogs, setCryptoLogs }) => {
       console.log('当前用户信息:', userWithPublicKey);
       console.log('使用的SM2密钥对:', keyPair);
 
-      const creditScore = Number(userWithPublicKey.creditScore) || 0;
+      const creditScore = Number(userWithPublicKey.creditScore) || currentCreditScore || 0;
 
       const proofResult = await new Promise((resolve, reject) => {
         const requestId = 'proof-' + Date.now();
@@ -365,8 +364,7 @@ const CreditProof = ({ user, cryptoLogs, setCryptoLogs }) => {
   };
 
   if (!user) {
-    navigate('/');
-    return null;
+    return null; // App.js 路由守卫已处理未登录重定向
   }
 
   return (
@@ -387,7 +385,7 @@ const CreditProof = ({ user, cryptoLogs, setCryptoLogs }) => {
                   用户名: {user.username}
                 </Typography>
                 <Typography variant="body1">
-                  信用分数: {user.creditScore}
+                  信用分数: {currentCreditScore}
                 </Typography>
                 <Typography variant="body2" sx={{ color: hasNoOverdue ? '#10b981' : '#ef4444', mt: 1 }}>
                   逾期状态: {hasNoOverdue ? '无逾期记录' : '有逾期记录'}
@@ -398,7 +396,7 @@ const CreditProof = ({ user, cryptoLogs, setCryptoLogs }) => {
                   您当前有逾期借款记录，无法生成信用证明
                 </Alert>
               )}
-              {hasNoOverdue && (user.creditScore || 0) < 600 && (
+              {hasNoOverdue && currentCreditScore < 600 && (
                 <Alert severity="warning" sx={{ mb: 2 }}>
                   您当前信用分不足600分，无法生成信用证明。请通过按时还款提升信用分。
                 </Alert>
@@ -407,7 +405,7 @@ const CreditProof = ({ user, cryptoLogs, setCryptoLogs }) => {
                 variant="contained"
                 color="primary"
                 onClick={handleGenerateProof}
-                disabled={loading || !zkWorkerReady || !hasNoOverdue || (user.creditScore || 0) < 600}
+                disabled={loading || !zkWorkerReady || !hasNoOverdue || currentCreditScore < 600}
                 fullWidth
               >
                 {loading ? <CircularProgress size={24} /> : (zkStatus || '生成信用证明')}
@@ -430,10 +428,10 @@ const CreditProof = ({ user, cryptoLogs, setCryptoLogs }) => {
               {proof && (
                 <Box sx={{ mb: 2 }}>
                   <Typography variant="body2" color="text.secondary">
-                    证明ID: {proof.id}
+                    证明ID: {proof.proofId || proof.id}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    生成时间: {new Date(proof.timestamp).toLocaleString()}
+                    生成时间: {new Date(proof.proofData ? JSON.parse(proof.proofData).timestamp : Date.now()).toLocaleString()}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     有效期至: {getExpiryTime()}

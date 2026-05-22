@@ -1,28 +1,21 @@
 // 密码操作日志工具
+import { post } from './apiUtils';
 
 /**
  * 同步日志到后端持久化存储（SM3 哈希链）
  */
 export const syncLogToBackend = async (logData) => {
   try {
-    const token = localStorage.getItem('token');
-    await fetch('/api/v1/crypto-log', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        userId: logData.userId,
-        operationType: logData.operationType,
-        description: logData.description,
-        data: {
-          status: logData.status,
-          detail: logData.detail,
-          correlationInfo: logData.correlationInfo
-        }
-      })
-    });
+    await post('/api/v1/crypto-log', {
+      userId: logData.userId,
+      operationType: logData.operationType,
+      description: logData.description,
+      data: {
+        status: logData.status,
+        detail: logData.detail,
+        correlationInfo: logData.correlationInfo
+      }
+    }, true);
   } catch (err) {
     // 不阻塞前端 UI，静默失败
     console.warn('Failed to sync crypto log to backend:', err.message);

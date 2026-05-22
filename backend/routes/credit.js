@@ -5,7 +5,8 @@ const proofDao = require('../dao/proofDao');
 const transactionDao = require('../dao/transactionDao');
 const { execute } = require('../config/database');
 const logger = require('../utils/logger');
-const { generateSM3Hash } = require('../utils/cryptoUtils');
+const { generateSM3Hash, verifySM2Signature, buildSignatureData } = require('../utils/cryptoUtils');
+const crypto = require('crypto');
 const { verifyProof } = require('../services/zkService');
 const blockchainService = require('../services/blockchainService');
 const blockchainQueueService = require('../services/blockchainQueueService');
@@ -109,6 +110,23 @@ router.post('/generate-proof', async (req, res) => {
       });
     }
 
+    // 验证业务级SM2签名
+    if (!signature) {
+      logger.warning('信用证明生成失败：缺少SM2签名', { userId });
+      return res.status(400).json({ success: false, message: '缺少SM2签名' });
+    }
+    if (!user.sm2_public_key) {
+      logger.warning('信用证明生成失败：用户未注册SM2公钥', { userId });
+      return res.status(400).json({ success: false, message: '用户未注册SM2公钥' });
+    }
+    const signatureData = JSON.stringify({ userId: String(userId), creditScore: user.credit_score || 0 });
+    const isSignatureValid = verifySM2Signature(signatureData, signature, user.sm2_public_key);
+    if (!isSignatureValid) {
+      logger.warning('信用证明生成失败：无效的SM2签名', { userId });
+      return res.status(400).json({ success: false, message: '无效的SM2签名' });
+    }
+    logger.info('SM2签名验证通过', { userId });
+
     // 如果前端提供了 proof 和 publicSignals，进行端侧ZKP验证
     if (proof && publicSignals) {
       try {
@@ -147,8 +165,8 @@ router.post('/generate-proof', async (req, res) => {
 
     const sm3Hash = generateSM3Hash(proofData);
 
-    const proofId = `proof_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const verificationCode = `code_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const proofId = `proof_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
+    const verificationCode = `code_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
     const expiresAtDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     const expiresAt = expiresAtDate.toISOString().slice(0, 19).replace('T', ' ');
 
@@ -244,7 +262,13 @@ router.post('/verify-proof', async (req, res) => {
 
     // 验证证明
 
-    const isValid = proof.verification_code === verificationCode;
+    // 使用时序安全比较防止时序攻击
+    let isValid = false;
+    if (proof.verification_code && verificationCode) {
+      const a = Buffer.from(proof.verification_code, 'utf8');
+      const b = Buffer.from(verificationCode, 'utf8');
+      isValid = a.length === b.length && crypto.timingSafeEqual(a, b);
+    }
 
     if (isValid) {
       logger.info('信用证明验证成功', { proofId });

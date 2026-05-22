@@ -37,15 +37,7 @@ async function main() {
   addresses.ZKPVerifier = zkpVerifier.address;
   console.log("  ZKPVerifier 地址:", zkpVerifier.address);
 
-  // 3. 部署 TransactionHashStorage
-  console.log("正在部署 TransactionHashStorage 合约...");
-  const TransactionHashStorage = await ethers.getContractFactory("TransactionHashStorage");
-  const txHashStorage = await TransactionHashStorage.deploy();
-  await txHashStorage.deployed();
-  addresses.TransactionHashStorage = txHashStorage.address;
-  console.log("  TransactionHashStorage 地址:", txHashStorage.address);
-
-  // 4. 部署 Verifier (ZKP Groth16)
+  // 3. 部署 Verifier (ZKP Groth16)
   console.log("正在部署 Verifier 合约...");
   const Verifier = await ethers.getContractFactory("Verifier");
   const verifier = await Verifier.deploy();
@@ -53,13 +45,13 @@ async function main() {
   addresses.Verifier = verifier.address;
   console.log("  Verifier 地址:", verifier.address);
 
-  // 5. 部署 FinZkTrust
-  console.log("正在部署 FinZkTrust 合约...");
-  const FinZkTrust = await ethers.getContractFactory("FinZkTrust");
-  const finZkTrust = await FinZkTrust.deploy(verifier.address);
-  await finZkTrust.deployed();
-  addresses.FinZkTrust = finZkTrust.address;
-  console.log("  FinZkTrust 地址:", finZkTrust.address);
+  // 4. 部署 PublicKeyRegistry
+  console.log("正在部署 PublicKeyRegistry 合约...");
+  const PublicKeyRegistry = await ethers.getContractFactory("PublicKeyRegistry");
+  const publicKeyRegistry = await PublicKeyRegistry.deploy();
+  await publicKeyRegistry.deployed();
+  addresses.PublicKeyRegistry = publicKeyRegistry.address;
+  console.log("  PublicKeyRegistry 地址:", publicKeyRegistry.address);
 
   // 保存合约地址
   const contractAddresses = {
@@ -88,6 +80,10 @@ async function main() {
   // 授权 deployer 为 ZKPVerifier 操作员
   await zkpVerifier.authorizeOperator(deployer.address);
   console.log("  ZKPVerifier: deployer 已授权为操作员");
+
+  // 授权 deployer 为 PublicKeyRegistry 操作员
+  await publicKeyRegistry.authorizeOperator(deployer.address);
+  console.log("  PublicKeyRegistry: deployer 已授权为操作员");
 
   // 测试存储
   const testHash = ethers.utils.hexZeroPad("0x1234567890abcdef", 32);

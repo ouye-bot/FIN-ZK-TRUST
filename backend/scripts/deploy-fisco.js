@@ -142,7 +142,7 @@ async function main() {
   const artifactsDir = path.join(__dirname, '../../contracts/artifacts/contracts');
   const contracts = {};
 
-  for (const name of ['AuditStorage', 'ZKPVerifier', 'Verifier']) {
+  for (const name of ['AuditStorage', 'ZKPVerifier', 'Verifier', 'PublicKeyRegistry']) {
     const artifactPath = path.join(artifactsDir, `${name}.sol/${name}.json`);
     if (!fs.existsSync(artifactPath)) {
       console.error(`找不到 ${name} 编译产物: ${artifactPath}`);
@@ -246,6 +246,27 @@ async function main() {
       console.log('✓ ZKPVerifier 授权成功');
     } catch (e) {
       console.error('ZKPVerifier 授权失败:', e.message);
+    }
+  }
+
+  if (deployed.PublicKeyRegistry) {
+    console.log('正在授权部署者为 PublicKeyRegistry 操作员...');
+    try {
+      const authData = new ethers.utils.Interface(['function authorizeOperator(address)'])
+        .encodeFunctionData('authorizeOperator', [sender]);
+
+      const randomid4 = ethers.utils.hexlify(ethers.utils.randomBytes(32));
+      const blockLimit4 = ethers.utils.hexlify(currentBlock + 500);
+      const signedAuth = signFiscoTx(PRIVATE_KEY, {
+        randomid: randomid4, blockLimit: blockLimit4,
+        to: deployed.PublicKeyRegistry, data: authData,
+        value: '0x0', gasPrice: '0x0', gasLimit: ethers.utils.hexlify(300000000),
+        chainId: CHAIN_ID, groupId: GROUP_ID, extraData: '0x'
+      });
+      await rpcCall('sendRawTransaction', [GROUP_ID, signedAuth]);
+      console.log('✓ PublicKeyRegistry 授权成功');
+    } catch (e) {
+      console.error('PublicKeyRegistry 授权失败:', e.message);
     }
   }
 

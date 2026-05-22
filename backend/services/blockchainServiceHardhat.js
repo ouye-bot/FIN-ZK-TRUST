@@ -7,7 +7,7 @@
  * 2. 自动签名上链，无需用户连接 MetaMask
  * 3. 仅存储交易数据的 SM3 哈希摘要，原始数据不上链
  * 4. 异步非阻塞处理，上链失败不打断主业务流程
- * 5. 支持多合约集成：TransactionHashStorage（兼容）、AuditStorage、ZKPVerifier
+ * 5. 支持多合约集成：AuditStorage、ZKPVerifier、Verifier
  */
 
 const { ethers } = require('ethers');
@@ -30,10 +30,10 @@ class BlockchainService {
   constructor() {
     this.provider = null;
     this.wallet = null;
-    this.contract = null; // TransactionHashStorage（兼容旧代码）
     this.auditContract = null; // AuditStorage 新合约
     this.zkpVerifierContract = null; // ZKPVerifier 新合约
     this.verifierContract = null; // Verifier 合约（Groth16 验证器）
+    this.publicKeyRegistryContract = null; // PublicKeyRegistry 合约
     this.contractAddress = null;
     this.auditContractAddress = null; // AuditStorage 合约地址
     this.isInitialized = false;
@@ -65,6 +65,9 @@ class BlockchainService {
 
       // 2. 创建钱包（使用固定私钥自动签名）
       const privateKey = process.env.HARDHAT_PRIVATE_KEY || HARDHAT_DEFAULT_PRIVATE_KEY;
+      if (!process.env.HARDHAT_PRIVATE_KEY) {
+        logger.warning('使用 Hardhat 默认测试私钥，请勿在生产环境使用');
+      }
       this.wallet = new ethers.Wallet(privateKey, this.provider);
       
       const balance = await this.wallet.getBalance();
@@ -141,10 +144,10 @@ class BlockchainService {
    */
   async loadAllContracts() {
     try {
-      this.contract = await this.loadContract('TransactionHashStorage');
       this.auditContract = await this.loadContract('AuditStorage');
       this.zkpVerifierContract = await this.loadContract('ZKPVerifier');
       this.verifierContract = await this.loadContract('Verifier');
+      this.publicKeyRegistryContract = await this.loadContract('PublicKeyRegistry');
 
       // 存储 AuditStorage 合约地址（供查询方法使用）
       if (this.auditContract) {
@@ -152,10 +155,10 @@ class BlockchainService {
       }
 
       logger.info('所有合约加载完成', {
-        TransactionHashStorage: !!this.contract,
         AuditStorage: !!this.auditContract,
         ZKPVerifier: !!this.zkpVerifierContract,
-        Verifier: !!this.verifierContract
+        Verifier: !!this.verifierContract,
+        PublicKeyRegistry: !!this.publicKeyRegistryContract
       });
 
       return true;
@@ -270,32 +273,147 @@ class BlockchainService {
 
   /**
    * 注册用户公钥锚定到区块链（异步非阻塞）
+   * 优先使用 PublicKeyRegistry 合约存储完整公钥，同时写入 AuditStorage 审计存证
    * @param {string|number} userId - 用户ID
    * @param {string} publicKey - SM2 公钥
    * @returns {Promise<Object>} 上链结果
    */
   registerUserOnChain(userId, publicKey) {
-    if (!this.isInitialized || !this.auditContract) {
-      logger.warning('区块链服务或 AuditStorage 合约未初始化，跳过用户注册', { userId });
+    if (!this.isInitialized) {
+      logger.warning('区块链服务未初始化，跳过用户注册', { userId });
       return Promise.resolve({ success: false, skipped: true });
     }
 
     try {
       const pkHash = this.generateSM3Hash(publicKey);
       const timestamp = Math.floor(Date.now() / 1000);
-      
+
       logger.info('准备用户公钥锚定上链', { userId, pkHash: pkHash.substring(0, 20) + '...' });
 
-      return this.storeAuditHash(pkHash, timestamp, 'REGISTER', userId)
-        .then(result => {
-          if (result.success) {
-            logger.info('用户公钥锚定上链成功', { userId, pkHash: pkHash.substring(0, 20) + '...' });
-          }
-          return { ...result, pkHash };
-        });
+      const promises = [];
+
+      if (this.publicKeyRegistryContract) {
+        const pkHashBytes32 = pkHash.startsWith('0x') ? pkHash : '0x' + pkHash;
+        promises.push(
+          this.publicKeyRegistryContract.register(userId.toString(), pkHashBytes32, publicKey)
+            .then(tx => tx.wait())
+            .then(r => ({ registry: true, success: true, blockchainTxHash: r.transactionHash, blockNumber: r.blockNumber }))
+            .catch(e => { logger.warning('PublicKeyRegistry 注册失败', { error: e.message }); return { registry: false, success: false, error: e.message }; })
+        );
+      }
+
+      if (this.auditContract) {
+        promises.push(
+          this.storeAuditHash(pkHash, timestamp, 'REGISTER', userId)
+            .then(r => ({ audit: true, ...r }))
+            .catch(e => ({ audit: false, success: false, error: e.message }))
+        );
+      }
+
+      if (promises.length === 0) {
+        return Promise.resolve({ success: false, skipped: true, error: 'No contract available' });
+      }
+
+      return Promise.all(promises).then(results => {
+        const registryResult = results.find(r => r.registry !== undefined);
+        const auditResult = results.find(r => r.audit !== undefined);
+        const success = (registryResult?.success) || (auditResult?.success);
+        if (success) {
+          logger.info('用户公钥锚定上链成功', { userId });
+        }
+        return { success, pkHash, registry: registryResult, audit: auditResult };
+      });
     } catch (error) {
       logger.error('用户公钥锚定上链失败', { error: error.message, userId });
       return Promise.resolve({ success: false, error: error.message });
+    }
+  }
+
+  /**
+   * 注册公钥到 PublicKeyRegistry 合约（独立方法）
+   * @param {string} userId - 用户ID
+   * @param {string} publicKey - 完整 SM2 公钥
+   * @returns {Promise<Object>} 上链结果
+   */
+  async registerPublicKey(userId, publicKey) {
+    if (!this.isInitialized || !this.publicKeyRegistryContract) {
+      return { success: false, skipped: true, error: 'Service not initialized' };
+    }
+
+    try {
+      const pkHash = this.generateSM3Hash(publicKey);
+      const pkHashBytes32 = pkHash.startsWith('0x') ? pkHash : '0x' + pkHash;
+
+      const tx = await this.publicKeyRegistryContract.register(userId.toString(), pkHashBytes32, publicKey);
+      const receipt = await tx.wait();
+
+      logger.info('公钥注册成功 (Hardhat)', { userId, txHash: receipt.transactionHash });
+      return { success: true, pkHash, blockchainTxHash: receipt.transactionHash, blockNumber: receipt.blockNumber };
+    } catch (error) {
+      logger.error('公钥注册失败 (Hardhat)', { error: error.message, userId });
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * 撤销公钥
+   */
+  async revokePublicKey(userId, pkHash) {
+    if (!this.isInitialized || !this.publicKeyRegistryContract) {
+      return { success: false, skipped: true, error: 'Service not initialized' };
+    }
+
+    try {
+      const pkHashBytes32 = pkHash.startsWith('0x') ? pkHash : '0x' + pkHash;
+      const tx = await this.publicKeyRegistryContract.revoke(userId.toString(), pkHashBytes32);
+      const receipt = await tx.wait();
+      logger.info('公钥撤销成功 (Hardhat)', { userId, txHash: receipt.transactionHash });
+      return { success: true, blockchainTxHash: receipt.transactionHash };
+    } catch (error) {
+      logger.error('公钥撤销失败 (Hardhat)', { error: error.message, userId });
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * 获取用户当前活跃公钥
+   */
+  async getActivePublicKey(userId) {
+    if (!this.isInitialized || !this.publicKeyRegistryContract) return null;
+
+    try {
+      const result = await this.publicKeyRegistryContract.getActiveKey(userId.toString());
+      return {
+        pkHash: result.pkHash || '',
+        publicKey: result.publicKey || '',
+        timestamp: result.timestamp ? result.timestamp.toNumber() : 0,
+        version: result.version ? result.version.toNumber() : 0,
+        active: Boolean(result.active)
+      };
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * 获取用户公钥历史
+   */
+  async getPublicKeyHistory(userId) {
+    if (!this.isInitialized || !this.publicKeyRegistryContract) return [];
+
+    try {
+      const result = await this.publicKeyRegistryContract.getKeyHistory(userId.toString());
+      if (!result || !Array.isArray(result)) return [];
+
+      return result.map(r => ({
+        pkHash: r.pkHash || '',
+        publicKey: r.publicKey || '',
+        timestamp: r.timestamp ? r.timestamp.toNumber() : 0,
+        version: r.version ? r.version.toNumber() : 0,
+        active: Boolean(r.active)
+      }));
+    } catch (error) {
+      return [];
     }
   }
 
@@ -414,13 +532,13 @@ class BlockchainService {
   }
 
   /**
-   * 验证交易哈希（向后兼容 - 使用旧的 TransactionHashStorage 合约）
+   * 验证交易哈希（使用 AuditStorage 合约）
    * @param {string} transactionId - 交易唯一标识符
    * @param {Object} transactionData - 交易数据
    * @returns {Promise<Object>} 验证结果
    */
   async verifyTransactionHash(transactionId, transactionData) {
-    if (!this.isInitialized || !this.contract) {
+    if (!this.isInitialized || !this.auditContract) {
       logger.warning('区块链服务未初始化，无法验证交易哈希');
       return { success: false, error: 'Blockchain service not initialized' };
     }
@@ -428,26 +546,19 @@ class BlockchainService {
     try {
       const calculatedHash = this.generateSM3Hash(transactionData);
       const calculatedHashBytes32 = this.convertSM3ToBytes32(calculatedHash);
-      
-      const txIdBytes32 = ethers.utils.formatBytes32String(transactionId.toString().slice(0, 31));
-      
-      const storedRecord = await this.contract.getTransactionHash(txIdBytes32);
-      const storedHash = storedRecord.sm3Hash;
-      
-      const isValid = storedHash === calculatedHashBytes32;
-      
-      logger.info('交易哈希验证完成（旧合约）', {
-        transactionId,
-        isValid
-      });
+
+      const storedRecord = await this.auditContract.getRecordByHash(calculatedHashBytes32);
+      const isValid = storedRecord.hashValue === calculatedHashBytes32;
+
+      logger.info('交易哈希验证完成', { transactionId, isValid });
 
       return {
         success: true,
         isValid,
-        storedHash,
+        storedHash: storedRecord.hashValue,
         calculatedHash: calculatedHashBytes32,
         timestamp: storedRecord.timestamp.toNumber(),
-        transactionType: storedRecord.transactionType,
+        transactionType: storedRecord.operationType,
         userId: storedRecord.userId
       };
 
@@ -646,10 +757,10 @@ class BlockchainService {
       walletAddress: this.wallet ? this.wallet.address : null,
       network: LOCAL_CHAIN_CONFIG,
       contracts: {
-        TransactionHashStorage: !!this.contract,
         AuditStorage: !!this.auditContract,
         ZKPVerifier: !!this.zkpVerifierContract,
-        Verifier: !!this.verifierContract
+        Verifier: !!this.verifierContract,
+        PublicKeyRegistry: !!this.publicKeyRegistryContract
       }
     };
   }

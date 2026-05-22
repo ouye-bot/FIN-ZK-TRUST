@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, createContext, useContext } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { post, put, get } from './utils/apiUtils';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import Box from '@mui/material/Box';
@@ -326,13 +327,7 @@ function App() {
   const login = async (username, password) => {
     try {
       console.log('Attempting login for user:', username);
-      const response = await fetch('/api/v1/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ username, password }),
-      });
+      const response = await post('/api/v1/auth/login', { username, password }, true);
 
       const data = await response.json();
       console.log('Login response:', { success: data.success });
@@ -418,6 +413,10 @@ function App() {
             }
           }
 
+          // 将设备主密钥存入 Context 和全局变量（必须在 put() 之前，否则签名无法工作）
+          setAesKey(deviceKey);
+          globalAesKey = deviceKey;
+
           // 如果密钥对仍不存在，生成新的
           if (!keyPair) {
             const { generateSM2KeyPair } = await import('./utils/cryptoUtils');
@@ -425,20 +424,9 @@ function App() {
             await saveSM2KeyPair(keyPair, deviceKey);
 
             // 更新后端公钥
-            await fetch(`/api/v1/users/${userId}/update-sm2-key`, {
-              method: 'PUT',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-              },
-              body: JSON.stringify({ sm2PublicKey: keyPair.publicKey })
-            });
+            await put(`/api/v1/users/${userId}/update-sm2-key`, { sm2PublicKey: keyPair.publicKey });
             console.log('SM2密钥对生成并保存');
           }
-
-          // 将设备主密钥存入 Context 和全局变量
-          setAesKey(deviceKey);
-          globalAesKey = deviceKey;
           console.log('Login: 全局设备主密钥已设置');
           console.log('Login: 设备主密钥恢复/生成成功');
         } catch (err) {
@@ -447,12 +435,7 @@ function App() {
 
         // 获取用户完整信息
         try {
-          const userResponse = await fetch(`/api/v1/users/${userId}`, {
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            }
-          });
+          const userResponse = await get(`/api/v1/users/${userId}`);
 
           const userData = await userResponse.json();
 
@@ -500,11 +483,21 @@ function App() {
   };
 
   const logout = async () => {
+    // 先调用登出 API（需要 token 还在 localStorage 中）
+    const token = localStorage.getItem('token');
+    if (token) {
+      try {
+        await post('/api/v1/auth/logout', {}, true);
+      } catch (err) {
+        console.warn('[Logout] Failed to call logout API:', err.message);
+      }
+    }
+
+    // 再清理本地状态
     setUser(null);
     setAesKey(null);
     globalAesKey = null;
     localStorage.removeItem('user');
-    const token = localStorage.getItem('token');
     localStorage.removeItem('token');
     setCryptoLogs([]);
     UserDataCache.clearUserData();
@@ -515,20 +508,6 @@ function App() {
     localStorage.removeItem('sm2_salt');
     localStorage.removeItem('deviceKeyEncrypted');
     sessionStorage.removeItem('pendingKeyPair');
-
-    if (token) {
-      try {
-        await fetch('/api/v1/auth/logout', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-      } catch (err) {
-        console.warn('[Logout] Failed to call logout API:', err.message);
-      }
-    }
   };
 
   return (

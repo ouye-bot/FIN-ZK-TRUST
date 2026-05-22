@@ -3,15 +3,21 @@ const transactionDao = require('../dao/transactionDao');
 
 const loginFailures = new Map();
 const apiCallCounts = new Map();
+const MAX_ENTRIES = 10000;
 
 const detectLoginBruteForce = async (req) => {
   if (req.path !== '/api/v1/auth/login' || req.method !== 'POST') {
-    return;
+    return null;
   }
 
   const ip = req.ip || req.connection.remoteAddress;
   const now = Date.now();
   const windowMs = 5 * 60 * 1000;
+
+  if (loginFailures.size >= MAX_ENTRIES) {
+    const oldestKey = loginFailures.keys().next().value;
+    if (oldestKey) loginFailures.delete(oldestKey);
+  }
 
   let entry = loginFailures.get(ip);
   if (!entry || now - entry.firstAttemptTime > windowMs) {
@@ -33,7 +39,9 @@ const detectLoginBruteForce = async (req) => {
         timestamp: new Date().toISOString()
       }
     });
+    return { blocked: true, message: '登录尝试过于频繁，请5分钟后再试' };
   }
+  return null;
 };
 
 const detectLargeTransaction = async (req) => {
@@ -41,7 +49,7 @@ const detectLargeTransaction = async (req) => {
     return;
   }
 
-  const userId = req.user?.id || req.body?.userId;
+  const userId = req.user?.id;
   if (!userId) {
     return;
   }
@@ -98,6 +106,11 @@ const detectHighFrequency = async (req) => {
   const now = Date.now();
   const windowMs = 60 * 1000;
 
+  if (apiCallCounts.size >= MAX_ENTRIES) {
+    const oldestKey = apiCallCounts.keys().next().value;
+    if (oldestKey) apiCallCounts.delete(oldestKey);
+  }
+
   let entry = apiCallCounts.get(userId);
   if (!entry || now - entry.windowStartTime > windowMs) {
     entry = { count: 0, windowStartTime: now };
@@ -132,7 +145,7 @@ const detectAbnormalTime = async (req) => {
   const hour = new Date().getHours();
   
   if (hour >= 2 && hour < 5) {
-    const userId = req.user?.id || req.body?.userId;
+    const userId = req.user?.id;
     const amount = Number(req.body?.amount || 0);
     
     logger.warning('异常行为检测：异常时段借款', {
@@ -152,7 +165,10 @@ const detectAbnormalTime = async (req) => {
 
 const anomalyDetectionMiddleware = async (req, res, next) => {
   try {
-    await detectLoginBruteForce(req);
+    const r1Result = await detectLoginBruteForce(req);
+    if (r1Result?.blocked) {
+      return res.status(429).json({ success: false, message: r1Result.message });
+    }
   } catch (error) {
     logger.error('异常检测 R1 异常', { error: error.message });
   }

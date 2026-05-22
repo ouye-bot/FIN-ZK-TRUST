@@ -97,13 +97,16 @@ router.post('/reset', async (req, res) => {
       message: 'MFA 已重置，请重新登录设置新的 MFA'
     });
   } catch (error) {
-    console.error('MFA reset error:', error);
+    logger.error('MFA reset error', { error: error.message });
     res.status(500).json({ success: false, message: 'MFA 重置失败' });
   }
 });
 
 router.post('/setup', async (req, res) => {
   try {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ success: false, message: '未认证' });
+    }
     const userId = req.user.id;
     const user = await userDao.findById(userId);
 
@@ -121,13 +124,16 @@ router.post('/setup', async (req, res) => {
 
     res.status(200).json({ success: true, otpauthUrl, secret });
   } catch (error) {
-    console.error('MFA setup error:', error);
+    logger.error('MFA setup error', { error: error.message });
     res.status(500).json({ success: false, message: 'MFA 设置失败' });
   }
 });
 
 router.get('/setup', async (req, res) => {
   try {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ success: false, message: '未认证' });
+    }
     const userId = req.user.id;
     const user = await userDao.findById(userId);
 
@@ -153,13 +159,16 @@ router.get('/setup', async (req, res) => {
 
     res.status(200).json({ success: true, otpauthUrl, secret });
   } catch (error) {
-    console.error('MFA setup error:', error);
+    logger.error('MFA setup error', { error: error.message });
     res.status(500).json({ success: false, message: 'MFA 设置失败' });
   }
 });
 
 router.post('/verify-and-enable', async (req, res) => {
   try {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ success: false, message: '未认证' });
+    }
     const { token } = req.body;
     const userId = req.user.id;
 
@@ -195,7 +204,7 @@ router.post('/verify-and-enable', async (req, res) => {
 
     res.status(200).json({ success: true, backupCodes, sessionKey });
   } catch (error) {
-    console.error('MFA verify and enable error:', error);
+    logger.error('MFA verify and enable error', { error: error.message });
     res.status(500).json({ success: false, message: 'MFA 启用失败' });
   }
 });
@@ -297,14 +306,17 @@ router.post('/verify', async (req, res) => {
         };
 
         const newToken = jwt.sign(
-        { ...userData, jti: crypto.randomUUID() },
-        process.env.JWT_SECRET,
-        { expiresIn: '24h' }
-      );
+          { ...userData, jti: crypto.randomUUID() },
+          process.env.JWT_SECRET,
+          { expiresIn: '24h' }
+        );
 
+        const sessionSecret = crypto.createHash('sha256')
+          .update(process.env.JWT_SECRET + ':session-key-salt')
+          .digest('hex');
         const sessionKey = jwt.sign(
           { userId: user.id, purpose: 'key-session' },
-          process.env.JWT_SECRET,
+          sessionSecret,
           { expiresIn: '1h' }
         );
 
@@ -314,7 +326,7 @@ router.post('/verify', async (req, res) => {
 
     res.status(400).json({ success: false, message: '验证码无效' });
   } catch (error) {
-    console.error('MFA verify error:', error);
+    logger.error('MFA verify error', { error: error.message });
     res.status(500).json({ 
       success: false, 
       message: '验证失败，请重试或重新登录',
@@ -325,12 +337,15 @@ router.post('/verify', async (req, res) => {
 
 router.get('/status', async (req, res) => {
   try {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ success: false, message: '未认证' });
+    }
     const userId = req.user.id;
     const totpData = await userDao.getTotpData(userId);
 
     res.status(200).json({ success: true, enabled: totpData ? totpData.totpEnabled : false });
   } catch (error) {
-    console.error('MFA status error:', error);
+    logger.error('MFA status error', { error: error.message });
     res.status(500).json({ success: false, message: '获取 MFA 状态失败' });
   }
 });

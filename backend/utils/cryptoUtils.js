@@ -244,21 +244,12 @@ exports.verifySM2Signature = (message, signature, publicKey) => {
   }
   validateSM2PublicKey(publicKey);
 
-  const cacheKey = `sm2_verify::${message}::${signature}::${publicKey}`;
-  const cachedResult = signatureCache.get(cacheKey);
-  
-  if (cachedResult !== null) {
-    return cachedResult;
-  }
-  
+  // 不缓存签名验证结果——防重放应由 nonce 机制保证，缓存会允许签名在 TTL 内被重用
   try {
     const result = sm2.doVerifySignature(message, signature, publicKey, { der: false });
-    logger.info('SM2 signature verification completed', { result });
-    signatureCache.set(cacheKey, result);
     return result;
   } catch (error) {
     logger.error('SM2 signature verification failed:', { error: error.message });
-    signatureCache.set(cacheKey, false);
     return false;
   }
 };
@@ -329,18 +320,27 @@ exports.signWithSM2 = (message, privateKey) => {
  * @returns {string} - JSON 字符串
  */
 exports.buildSignatureData = (params, keyOrder) => {
-  const parts = [];
+  const obj = {};
   for (const key of keyOrder) {
     if (params.hasOwnProperty(key)) {
-      const value = params[key];
-      if (typeof value === 'string') {
-        parts.push(`"${key}":"${value}"`);
-      } else {
-        parts.push(`"${key}":${value}`);
-      }
+      obj[key] = params[key];
     }
   }
-  return `{${parts.join(',')}}`;
+  return JSON.stringify(obj);
+};
+
+/**
+ * 确定性 JSON 序列化（canonical JSON）
+ * 按 key 排序后序列化，确保前后端签名原文一致
+ * @param {any} data - 要序列化的数据
+ * @returns {string} - 排序后的 JSON 字符串
+ */
+exports.canonicalStringify = (data) => {
+  if (data === null || data === undefined) return JSON.stringify(data);
+  if (typeof data !== 'object') return JSON.stringify(data);
+  if (Array.isArray(data)) return '[' + data.map(exports.canonicalStringify).join(',') + ']';
+  const keys = Object.keys(data).sort();
+  return '{' + keys.map(k => JSON.stringify(k) + ':' + exports.canonicalStringify(data[k])).join(',') + '}';
 };
 
 // 测试专用：暴露缓存实例供性能测试清除

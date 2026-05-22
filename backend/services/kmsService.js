@@ -62,22 +62,28 @@ async function generateDEK(userId, connection) {
   const exec = connection
     ? (sql, params) => connection.execute(sql, params).then(([rows]) => rows)
     : execute;
-  const existing = await exec('SELECT encrypted_dek FROM user_keys WHERE user_id = ?', [userId]);
-  if (existing.length > 0) {
-    logger.info('DEK 已存在，跳过生成', { userId });
-    return decryptWithMasterKey(existing[0].encrypted_dek);
-  }
 
+  // 使用 INSERT IGNORE 防止 TOCTOU 竞态：并发调用时只有一个成功
   const dekHex = crypto.randomBytes(16).toString('hex');
   const encryptedDek = encryptWithMasterKey(dekHex);
 
-  await exec(
-    'INSERT INTO user_keys (user_id, encrypted_dek, created_at) VALUES (?, ?, ?)',
-    [userId, encryptedDek, Date.now()]
-  );
+  try {
+    await exec(
+      'INSERT IGNORE INTO user_keys (user_id, encrypted_dek, created_at) VALUES (?, ?, ?)',
+      [userId, encryptedDek, Date.now()]
+    );
+  } catch (e) {
+    // INSERT IGNORE 忽略重复键错误
+  }
 
-  logger.info('用户 DEK 已生成并加密存储', { userId });
-  return dekHex;
+  // 无论插入是否成功，都从数据库读取（确保返回正确的 DEK）
+  const rows = await exec('SELECT encrypted_dek FROM user_keys WHERE user_id = ?', [userId]);
+  if (rows.length === 0) {
+    throw new Error('DEK 生成失败');
+  }
+
+  logger.info('用户 DEK 已就绪', { userId });
+  return decryptWithMasterKey(rows[0].encrypted_dek);
 }
 
 const dekCache = new Map();
@@ -153,7 +159,7 @@ function decryptWithDEK(dek, ciphertext, aad = '') {
       const legacyTag = crypto.createHmac(HMAC_ALGORITHM, hmacKey)
         .update(ivHex + encryptedHex).digest('hex');
       if (timingSafeCompare(authTagHex, legacyTag)) {
-        logger.warning('解密使用旧格式（无 AAD），建议运行迁移脚本', { aad });
+        logger.error('SECURITY: 解密降级为v1无AAD模式，AAD绑定被跳过，需尽快迁移数据到v2格式', { aad });
       } else {
         throw new Error('认证标签不匹配（AAD 校验失败）');
       }
@@ -178,7 +184,7 @@ async function rotateDEK(userId) {
     );
     if (keyRows.length === 0) throw new Error('用户密钥不存在');
 
-    const oldDek = await getDEK(userId);
+    const oldDek = await getDEK(userId, connection);
     const newDekHex = crypto.randomBytes(16).toString('hex');
     const encryptedNewDek = encryptWithMasterKey(newDekHex);
 
@@ -238,6 +244,5 @@ module.exports = {
   decryptWithDEK,
   rotateDEK,
   encryptWithMasterKey,
-  decryptWithMasterKey,
-  getMasterKey
+  decryptWithMasterKey
 };

@@ -6,6 +6,7 @@ import CopyIcon from '@mui/icons-material/ContentCopy';
 import { useNavigate } from 'react-router-dom';
 import { useAesKey } from '../App';
 import { deriveTransportKey, encryptDeviceKey } from '../utils/deviceKeyManager';
+import { get, post } from '../utils/apiUtils';
 
 const API_BASE = '/api/v1';
 
@@ -26,12 +27,7 @@ function MfaSetup({ user }) {
 
   const fetchSetupData = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE}/mfa/setup`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await get(`${API_BASE}/mfa/setup`);
 
       if (!response.ok) {
         const text = await response.text();
@@ -62,15 +58,7 @@ function MfaSetup({ user }) {
     setError('');
 
     try {
-      const userToken = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE}/mfa/verify-and-enable`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${userToken}`
-        },
-        body: JSON.stringify({ token })
-      });
+      const response = await post(`${API_BASE}/mfa/verify-and-enable`, { token });
       const data = await response.json();
       if (data.success) {
         setBackupCodes(data.backupCodes);

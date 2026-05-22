@@ -216,4 +216,102 @@ router.get('/zkp-verify/:proofId', requireBlockchain, async (req, res) => {
   }
 });
 
+/**
+ * GET /api/v1/blockchain/public-key/:userId
+ * 查询用户当前活跃的链上公钥（第三方可调用）
+ */
+router.get('/public-key/:userId', requireBlockchain, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    if (!userId) {
+      return res.status(400).json({ success: false, message: '缺少用户ID' });
+    }
+
+    const activeKey = await blockchainService.getActivePublicKey(userId);
+    if (!activeKey) {
+      return res.json({
+        success: true,
+        data: { found: false, message: '该用户无链上公钥记录' }
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        found: true,
+        userId,
+        publicKey: activeKey.publicKey,
+        pkHash: activeKey.pkHash,
+        version: activeKey.version,
+        timestamp: activeKey.timestamp,
+        active: activeKey.active
+      }
+    });
+  } catch (error) {
+    logger.error('链上公钥查询失败', { error: error.message, userId: req.params.userId });
+    res.status(500).json({ success: false, message: '查询失败' });
+  }
+});
+
+/**
+ * GET /api/v1/blockchain/public-key/:userId/history
+ * 查询用户公钥历史（含已撤销密钥）
+ */
+router.get('/public-key/:userId/history', requireBlockchain, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    if (!userId) {
+      return res.status(400).json({ success: false, message: '缺少用户ID' });
+    }
+
+    const history = await blockchainService.getPublicKeyHistory(userId);
+    res.json({
+      success: true,
+      data: {
+        userId,
+        totalKeys: history.length,
+        keys: history.map(k => ({
+          publicKey: k.publicKey,
+          pkHash: k.pkHash,
+          version: k.version,
+          timestamp: k.timestamp,
+          active: k.active
+        }))
+      }
+    });
+  } catch (error) {
+    logger.error('链上公钥历史查询失败', { error: error.message, userId: req.params.userId });
+    res.status(500).json({ success: false, message: '查询失败' });
+  }
+});
+
+/**
+ * POST /api/v1/blockchain/public-key/revoke
+ * 紧急撤销公钥（管理员操作）
+ * Body: { userId, pkHash }
+ */
+router.post('/public-key/revoke', requireBlockchain, async (req, res) => {
+  try {
+    const { userId, pkHash } = req.body;
+    if (!userId || !pkHash) {
+      return res.status(400).json({ success: false, message: '缺少 userId 或 pkHash' });
+    }
+
+    if (!req.user || req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: '需要管理员权限' });
+    }
+
+    const result = await blockchainService.revokePublicKey(userId, pkHash);
+    if (result.success) {
+      logger.info('管理员撤销公钥成功', { userId, pkHash, admin: req.user.id });
+      res.json({ success: true, message: '公钥撤销成功', data: result });
+    } else {
+      res.status(400).json({ success: false, message: '公钥撤销失败', error: result.error });
+    }
+  } catch (error) {
+    logger.error('公钥撤销失败', { error: error.message });
+    res.status(500).json({ success: false, message: '撤销失败' });
+  }
+});
+
 module.exports = router;

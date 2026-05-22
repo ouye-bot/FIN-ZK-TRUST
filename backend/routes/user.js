@@ -52,6 +52,7 @@ router.get('/:id', async (req, res) => {
         balance: user.balance || 0,
         role: user.role || 'user',
         sm2PublicKey: user.sm2_public_key || '',
+        created_at: user.created_at,
         assets: userAssets
       }
     });

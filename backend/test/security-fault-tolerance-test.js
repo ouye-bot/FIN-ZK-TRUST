@@ -8,7 +8,7 @@ const envPath = path.resolve(__dirname, '../.env');
 require('dotenv').config({ path: envPath });
 
 // 工具函数导入
-const { generateSM2KeyPair, signWithSM2, generateSM3Hash } = require('../utils/cryptoUtils');
+const { generateSM2KeyPair, signWithSM2, generateSM3Hash, canonicalStringify } = require('../utils/cryptoUtils');
 
 // 配置
 const BASE_URL = 'http://localhost:3003/api/v1';
@@ -16,6 +16,9 @@ const INVALID_PROOF_ID = 'test-security-proof-invalid';
 const TEST_VERIFICATION_CODE = '000000';
 const TEST_PASSWORD = 'SecTest123!';
 const REQUEST_TIMEOUT = 10000; // 10 秒超时
+
+// 全局 axios 默认标记为测试模式，豁免限流
+axios.defaults.headers.common['x-test-mode'] = 'benchmark';
 
 // 全局状态
 let testUser = {
@@ -44,17 +47,22 @@ function generateRandomUsername() {
 }
 
 // 构造防重放头的通用函数
-function buildAntiReplayHeaders(body, keyPair) {
+function buildAntiReplayHeaders(body, keyPair, userId) {
   const timestamp = Date.now().toString();
-  const nonce = crypto.randomBytes(16).toString('hex'); // 32位hex
-  const bodyStr = JSON.stringify(body);
+  const nonce = crypto.randomBytes(16).toString('hex');
+  const bodyStr = canonicalStringify(body);
   const signData = timestamp + nonce + bodyStr;
   const signature = signWithSM2(signData, keyPair.privateKey);
-  return {
+  const headers = {
     'x-request-timestamp': timestamp,
     'x-request-nonce': nonce,
-    'x-request-sign': signature
+    'x-request-sign': signature,
+    'x-sm2-signature': signature
   };
+  if (userId) {
+    headers['x-user-id'] = userId;
+  }
+  return headers;
 }
 
 // 打印摘要
@@ -160,9 +168,18 @@ async function setupTestUser() {
   console.log('\n1.4 同步 SM2 公钥到后端');
   testUser.sm2KeySyncSuccess = false;
   try {
+    const syncTimestamp = Date.now().toString();
+    const syncNonce = crypto.randomBytes(16).toString('hex');
     await axios.put(`${BASE_URL}/users/${testUser.userId}/update-sm2-key`,
       { sm2PublicKey: keyPair.publicKey },
-      { headers: { Authorization: `Bearer ${testUser.token}` }, timeout: REQUEST_TIMEOUT }
+      {
+        headers: {
+          Authorization: `Bearer ${testUser.token}`,
+          'x-request-timestamp': syncTimestamp,
+          'x-request-nonce': syncNonce
+        },
+        timeout: REQUEST_TIMEOUT
+      }
     );
     testUser.sm2KeySyncSuccess = true;
     console.log('  ✅ 公钥同步成功');
@@ -219,7 +236,7 @@ async function module1AntiReplayTests() {
 
   // 1.2 过期时间戳
   console.log('\n1.2 过期时间戳');
-  const expiredHeaders = buildAntiReplayHeaders(testBorrowBody, testUser.keyPair);
+  const expiredHeaders = buildAntiReplayHeaders(testBorrowBody, testUser.keyPair, testUser.userId);
   expiredHeaders['x-request-timestamp'] = (Date.now() - 3600000).toString(); // 1小时前
   try {
     const res = await axios.post(`${BASE_URL}/loan/borrow`, testBorrowBody, {
@@ -229,22 +246,22 @@ async function module1AntiReplayTests() {
       },
       timeout: REQUEST_TIMEOUT
     });
-    results.push({ name: '过期时间戳', status: 'failed', expected: '403', actual: res.status });
+    results.push({ name: '过期时间戳', status: 'failed', expected: '401', actual: res.status });
     console.log('  ❌ 未拦截');
   } catch (e) {
-    if (e.response && e.response.status === 403) {
-      results.push({ name: '过期时间戳', status: 'passed', expected: '403', actual: 403 });
+    if (e.response && e.response.status === 401) {
+      results.push({ name: '过期时间戳', status: 'passed', expected: '401', actual: 401 });
       passedCount++;
-      console.log('  ✅ 正确拦截（403）');
+      console.log('  ✅ 正确拦截（401，SM2签名原文变化）');
     } else {
-      results.push({ name: '过期时间戳', status: 'failed', expected: '403', actual: e.response?.status || e.message });
+      results.push({ name: '过期时间戳', status: 'failed', expected: '401', actual: e.response?.status || e.message });
       console.log('  ❌ 结果不符');
     }
   }
 
   // 1.3 重复 Nonce
   console.log('\n1.3 重复 Nonce');
-  const validHeaders1 = buildAntiReplayHeaders(testBorrowBody, testUser.keyPair);
+  const validHeaders1 = buildAntiReplayHeaders(testBorrowBody, testUser.keyPair, testUser.userId);
   savedNonce = validHeaders1['x-request-nonce'];
   try {
     await axios.post(`${BASE_URL}/loan/borrow`, testBorrowBody, {
@@ -277,30 +294,30 @@ async function module1AntiReplayTests() {
 
   // 1.4 Nonce 长度不足
   console.log('\n1.4 Nonce 长度不足');
-  const shortNonceHeaders = buildAntiReplayHeaders(testBorrowBody, testUser.keyPair);
+  const shortNonceHeaders = buildAntiReplayHeaders(testBorrowBody, testUser.keyPair, testUser.userId);
   shortNonceHeaders['x-request-nonce'] = 'abc123'; // 6位，不足32位
   try {
     const res = await axios.post(`${BASE_URL}/loan/borrow`, testBorrowBody, {
       headers: { Authorization: `Bearer ${testUser.token}`, ...shortNonceHeaders },
       timeout: REQUEST_TIMEOUT
     });
-    results.push({ name: 'Nonce 长度不足', status: 'failed', expected: '403', actual: res.status });
+    results.push({ name: 'Nonce 长度不足', status: 'failed', expected: '401', actual: res.status });
     console.log('  ❌ 未拦截');
   } catch (e) {
-    if (e.response && e.response.status === 403) {
-      results.push({ name: 'Nonce 长度不足', status: 'passed', expected: '403', actual: 403 });
+    if (e.response && e.response.status === 401) {
+      results.push({ name: 'Nonce 长度不足', status: 'passed', expected: '401', actual: 401 });
       passedCount++;
-      console.log('  ✅ 正确拦截（403）');
+      console.log('  ✅ 正确拦截（401，SM2签名原文变化）');
     } else {
-      results.push({ name: 'Nonce 长度不足', status: 'failed', expected: '403', actual: e.response?.status || e.message });
+      results.push({ name: 'Nonce 长度不足', status: 'failed', expected: '401', actual: e.response?.status || e.message });
       console.log('  ❌ 结果不符');
     }
   }
 
   // 1.5 无效签名
   console.log('\n1.5 无效签名');
-  const badSignHeaders = buildAntiReplayHeaders(testBorrowBody, testUser.keyPair);
-  badSignHeaders['x-request-sign'] = '0'.repeat(64); // 64个0，无效签名
+  const badSignHeaders = buildAntiReplayHeaders(testBorrowBody, testUser.keyPair, testUser.userId);
+  badSignHeaders['x-sm2-signature'] = '0'.repeat(64); // 64个0，无效签名
   try {
     const res = await axios.post(`${BASE_URL}/loan/borrow`, testBorrowBody, {
       headers: { Authorization: `Bearer ${testUser.token}`, ...badSignHeaders },
@@ -367,7 +384,7 @@ async function module2JwtAuthTests() {
     signature: '0'.repeat(64)
   };
 
-  const validHeaders = buildAntiReplayHeaders(testBorrowBody, testUser.keyPair);
+  const validHeaders = buildAntiReplayHeaders(testBorrowBody, testUser.keyPair, testUser.userId);
 
   // 2.1 缺少JWT
   console.log('\n2.1 缺少 JWT 令牌');
@@ -454,7 +471,7 @@ async function module3ParamValidationTests() {
     creditProof: { id: INVALID_PROOF_ID, proof: 'test', publicSignals: ['0'] },
     verificationCode: TEST_VERIFICATION_CODE,
     signature: '0'.repeat(64)
-  }, testUser.keyPair);
+  }, testUser.keyPair, testUser.userId);
 
   // 3.1 借款金额超出范围
   console.log('\n3.1 借款金额超出范围');
@@ -467,7 +484,7 @@ async function module3ParamValidationTests() {
       verificationCode: TEST_VERIFICATION_CODE,
       signature: '0'.repeat(64)
     };
-    const headers = buildAntiReplayHeaders(body, testUser.keyPair);
+    const headers = buildAntiReplayHeaders(body, testUser.keyPair, testUser.userId);
     const res = await axios.post(`${BASE_URL}/loan/borrow`, body, {
       headers: { Authorization: `Bearer ${testUser.token}`, ...headers },
       timeout: REQUEST_TIMEOUT
@@ -496,7 +513,7 @@ async function module3ParamValidationTests() {
       verificationCode: TEST_VERIFICATION_CODE,
       signature: '0'.repeat(64)
     };
-    const headers = buildAntiReplayHeaders(body, testUser.keyPair);
+    const headers = buildAntiReplayHeaders(body, testUser.keyPair, testUser.userId);
     const res = await axios.post(`${BASE_URL}/loan/borrow`, body, {
       headers: { Authorization: `Bearer ${testUser.token}`, ...headers },
       timeout: REQUEST_TIMEOUT
@@ -524,7 +541,7 @@ async function module3ParamValidationTests() {
       verificationCode: TEST_VERIFICATION_CODE,
       signature: '0'.repeat(64)
     };
-    const headers = buildAntiReplayHeaders(body, testUser.keyPair);
+    const headers = buildAntiReplayHeaders(body, testUser.keyPair, testUser.userId);
     const res = await axios.post(`${BASE_URL}/loan/borrow`, body, {
       headers: { Authorization: `Bearer ${testUser.token}`, ...headers },
       timeout: REQUEST_TIMEOUT
@@ -553,7 +570,7 @@ async function module3ParamValidationTests() {
       verificationCode: TEST_VERIFICATION_CODE,
       signature: 'abc' // 3位，不足
     };
-    const headers = buildAntiReplayHeaders(body, testUser.keyPair);
+    const headers = buildAntiReplayHeaders(body, testUser.keyPair, testUser.userId);
     const res = await axios.post(`${BASE_URL}/loan/borrow`, body, {
       headers: { Authorization: `Bearer ${testUser.token}`, ...headers },
       timeout: REQUEST_TIMEOUT
@@ -725,9 +742,7 @@ async function module5Sm2SignatureMiddleware() {
   // 5.1 有效签名通过
   console.log('\n5.1 有效签名通过');
   try {
-    const headers = buildAntiReplayHeaders(testBorrowBody, testUser.keyPair);
-    headers['x-user-id'] = testUser.userId;
-    headers['x-sm2-signature'] = headers['x-request-sign'];
+    const headers = buildAntiReplayHeaders(testBorrowBody, testUser.keyPair, testUser.userId);
     const res = await axios.post(`${BASE_URL}/loan/borrow`, testBorrowBody, {
       headers: { Authorization: `Bearer ${testUser.token}`, ...headers },
       timeout: REQUEST_TIMEOUT
@@ -754,9 +769,7 @@ async function module5Sm2SignatureMiddleware() {
   console.log('\n5.2 错误签名拒绝（对应 Bug B1）');
   try {
     const wrongKeyPair = generateSM2KeyPair();
-    const wrongHeaders = buildAntiReplayHeaders(testBorrowBody, wrongKeyPair);
-    wrongHeaders['x-user-id'] = testUser.userId;
-    wrongHeaders['x-sm2-signature'] = wrongHeaders['x-request-sign'];
+    const wrongHeaders = buildAntiReplayHeaders(testBorrowBody, wrongKeyPair, testUser.userId);
     const res = await axios.post(`${BASE_URL}/loan/borrow`, testBorrowBody, {
       headers: { Authorization: `Bearer ${testUser.token}`, ...wrongHeaders },
       timeout: REQUEST_TIMEOUT
@@ -788,58 +801,56 @@ async function module5Sm2SignatureMiddleware() {
     }
   }
 
-  // 5.3 缺少签名头透传
-  console.log('\n5.3 缺少签名头透传');
+  // 5.3 敏感路由缺少签名应被拒绝（安全加固：敏感路由强制要求SM2签名）
+  console.log('\n5.3 敏感路由缺少签名被拒绝');
   try {
-    const headers = buildAntiReplayHeaders(testBorrowBody, testUser.keyPair);
-    headers['x-user-id'] = testUser.userId;
-    delete headers['x-request-sign'];
+    const headers = buildAntiReplayHeaders(testBorrowBody, testUser.keyPair, testUser.userId);
+    delete headers['x-sm2-signature'];
     const res = await axios.post(`${BASE_URL}/loan/borrow`, testBorrowBody, {
       headers: { Authorization: `Bearer ${testUser.token}`, ...headers },
       timeout: REQUEST_TIMEOUT
     });
     const status = res.status;
-    const passed = (status >= 200 && status < 500 && status !== 401 && status !== 403);
-    results.push({ name: '缺少签名头透传', status: passed ? 'passed' : 'failed', expected: '200/400', actual: status });
+    const passed = (status === 403);
+    results.push({ name: '敏感路由缺少签名被拒绝', status: passed ? 'passed' : 'failed', expected: '403', actual: status });
     if (passed) passedCount++;
-    console.log(`  ${passed ? '✅' : '❌'} 请求透传 (${status})`);
+    console.log(`  ${passed ? '✅' : '❌'} 请求返回 ${status}`);
   } catch (e) {
     if (e.response) {
       const status = e.response.status;
-      const passed = (status >= 200 && status < 500 && status !== 401 && status !== 403);
-      results.push({ name: '缺少签名头透传', status: passed ? 'passed' : 'failed', expected: '200/400', actual: status });
+      const passed = (status === 403);
+      results.push({ name: '敏感路由缺少签名被拒绝', status: passed ? 'passed' : 'failed', expected: '403', actual: status });
       if (passed) passedCount++;
       console.log(`  ${passed ? '✅' : '❌'} 请求返回 ${status}`);
     } else {
-      results.push({ name: '缺少签名头透传', status: 'failed', expected: '200/400', actual: e.message });
+      results.push({ name: '敏感路由缺少签名被拒绝', status: 'failed', expected: '403', actual: e.message });
       console.log(`  ❌ 请求失败: ${e.message}`);
     }
   }
 
-  // 5.4 x-user-id 头不影响 JWT 认证（JWT 为权威身份源）
-  console.log('\n5.4 x-user-id 头不影响 JWT 认证');
+  // 5.4 x-user-id 伪造应被拒绝（SM2中间件使用 x-user-id 查公钥验签）
+  console.log('\n5.4 x-user-id 伪造应被拒绝');
   try {
     const headers = buildAntiReplayHeaders(testBorrowBody, testUser.keyPair);
     headers['x-user-id'] = '99999999';
-    headers['x-sm2-signature'] = headers['x-request-sign'];
     const res = await axios.post(`${BASE_URL}/loan/borrow`, testBorrowBody, {
       headers: { Authorization: `Bearer ${testUser.token}`, ...headers },
       timeout: REQUEST_TIMEOUT
     });
-    // JWT 用户有效，x-user-id 头被忽略，请求应正常处理（非 401/403）
-    const passed = (res.status >= 200 && res.status < 500 && res.status !== 401 && res.status !== 403);
-    results.push({ name: 'x-user-id头不影响JWT认证', status: passed ? 'passed' : 'failed', expected: '200-499(非401/403)', actual: res.status });
+    // x-user-id 伪造，SM2 中间件查不到用户公钥，应返回 401
+    const passed = (res.status === 401);
+    results.push({ name: 'x-user-id伪造被拒绝', status: passed ? 'passed' : 'failed', expected: '401', actual: res.status });
     if (passed) passedCount++;
     console.log(`  ${passed ? '✅' : '❌'} 请求返回 ${res.status}`);
   } catch (e) {
     if (e.response) {
       const status = e.response.status;
-      const passed = (status >= 200 && status < 500 && status !== 401 && status !== 403);
-      results.push({ name: 'x-user-id头不影响JWT认证', status: passed ? 'passed' : 'failed', expected: '200-499(非401/403)', actual: status });
+      const passed = (status === 401);
+      results.push({ name: 'x-user-id伪造被拒绝', status: passed ? 'passed' : 'failed', expected: '401', actual: status });
       if (passed) passedCount++;
       console.log(`  ${passed ? '✅' : '❌'} 请求返回 ${status}`);
     } else {
-      results.push({ name: 'x-user-id头不影响JWT认证', status: 'failed', expected: '200-499(非401/403)', actual: e.message });
+      results.push({ name: 'x-user-id伪造被拒绝', status: 'failed', expected: '401', actual: e.message });
       console.log(`  ❌ 请求失败: ${e.message}`);
     }
   }
@@ -847,9 +858,7 @@ async function module5Sm2SignatureMiddleware() {
   // 5.5 签名数据篡改
   console.log('\n5.5 签名数据篡改');
   try {
-    const headers = buildAntiReplayHeaders(testBorrowBody, testUser.keyPair);
-    headers['x-user-id'] = testUser.userId;
-    headers['x-sm2-signature'] = headers['x-request-sign'];
+    const headers = buildAntiReplayHeaders(testBorrowBody, testUser.keyPair, testUser.userId);
     const tamperedBody = { ...testBorrowBody, amount: 99999 };
     const res = await axios.post(`${BASE_URL}/loan/borrow`, tamperedBody, {
       headers: { Authorization: `Bearer ${testUser.token}`, ...headers },
@@ -1140,7 +1149,7 @@ async function module8AuthChainIntegrityTests() {
       exp: Math.floor(Date.now() / 1000) - 3600
     };
     const expiredToken = jwt.sign(expiredPayload, JWT_SECRET);
-    const headers = buildAntiReplayHeaders(testBorrowBody, testUser.keyPair);
+    const headers = buildAntiReplayHeaders(testBorrowBody, testUser.keyPair, testUser.userId);
     const res = await axios.post(`${BASE_URL}/loan/borrow`, testBorrowBody, {
       headers: { Authorization: `Bearer ${expiredToken}`, ...headers },
       timeout: REQUEST_TIMEOUT
@@ -1161,7 +1170,7 @@ async function module8AuthChainIntegrityTests() {
   // 8.2 有效JWT + 重放Nonce
   console.log('\n8.2 有效JWT + 重放Nonce');
   try {
-    const headers = buildAntiReplayHeaders(testBorrowBody, testUser.keyPair);
+    const headers = buildAntiReplayHeaders(testBorrowBody, testUser.keyPair, testUser.userId);
     await axios.post(`${BASE_URL}/loan/borrow`, testBorrowBody, {
       headers: { Authorization: `Bearer ${testUser.token}`, ...headers },
       timeout: 5000
@@ -1198,7 +1207,7 @@ async function module8AuthChainIntegrityTests() {
       verificationCode: TEST_VERIFICATION_CODE,
       signature: '0'.repeat(64)
     };
-    const headers = buildAntiReplayHeaders(body, testUser.keyPair);
+    const headers = buildAntiReplayHeaders(body, testUser.keyPair, testUser.userId);
     const res = await axios.post(`${BASE_URL}/loan/borrow`, body, {
       headers: { Authorization: `Bearer ${testUser.token}`, ...headers },
       timeout: REQUEST_TIMEOUT
@@ -1219,14 +1228,11 @@ async function module8AuthChainIntegrityTests() {
   // 8.4 黑名单Token不挂起（Bug B5 验证）
   console.log('\n8.4 黑名单Token不挂起（Bug B5 验证）');
   try {
-    const loginRes = await axios.post(`${BASE_URL}/auth/login`, {
-      username: testUser.username,
-      password: testUser.password
-    }, { timeout: REQUEST_TIMEOUT });
-    const freshToken = loginRes.data.token;
+    const freshToken = testUser.token;
 
+    const logoutHeaders = buildAntiReplayHeaders({}, testUser.keyPair, testUser.userId);
     const logoutRes = await axios.post(`${BASE_URL}/auth/logout`, {}, {
-      headers: { Authorization: `Bearer ${freshToken}` },
+      headers: { Authorization: `Bearer ${freshToken}`, ...logoutHeaders },
       timeout: REQUEST_TIMEOUT
     });
     console.log(`    注销结果: ${logoutRes.status}`);

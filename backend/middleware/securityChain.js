@@ -3,6 +3,7 @@ const { execute } = require('../config/database');
 const { antiReplayMiddleware } = require('./antiReplayMiddleware');
 const { authPermissionMiddleware } = require('./authPermissionMiddleware');
 const { anomalyDetectionMiddleware } = require('./anomalyDetection');
+const logger = require('../utils/logger');
 
 const blacklistCache = new Map();
 
@@ -30,7 +31,12 @@ const isTokenBlacklisted = async (jti, expiresAt) => {
     }
     return false;
   } catch (dbError) {
-    console.warn('[JWT] Blacklist database query failed, falling back to cache only:', dbError.message);
+    // DB查询失败时，检查缓存中是否有该JTI的记录
+    if (blacklistCache.has(jti)) {
+      logger.warning('Blacklist DB failed, token found in cache', { jti });
+      return true;
+    }
+    logger.error('CRITICAL: Blacklist database query failed and token not in cache', { error: dbError.message, jti });
     return false;
   }
 };
@@ -53,15 +59,15 @@ const setupSecurityChain = (app) => {
           const isBlacklisted = await isTokenBlacklisted(decoded.jti, expiresAt);
           
           if (isBlacklisted) {
-            console.log('[JWT] Token is blacklisted:', decoded.jti);
+            logger.warning('JWT Token is blacklisted', { jti: decoded.jti });
             return res.status(401).json({ success: false, message: 'Token 已被撤销' });
           }
         }
         
         req.user = decoded;
-        console.log('[JWT] User parsed:', req.user?.id);
+        logger.debug('JWT User parsed', { userId: req.user?.id });
       } catch(err) {
-        console.log('[JWT] Token invalid:', err.message);
+        logger.debug('JWT Token invalid', { error: err.message });
         return res.status(401).json({ success: false, message: '无效的认证令牌' });
       }
     }
@@ -71,10 +77,14 @@ const setupSecurityChain = (app) => {
   // 2. 异常行为检测中间件
   app.use(anomalyDetectionMiddleware);
 
-  // 3. 防重放中间件
+  // 3. SM2 签名验证中间件（有 x-user-id 时强制要求签名）
+  const sm2SignatureMiddleware = require('./sm2SignatureMiddleware');
+  app.use(sm2SignatureMiddleware);
+
+  // 4. 防重放中间件
   app.use(antiReplayMiddleware);
 
-  // 4. 权限校验中间件
+  // 5. 权限校验中间件
   app.use(authPermissionMiddleware);
 };
 
@@ -94,10 +104,10 @@ const blacklistCleanupInterval = setInterval(async () => {
         [now]
       );
       if (result.affectedRows > 0) {
-        console.log('[JWT] Cleaned up expired blacklist entries:', result.affectedRows);
+        logger.debug('Cleaned up expired blacklist entries', { count: result.affectedRows });
       }
     } catch (dbError) {
-      console.warn('[JWT] Failed to clean up blacklist:', dbError.message);
+      logger.warning('Failed to clean up blacklist', { error: dbError.message });
     }
   }
 }, 60000);

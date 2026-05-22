@@ -1,0 +1,12 @@
+types {
+    text/html                             html htm shtml;
+    text/css                              css;
+    text/xml                              xml;
+    application/json                      json;
+    application/javascript                js;
+    image/gif                             gif;
+    image/jpeg                            jpeg jpg;
+    image/png                             png;
+    image/svg+xml                         svg;
+    application/octet-stream              bin exe dll;
+}

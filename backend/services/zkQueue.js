@@ -65,8 +65,9 @@ class ZKQueue {
   async updateTaskStatus(taskId, status, result, error) {
     try {
       const resultStr = result ? JSON.stringify(result) : null;
+      const retryInc = status === 'failed' ? ', retry_count = retry_count + 1' : '';
       await execute(
-        'UPDATE zk_queue SET status = ?, result = ?, error = ?, retry_count = retry_count + 1 WHERE task_id = ?',
+        `UPDATE zk_queue SET status = ?, result = ?, error = ?${retryInc} WHERE task_id = ?`,
         [status, resultStr, error || null, taskId]
       );
       return true;

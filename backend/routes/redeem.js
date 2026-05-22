@@ -7,6 +7,7 @@ const transactionDao = require('../dao/transactionDao');
 const poolDao = require('../dao/poolDao');
 const proofDao = require('../dao/proofDao');
 const { verifySM2Signature, generateSM3Hash, buildSignatureData } = require('../utils/cryptoUtils');
+const cryptoNode = require('crypto');
 const poolService = require('../services/poolService');
 const logger = require('../utils/logger');
 const dynamicConfig = require('../services/dynamicConfigService');
@@ -21,6 +22,11 @@ router.post('/', validate(redeemSchema), async (req, res) => {
   try {
     const { userId, amount, creditProof, verificationCode, signature } = req.body;
     logger.info('赎回请求', { userId, amount });
+
+    // 数据隔离检查
+    if (parseInt(userId) !== req.user.id) {
+      return res.status(403).json({ success: false, message: '无权操作其他用户的赎回' });
+    }
 
     // 验证请求参数
     if (!userId || !amount || !creditProof || !verificationCode || !signature) {
@@ -72,10 +78,16 @@ router.post('/', validate(redeemSchema), async (req, res) => {
     // 验证信用证明和口令
     const matchingProof = await proofDao.findByProofId(creditProof.id);
 
-    if (!matchingProof || new Date(matchingProof.expires_at) <= new Date() || matchingProof.verification_code !== verificationCode) {
+    // 时序安全比较验证口令
+    let codeValid = false;
+    if (matchingProof && matchingProof.verification_code && verificationCode) {
+      const a = Buffer.from(matchingProof.verification_code, 'utf8');
+      const b = Buffer.from(verificationCode, 'utf8');
+      codeValid = a.length === b.length && cryptoNode.timingSafeEqual(a, b);
+    }
+    if (!matchingProof || new Date(matchingProof.expires_at) <= new Date() || !codeValid) {
       logger.warning('赎回失败：信用证明或验证口令无效', {
-        proofId: creditProof.id,
-        verificationCode
+        proofId: creditProof.id
       });
       return res.status(400).json({
         success: false,

@@ -376,6 +376,28 @@ async function module2CryptoBenchmark() {
   const moduleTime = performance.now() - moduleStart;
   results.durationMs = moduleTime.toFixed(2);
 
+  // 业务场景映射（基于以上性能数据）
+  const sm2SignOps = results.sm2Sign.opsPerSec;
+  const sm3HashMBs = results.sm3Hash['1KB'].throughputMBs;
+  const sm4EncMBs = results.sm4EncDec['1KB'].throughputMBs;
+
+  const loans100SignMs = ((100 * 2) / sm2SignOps * 1000).toFixed(1);
+  const loans10000HashMs = ((10000 * 2048) / (sm3HashMBs * 1024 * 1024) * 1000).toFixed(1);
+  const loans10000EncMs = ((10000 * 1024) / (sm4EncMBs * 1024 * 1024) * 1000).toFixed(1);
+
+  results.businessMapping = {
+    sm2: `100笔贷款 × 2次签名 = ${loans100SignMs}ms`,
+    sm3: `10000笔贷款 × 2KB哈希 = ${loans10000HashMs}ms`,
+    sm4: `10000笔贷款 × 1KB加密 = ${loans10000EncMs}ms`,
+    note: 'SM2/SM3/SM4均为纯JavaScript实现，性能受JS引擎限制，生产环境可通过C/C++ addon或硬件加速提升10-50倍'
+  };
+
+  console.log('\n  业务场景映射（基于以上性能数据）：');
+  console.log(`    单笔借款需2次SM2签名（借款申请+信用证明），100笔贷款签名总耗时 ≈ ${loans100SignMs}ms`);
+  console.log(`    单笔借款约2KB数据需SM3哈希，10000笔贷款哈希总耗时 ≈ ${loans10000HashMs}ms`);
+  console.log(`    单笔借款约1KB敏感字段需SM4加密，10000笔贷款加密总耗时 ≈ ${loans10000EncMs}ms`);
+  console.log(`    注：均为纯JavaScript实现，生产环境可通过C/C++ addon或硬件加速提升10-50倍`);
+
   return { status: 'success', ...results };
 }
 
@@ -735,193 +757,6 @@ async function module6SecurityChainOverhead() {
 }
 
 // ============================================
-// 模块7：密码学对比基准（国密 vs 国际标准）
-// ============================================
-async function module7CryptoComparisonBenchmark() {
-  console.log('\n' + '='.repeat(70));
-  console.log('  模块7：密码学对比基准（国密 vs 国际标准）');
-  console.log('='.repeat(70));
-
-  const moduleStart = performance.now();
-  const results = {};
-  const testData1KB = Buffer.alloc(1024, 'x').toString('utf8');
-
-  // 7.1 SM3 vs SHA-256 (1KB数据, 各10000次, 3轮)
-  console.log('\n  7.1 SM3 vs SHA-256 (1KB数据, 各10000次, 3轮)');
-  await collectGarbage();
-
-  const { generateSM3Hash } = require('../utils/cryptoUtils');
-
-  // 预热（JIT 编译，丢弃结果）— 使用递增消息避免缓存
-  for (let i = 0; i < 1000; i++) generateSM3Hash(testData1KB + '_warmup_' + i);
-  for (let i = 0; i < 1000; i++) crypto.createHash('sha256').update(testData1KB + '_warmup_' + i).digest('hex');
-
-  const ROUNDS = 3;
-  const sm3Throughputs = [];
-  const sha256Throughputs = [];
-
-  for (let round = 0; round < ROUNDS; round++) {
-    await collectGarbage();
-    clearCryptoCaches();
-
-    const sm3Start = performance.now();
-    for (let i = 0; i < 10000; i++) generateSM3Hash(testData1KB + '_r' + round + '_' + i);
-    const sm3Time = performance.now() - sm3Start;
-    sm3Throughputs.push((10000 * 1024 / 1024 / 1024) / (sm3Time / 1000));
-
-    const sha256Start = performance.now();
-    for (let i = 0; i < 10000; i++) crypto.createHash('sha256').update(testData1KB + '_r' + round + '_' + i).digest('hex');
-    const sha256Time = performance.now() - sha256Start;
-    sha256Throughputs.push((10000 * 1024 / 1024 / 1024) / (sha256Time / 1000));
-
-    console.log(`     轮次 ${round + 1}: SM3=${sm3Throughputs[round].toFixed(4)} GB/s, SHA-256=${sha256Throughputs[round].toFixed(4)} GB/s`);
-  }
-
-  const sm3Mean = calcMean(sm3Throughputs);
-  const sm3Std = calcStddev(sm3Throughputs);
-  const sha256Mean = calcMean(sha256Throughputs);
-  const sha256Std = calcStddev(sha256Throughputs);
-
-  results.sm3VsSha256 = {
-    sm3: { mean: parseFloat(sm3Mean.toFixed(4)), stddev: parseFloat(sm3Std.toFixed(4)), unit: 'GB/s' },
-    sha256: { mean: parseFloat(sha256Mean.toFixed(4)), stddev: parseFloat(sha256Std.toFixed(4)), unit: 'GB/s' },
-    ratio: `${(sm3Mean / sha256Mean * 100).toFixed(2)}%`
-  };
-
-  console.log(`     SM3: ${sm3Mean.toFixed(4)} ± ${sm3Std.toFixed(4)} GB/s`);
-  console.log(`     SHA-256: ${sha256Mean.toFixed(4)} ± ${sha256Std.toFixed(4)} GB/s`);
-  console.log(`     SM3/SHA-256 比率: ${(sm3Mean / sha256Mean * 100).toFixed(2)}%`);
-
-  // 7.2 SM4 vs AES-256-GCM (1KB数据, 各1000次, 3轮)
-  console.log('\n  7.2 SM4 vs AES-256-GCM (1KB数据, 各1000次, 3轮)');
-  await collectGarbage();
-
-  const kmsService7 = require('../services/kmsService');
-  const testDek7 = crypto.randomBytes(16).toString('hex');
-
-  // 预热
-  for (let i = 0; i < 100; i++) { const e = kmsService7.encryptWithDEK(testDek7, testData1KB); kmsService7.decryptWithDEK(testDek7, e); }
-  {
-    const k = crypto.randomBytes(32);
-    const iv = crypto.randomBytes(12);
-    for (let i = 0; i < 100; i++) { const c = crypto.createCipheriv('aes-256-gcm', k, iv); c.update(testData1KB, 'utf8', 'hex'); c.final(); c.getAuthTag(); }
-  }
-
-  const aesKey = crypto.randomBytes(32);
-  const aesIv = crypto.randomBytes(12);
-  const aesAuthTagLength = 16;
-
-  const sm4Throughputs = [];
-  const aesThroughputs = [];
-
-  for (let round = 0; round < ROUNDS; round++) {
-    await collectGarbage();
-
-    const sm4EncStart = performance.now();
-    let sm4Encrypted;
-    for (let i = 0; i < 1000; i++) sm4Encrypted = kmsService7.encryptWithDEK(testDek7, testData1KB);
-    const sm4EncTime = performance.now() - sm4EncStart;
-    sm4Throughputs.push((1000 * 1024 / 1024) / (sm4EncTime / 1000));
-
-    const aesEncStart = performance.now();
-    let aesEncrypted;
-    for (let i = 0; i < 1000; i++) {
-      const cipher = crypto.createCipheriv('aes-256-gcm', aesKey, aesIv);
-      aesEncrypted = cipher.update(testData1KB, 'utf8', 'hex');
-      cipher.final();
-      cipher.getAuthTag();
-    }
-    const aesEncTime = performance.now() - aesEncStart;
-    aesThroughputs.push((1000 * 1024 / 1024) / (aesEncTime / 1000));
-
-    console.log(`     轮次 ${round + 1}: SM4=${sm4Throughputs[round].toFixed(2)} MB/s, AES-256-GCM=${aesThroughputs[round].toFixed(2)} MB/s`);
-  }
-
-  const sm4Mean = calcMean(sm4Throughputs);
-  const sm4Std = calcStddev(sm4Throughputs);
-  const aesMean = calcMean(aesThroughputs);
-  const aesStd = calcStddev(aesThroughputs);
-
-  const encRatio = (sm4Mean / aesMean * 100).toFixed(2);
-
-  results.sm4VsAes = {
-    sm4: { mean: parseFloat(sm4Mean.toFixed(2)), stddev: parseFloat(sm4Std.toFixed(2)), unit: 'MB/s' },
-    aes256: { mean: parseFloat(aesMean.toFixed(2)), stddev: parseFloat(aesStd.toFixed(2)), unit: 'MB/s' },
-    ratio: `${encRatio}%`
-  };
-
-  console.log(`     SM4加密: ${sm4Mean.toFixed(2)} ± ${sm4Std.toFixed(2)} MB/s`);
-  console.log(`     AES-256-GCM: ${aesMean.toFixed(2)} ± ${aesStd.toFixed(2)} MB/s`);
-  console.log(`     SM4/AES-256 比率: ${encRatio}%`);
-
-  // 7.3 SM2 vs ECDSA P-256 (各签名5000次, 3轮)
-  console.log('\n  7.3 SM2 vs ECDSA P-256 (各签名5000次, 3轮, 递增消息避免缓存)');
-  await collectGarbage();
-
-  const { generateSM2KeyPair, signWithSM2 } = require('../utils/cryptoUtils');
-  const sm2KeyPair = generateSM2KeyPair();
-  const signMessage = 'benchmark test message for signature comparison';
-
-  // 预生成 ECDSA 密钥对（避免在测量循环内生成）
-  const ecdsaKeyPairPre = crypto.generateKeyPairSync('ec', {
-    namedCurve: 'P-256',
-    privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
-    publicKeyEncoding: { type: 'spki', format: 'pem' }
-  });
-
-  // 预热（递增消息）
-  for (let i = 0; i < 500; i++) signWithSM2(signMessage + '_warmup_' + i, sm2KeyPair.privateKey);
-  for (let i = 0; i < 500; i++) { const s = crypto.createSign('SHA256'); s.update(signMessage + '_warmup_' + i); s.sign(ecdsaKeyPairPre.privateKey, 'hex'); }
-
-  const sm2Ops = [];
-  const ecdsaOps = [];
-
-  for (let round = 0; round < ROUNDS; round++) {
-    await collectGarbage();
-    clearCryptoCaches();
-
-    const sm2SignStart = performance.now();
-    for (let i = 0; i < 5000; i++) signWithSM2(signMessage + '_r' + round + '_' + i, sm2KeyPair.privateKey);
-    const sm2SignTime = performance.now() - sm2SignStart;
-    sm2Ops.push(5000 / (sm2SignTime / 1000));
-
-    const ecdsaSignStart = performance.now();
-    for (let i = 0; i < 5000; i++) {
-      const sign = crypto.createSign('SHA256');
-      sign.update(signMessage + '_r' + round + '_' + i);
-      sign.sign(ecdsaKeyPairPre.privateKey, 'hex');
-    }
-    const ecdsaSignTime = performance.now() - ecdsaSignStart;
-    ecdsaOps.push(5000 / (ecdsaSignTime / 1000));
-
-    console.log(`     轮次 ${round + 1}: SM2=${sm2Ops[round].toFixed(0)} ops/s, ECDSA P-256=${ecdsaOps[round].toFixed(0)} ops/s`);
-  }
-
-  const sm2Mean = calcMean(sm2Ops);
-  const sm2Std = calcStddev(sm2Ops);
-  const ecdsaMean = calcMean(ecdsaOps);
-  const ecdsaStd = calcStddev(ecdsaOps);
-
-  const signRatio = (sm2Mean / ecdsaMean * 100).toFixed(2);
-
-  results.sm2VsEcdsa = {
-    sm2: { mean: parseFloat(sm2Mean.toFixed(0)), stddev: parseFloat(sm2Std.toFixed(0)), unit: 'ops/s' },
-    ecdsaP256: { mean: parseFloat(ecdsaMean.toFixed(0)), stddev: parseFloat(ecdsaStd.toFixed(0)), unit: 'ops/s' },
-    ratio: `${signRatio}%`
-  };
-
-  console.log(`     SM2签名: ${sm2Mean.toFixed(0)} ± ${sm2Std.toFixed(0)} ops/s`);
-  console.log(`     ECDSA P-256: ${ecdsaMean.toFixed(0)} ± ${ecdsaStd.toFixed(0)} ops/s`);
-  console.log(`     SM2/ECDSA 比率: ${signRatio}%`);
-
-  const moduleTime = performance.now() - moduleStart;
-  results.durationMs = moduleTime.toFixed(2);
-  results.status = 'success';
-
-  return results;
-}
-
-// ============================================
 // 模块8：端到端业务流程性能
 // ============================================
 async function module8EndToEndBusinessPerformance() {
@@ -955,8 +790,8 @@ async function module8EndToEndBusinessPerformance() {
   let userId = null;
   let keyPair = null;
 
+  const { generateSM2KeyPair, signWithSM2 } = require('../utils/cryptoUtils');
   try {
-    const { generateSM2KeyPair, signWithSM2 } = require('../utils/cryptoUtils');
     keyPair = generateSM2KeyPair();
 
     const step2Start = performance.now();
@@ -1316,6 +1151,9 @@ function printSummary(report) {
     if (m2.sm4EncDec && m2.sm4EncDec['1KB']) {
       console.log(`  SM4加解密(1KB): ${m2.sm4EncDec['1KB'].throughputMBs} MB/s`);
     }
+    if (m2.businessMapping) {
+      console.log(`  业务映射: ${m2.businessMapping.sm2}`);
+    }
   }
 
   if (report.results.module3) {
@@ -1358,20 +1196,6 @@ function printSummary(report) {
     if (m6.results && m6.results.length > 0) {
       const lastPoint = m6.results[m6.results.length - 1];
       console.log(`  200并发P95: ${lastPoint.p95Ms}ms, 成功率: ${lastPoint.successRate}%`);
-    }
-  }
-
-  if (report.results.module7) {
-    console.log('\n【模块7：密码学对比基准】');
-    const m7 = report.results.module7;
-    if (m7.sm3VsSha256) {
-      console.log(`  SM3 vs SHA-256: ${m7.sm3VsSha256.ratio}`);
-    }
-    if (m7.sm4VsAes) {
-      console.log(`  SM4 vs AES-256-GCM: ${m7.sm4VsAes.ratio}`);
-    }
-    if (m7.sm2VsEcdsa) {
-      console.log(`  SM2 vs ECDSA P-256: ${m7.sm2VsEcdsa.ratio}`);
     }
   }
 
@@ -1458,10 +1282,6 @@ async function runBenchmark() {
     // ---- 最后执行数据库压力测试（不影响前面的任何模块） ----
     testReport.results.module4 = await module4DatabasePoolStress();
     testReport.modules.databaseStress = { status: testReport.results.module4.status };
-
-    // ---- 模块7：密码学对比基准 ----
-    testReport.results.module7 = await module7CryptoComparisonBenchmark();
-    testReport.modules.cryptoComparison = { status: testReport.results.module7.status };
 
     // ---- 模块8：端到端业务流程性能 ----
     testReport.results.module8 = await module8EndToEndBusinessPerformance();

@@ -43,6 +43,14 @@ const autoRedeemMaturedInvestments = async () => {
         const totalRedeemAmount = Math.round((principal + dynamicInterest) * 100) / 100;
 
         const result = await transaction(async (connection) => {
+          // 事务内再次检查投资状态，防止并发重复处理
+          const [invCheck] = await connection.execute(
+            'SELECT status FROM transactions WHERE id = ? FOR UPDATE', [investmentId]
+          );
+          if (invCheck.length === 0 || invCheck[0].status !== 'active') {
+            return { success: false, reason: '投资已处理或不存在' };
+          }
+
           const [poolResults] = await connection.execute(
             'SELECT * FROM fund_pool WHERE id = 1 FOR UPDATE',
           );

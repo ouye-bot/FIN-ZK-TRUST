@@ -72,7 +72,7 @@ app.use(helmet({
       formAction: ["'self'"],
       upgradeInsecureRequests: [],
     },
-    reportOnly: true,
+    reportOnly: false,
     reportUri: '/api/v1/health/csp-report'
   },
   crossOriginEmbedderPolicy: false,
@@ -81,15 +81,15 @@ app.use(helmet({
 // 配置
 app.use(cors({
   origin: function(origin, callback) {
-    // 允许本地开发环境的任意端口（支持 http 和 https）
-    if (!origin || origin.startsWith('http://localhost:') || origin.startsWith('https://localhost:')) {
+    // 允许本地开发环境的任意端口（支持 http 和 https，localhost 和 127.0.0.1）
+    if (!origin || /^https?:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-sm2-signature', 'x-user-id', 'x-request-nonce', 'x-request-timestamp', 'x-request-sign']
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-sm2-signature', 'x-user-id', 'x-request-nonce', 'x-request-timestamp']
 }));
 
 // 定义限流器
@@ -124,7 +124,9 @@ const generalLimiter = rateLimit({
   windowMs: 60 * 1000,      // 1 分钟窗口
   max: 200,                  // 每个 IP 每分钟最多 200 次
   skip: (req) => {
-    return req.user?.bypassRateLimit === true || req.user?.username === 'perfuser';
+    // 仅在非生产环境，对 perfuser 或测试标记请求豁免限流
+    if (process.env.NODE_ENV === 'production') return false;
+    return req.user?.username === 'perfuser' || req.headers['x-test-mode'] === 'benchmark';
   },
   message: {
     success: false,
@@ -204,7 +206,7 @@ app.post('/api/v1/auth/logout', async (req, res) => {
     try {
       decoded = jwt.verify(token, process.env.JWT_SECRET);
     } catch (err) {
-      console.log('[Logout] Token already expired or invalid');
+      logger.info('[Logout] Token already expired or invalid');
       return res.status(200).json({ success: true, message: '已退出登录' });
     }
 
@@ -219,21 +221,22 @@ app.post('/api/v1/auth/logout', async (req, res) => {
       return res.status(200).json({ success: true, message: '已退出登录' });
     }
 
+    // 先写入缓存（同步，确保立即生效）
+    addToBlacklist(decoded.jti, expiresAt);
+
     try {
       await execute(
         'INSERT INTO token_blacklist (jti, expires_at) VALUES (?, ?)',
         [decoded.jti, expiresAt]
       );
-      console.log('[Logout] Token added to blacklist:', decoded.jti);
+      logger.info('[Logout] Token added to blacklist', { jti: decoded.jti });
     } catch (dbError) {
-      console.warn('[Logout] Failed to add token to blacklist:', dbError.message);
+      logger.warning('[Logout] Failed to add token to blacklist', { error: dbError.message });
     }
-
-    addToBlacklist(decoded.jti, expiresAt);
 
     res.status(200).json({ success: true, message: '退出登录成功' });
   } catch (error) {
-    console.error('[Logout] Error:', error.message);
+    logger.error('[Logout] Error', { error: error.message });
     res.status(500).json({ success: false, message: '退出登录失败' });
   }
 });

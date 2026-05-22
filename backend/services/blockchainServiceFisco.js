@@ -129,12 +129,12 @@ function consoleExec(groupId, command) {
     const safeGroupId = parseInt(groupId) || 1;
     const javaArgs = `-Djdk.tls.namedGroups="SM2,secp256k1,x25519,secp256r1,secp384r1,secp521r1" -cp "apps/*:conf/:lib/*:classes/:accounts/" console.Console ${safeGroupId}`;
 
-    // 清理命令中的 shell 特殊字符
-    const safeCommand = command.replace(/[;&|`$(){}!<>]/g, '');
+    // 清理命令中的 shell 特殊字符，转义单引防 printf 注入
+    const safeCommand = command.replace(/[;&|`$(){}!<>]/g, '').replace(/'/g, "'\\''");
 
     if (process.platform === 'win32') {
       // Windows: 写入临时脚本避免嵌套引号转义问题
-      const tmpFile = path.join(require('os').tmpdir(), `fisco_cmd_${Date.now()}.sh`);
+      const tmpFile = path.join(require('os').tmpdir(), `fisco_cmd_${crypto.randomBytes(8).toString('hex')}.sh`);
       const script = `#!/bin/bash\ncd "${consoleDir}" && printf '${safeCommand}\\nquit\\n' | java ${javaArgs} 2>&1`;
       fs.writeFileSync(tmpFile, script);
 
@@ -202,9 +202,11 @@ class BlockchainServiceFisco {
     this.auditContractAddress = null;
     this.zkpVerifierContractAddress = null;
     this.verifierContractAddress = null;
+    this.publicKeyRegistryAddress = null;
     this.auditAbi = null;
     this.zkpVerifierAbi = null;
     this.verifierAbi = null;
+    this.publicKeyRegistryAbi = null;
     this.isInitialized = false;
     this.auditHashSent = new Set();
     this.AUDIT_HASH_SENT_MAX = 10000; // 防止 Set 无限增长
@@ -262,6 +264,7 @@ class BlockchainServiceFisco {
         this.auditContractAddress = fiscoContracts.AuditStorage;
         this.zkpVerifierContractAddress = fiscoContracts.ZKPVerifier;
         this.verifierContractAddress = fiscoContracts.Verifier;
+        this.publicKeyRegistryAddress = fiscoContracts.PublicKeyRegistry;
       }
 
       // 加载 ABI（用于编码 call 数据）
@@ -284,10 +287,17 @@ class BlockchainServiceFisco {
         this.verifierAbi = artifact.abi;
       }
 
+      const pkrArtifactPath = path.join(__dirname, '../../contracts/artifacts/contracts/PublicKeyRegistry.sol/PublicKeyRegistry.json');
+      if (fs.existsSync(pkrArtifactPath)) {
+        const artifact = JSON.parse(fs.readFileSync(pkrArtifactPath, 'utf8'));
+        this.publicKeyRegistryAbi = artifact.abi;
+      }
+
       logger.info('FISCO BCOS 合约配置加载完成', {
         AuditStorage: this.auditContractAddress,
         ZKPVerifier: this.zkpVerifierContractAddress,
-        Verifier: this.verifierContractAddress
+        Verifier: this.verifierContractAddress,
+        PublicKeyRegistry: this.publicKeyRegistryAddress
       });
     } catch (error) {
       logger.error('加载 FISCO BCOS 合约配置失败', { error: error.message });
@@ -307,7 +317,8 @@ class BlockchainServiceFisco {
       const abiMap = {
         'AuditStorage': this.auditAbi,
         'ZKPVerifier': this.zkpVerifierAbi,
-        'Verifier': this.verifierAbi
+        'Verifier': this.verifierAbi,
+        'PublicKeyRegistry': this.publicKeyRegistryAbi
       };
       const abi = abiMap[contractName];
       if (!abi) throw new Error(`合约 ${contractName} ABI 未加载`);
@@ -356,7 +367,8 @@ class BlockchainServiceFisco {
     const map = {
       'AuditStorage': this.auditContractAddress,
       'ZKPVerifier': this.zkpVerifierContractAddress,
-      'Verifier': this.verifierContractAddress
+      'Verifier': this.verifierContractAddress,
+      'PublicKeyRegistry': this.publicKeyRegistryAddress
     };
     return map[contractName] || null;
   }
@@ -373,7 +385,8 @@ class BlockchainServiceFisco {
     const abiMap = {
       'AuditStorage': this.auditAbi,
       'ZKPVerifier': this.zkpVerifierAbi,
-      'Verifier': this.verifierAbi
+      'Verifier': this.verifierAbi,
+      'PublicKeyRegistry': this.publicKeyRegistryAbi
     };
     const abi = abiMap[contractName];
     if (!abi) throw new Error(`合约 ${contractName} ABI 未加载`);
@@ -604,9 +617,10 @@ class BlockchainServiceFisco {
 
   /**
    * 注册用户公钥锚定到 FISCO BCOS（异步非阻塞）
+   * 优先使用 PublicKeyRegistry 合约存储完整公钥，同时写入 AuditStorage 审计存证
    */
   registerUserOnChain(userId, publicKey) {
-    if (!this.isInitialized || !this.auditContractAddress) {
+    if (!this.isInitialized) {
       logger.warning('FISCO BCOS 服务未初始化，跳过用户注册', { userId });
       return Promise.resolve({ success: false, skipped: true });
     }
@@ -620,15 +634,186 @@ class BlockchainServiceFisco {
         pkHash: pkHash.substring(0, 20) + '...'
       });
 
-      return this.storeAuditHash(pkHash, timestamp, 'REGISTER', userId).then(result => {
-        if (result.success) {
-          logger.info('用户公钥锚定上链成功 (FISCO BCOS)', { userId });
+      // 并行写入 PublicKeyRegistry + AuditStorage
+      const promises = [];
+
+      if (this.publicKeyRegistryAddress && this.publicKeyRegistryAbi) {
+        const pkHashBytes32 = pkHash.startsWith('0x') ? pkHash : '0x' + pkHash;
+        promises.push(
+          this._sendRawTransaction('PublicKeyRegistry', 'register', [
+            userId.toString(), pkHashBytes32, publicKey
+          ]).then(r => ({ registry: true, ...r }))
+            .catch(e => { logger.warning('PublicKeyRegistry 注册失败', { error: e.message }); return { registry: false, error: e.message }; })
+        );
+      }
+
+      if (this.auditContractAddress) {
+        promises.push(
+          this.storeAuditHash(pkHash, timestamp, 'REGISTER', userId)
+            .then(r => ({ audit: true, ...r }))
+            .catch(e => ({ audit: false, error: e.message }))
+        );
+      }
+
+      if (promises.length === 0) {
+        return Promise.resolve({ success: false, skipped: true, error: 'No contract available' });
+      }
+
+      return Promise.all(promises).then(results => {
+        const registryResult = results.find(r => r.registry !== undefined);
+        const auditResult = results.find(r => r.audit !== undefined);
+        const registryOk = registryResult?.success || false;
+        const auditOk = auditResult?.success || false;
+        const success = registryOk || auditOk;
+
+        if (success) {
+          logger.info('用户公钥锚定上链成功 (FISCO BCOS)', {
+            userId,
+            registrySuccess: registryOk,
+            auditSuccess: auditOk,
+            partialFailure: !(registryOk && auditOk)
+          });
         }
-        return { ...result, pkHash };
+        if (!registryOk && registryResult) {
+          logger.warning('PublicKeyRegistry 写入失败，但 AuditStorage 成功', { userId, error: registryResult.error });
+        }
+        if (!auditOk && auditResult) {
+          logger.warning('AuditStorage 写入失败，但 PublicKeyRegistry 成功', { userId, error: auditResult.error });
+        }
+
+        return { success, pkHash, registry: registryResult, audit: auditResult };
       });
     } catch (error) {
       logger.error('用户公钥锚定上链失败 (FISCO BCOS)', { error: error.message, userId });
       return Promise.resolve({ success: false, error: error.message });
+    }
+  }
+
+  /**
+   * 注册公钥到 PublicKeyRegistry 合约（独立方法，供路由层直接调用）
+   * @param {string} userId - 用户ID
+   * @param {string} publicKey - 完整 SM2 公钥 (04开头, 130字符hex)
+   * @returns {Promise<Object>} 上链结果
+   */
+  async registerPublicKey(userId, publicKey) {
+    if (!this.isInitialized || !this.publicKeyRegistryAddress) {
+      logger.warning('FISCO BCOS 服务或 PublicKeyRegistry 未初始化', { userId });
+      return { success: false, skipped: true, error: 'Service not initialized' };
+    }
+
+    try {
+      const pkHash = this.generateSM3Hash(publicKey);
+      const pkHashBytes32 = pkHash.startsWith('0x') ? pkHash : '0x' + pkHash;
+
+      logger.info('注册公钥到 PublicKeyRegistry (FISCO BCOS)', {
+        userId,
+        pkHash: pkHash.substring(0, 20) + '...'
+      });
+
+      const result = await this._sendRawTransaction('PublicKeyRegistry', 'register', [
+        userId.toString(), pkHashBytes32, publicKey
+      ]);
+
+      logger.info('公钥注册成功 (FISCO BCOS)', { userId, txHash: result.transactionHash });
+      return { success: true, pkHash, blockchainTxHash: result.transactionHash, blockNumber: result.blockNumber };
+    } catch (error) {
+      logger.error('公钥注册失败 (FISCO BCOS)', { error: error.message, userId });
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * 撤销公钥
+   * @param {string} userId - 用户ID
+   * @param {string} pkHash - 待撤销公钥的 SM3 哈希
+   * @returns {Promise<Object>} 操作结果
+   */
+  async revokePublicKey(userId, pkHash) {
+    if (!this.isInitialized || !this.publicKeyRegistryAddress) {
+      return { success: false, skipped: true, error: 'Service not initialized' };
+    }
+
+    try {
+      const pkHashBytes32 = pkHash.startsWith('0x') ? pkHash : '0x' + pkHash;
+      const result = await this._sendRawTransaction('PublicKeyRegistry', 'revoke', [
+        userId.toString(), pkHashBytes32
+      ]);
+      logger.info('公钥撤销成功 (FISCO BCOS)', { userId, txHash: result.transactionHash });
+      return { success: true, blockchainTxHash: result.transactionHash };
+    } catch (error) {
+      logger.error('公钥撤销失败 (FISCO BCOS)', { error: error.message, userId });
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * 获取用户当前活跃公钥
+   * @param {string} userId - 用户ID
+   * @returns {Promise<Object|null>} 公钥记录或 null
+   */
+  async getActivePublicKey(userId) {
+    if (!this.isInitialized || !this.publicKeyRegistryAddress) return null;
+
+    try {
+      const result = await this.contractCall('PublicKeyRegistry', 'getActiveKey', [userId.toString()]);
+      if (!result) return null;
+
+      // ethers 解码返回 struct: { pkHash, publicKey, timestamp, version, active }
+      if (Array.isArray(result)) {
+        return {
+          pkHash: result[0] || '',
+          publicKey: result[1] || '',
+          timestamp: result[2] ? (result[2].toNumber ? result[2].toNumber() : parseInt(result[2])) : 0,
+          version: result[3] ? (result[3].toNumber ? result[3].toNumber() : parseInt(result[3])) : 0,
+          active: Boolean(result[4])
+        };
+      }
+      return {
+        pkHash: result.pkHash || '',
+        publicKey: result.publicKey || '',
+        timestamp: result.timestamp ? (result.timestamp.toNumber ? result.timestamp.toNumber() : parseInt(result.timestamp)) : 0,
+        version: result.version ? (result.version.toNumber ? result.version.toNumber() : parseInt(result.version)) : 0,
+        active: Boolean(result.active)
+      };
+    } catch (error) {
+      logger.info('获取活跃公钥: 无记录', { userId });
+      return null;
+    }
+  }
+
+  /**
+   * 获取用户公钥历史
+   * @param {string} userId - 用户ID
+   * @returns {Promise<Array>} 公钥记录数组
+   */
+  async getPublicKeyHistory(userId) {
+    if (!this.isInitialized || !this.publicKeyRegistryAddress) return [];
+
+    try {
+      const result = await this.contractCall('PublicKeyRegistry', 'getKeyHistory', [userId.toString()]);
+      if (!result || !Array.isArray(result)) return [];
+
+      return result.map(r => {
+        if (Array.isArray(r)) {
+          return {
+            pkHash: r[0] || '',
+            publicKey: r[1] || '',
+            timestamp: r[2] ? (r[2].toNumber ? r[2].toNumber() : parseInt(r[2])) : 0,
+            version: r[3] ? (r[3].toNumber ? r[3].toNumber() : parseInt(r[3])) : 0,
+            active: Boolean(r[4])
+          };
+        }
+        return {
+          pkHash: r.pkHash || '',
+          publicKey: r.publicKey || '',
+          timestamp: r.timestamp ? (r.timestamp.toNumber ? r.timestamp.toNumber() : parseInt(r.timestamp)) : 0,
+          version: r.version ? (r.version.toNumber ? r.version.toNumber() : parseInt(r.version)) : 0,
+          active: Boolean(r.active)
+        };
+      });
+    } catch (error) {
+      logger.warning('获取公钥历史失败 (FISCO BCOS)', { error: error.message, userId });
+      return [];
     }
   }
 
@@ -913,7 +1098,8 @@ class BlockchainServiceFisco {
       networkName: this.networkName,
       contracts: {
         AuditStorage: !!this.auditContractAddress,
-        ZKPVerifier: !!this.zkpVerifierContractAddress
+        ZKPVerifier: !!this.zkpVerifierContractAddress,
+        PublicKeyRegistry: !!this.publicKeyRegistryAddress
       }
     };
   }

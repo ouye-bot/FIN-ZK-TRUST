@@ -1,4 +1,5 @@
 // 前端缓存管理工具
+import { get } from './apiUtils';
 
 /**
  * 缓存管理工具类
@@ -259,13 +260,7 @@ export const UserDataCache = {
    */
   async refreshUserData(userId, token) {
     try {
-      const response = await fetch(`/api/v1/users/${userId}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          'x-wallet-address': userId
-        }
-      });
+      const response = await get(`/api/v1/users/${userId}`);
 
       const userData = await response.json();
       if (userData.success) {

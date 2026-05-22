@@ -25,7 +25,7 @@ import {
   Tabs,
   Tab,
 } from '@mui/material';
-import { signWithSM2, getSM2KeyPairWithAesKey, generateSM2KeyPair, saveSM2KeyPair, generateSignatureData } from '../utils/sm2Utils';
+import { signWithSM2, getSM2KeyPairWithAesKey, generateSM2KeyPair, saveSM2KeyPair, generateSignatureDataStrict } from '../utils/sm2Utils';
 import { get, post } from '../utils/apiUtils';
 import { useAesKey } from '../App';
 import { 
@@ -303,16 +303,17 @@ const Account = ({ user }) => {
         await saveSM2KeyPair(keyPair, aesKey);
       }
       
-      // 准备签名数据
+      // 准备签名数据（与后端 buildSignatureData 一致）
       const repayData = {
-        userId: user.id,
+        userId: String(user.id),
         transactionId: selectedTransaction.id,
         creditProofId: latestProof.id
       };
-      
+
       // 生成签名
-      const signatureData = generateSignatureData(repayData);
+      const signatureData = generateSignatureDataStrict(repayData, ['creditProofId', 'transactionId', 'userId']);
       const signature = signWithSM2(signatureData, keyPair.privateKey);
+      keyPair.privateKey = null; // 用后即焚
       
       const response = await post('/api/v1/loan/repay', {
         userId: user.id,

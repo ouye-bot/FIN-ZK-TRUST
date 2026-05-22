@@ -48,6 +48,25 @@ const getRemainingLoanLimit = (loanConfig, loans, user = null) => {
   return Math.max(0, effectiveLimit - totalBorrowed);
 };
 
+// 获取冷静期状态信息
+const getCoolingOffStatus = (loanConfig, user) => {
+  if (!user?.created_at || !loanConfig?.coolingOff) return null;
+  const registerDate = new Date(user.created_at);
+  const daysSinceRegister = Math.floor((Date.now() - registerDate) / (24 * 60 * 60 * 1000));
+  if (daysSinceRegister < loanConfig.coolingOff.days) {
+    const coolingOffLimit = Math.floor(loanConfig.maxLoanLimit * loanConfig.coolingOff.ratio);
+    const remainingDays = loanConfig.coolingOff.days - daysSinceRegister;
+    return {
+      originalLimit: loanConfig.maxLoanLimit,
+      coolingOffLimit,
+      remainingDays,
+      totalDays: loanConfig.coolingOff.days,
+      daysSinceRegister
+    };
+  }
+  return null;
+};
+
 const Borrow = ({ user, cryptoLogs, setCryptoLogs }) => {
   const aesKey = useAesKey();
   // 添加密码操作日志
@@ -253,25 +272,22 @@ const Borrow = ({ user, cryptoLogs, setCryptoLogs }) => {
         publicSignals
       };
       
-      // 准备签名数据
-      const transactionData = {
-        userId: user.id.toString(),
-        amount: parseInt(amount),
-        creditProofId: creditProof.id
-      };
-      
-      // 生成签名
-      const signatureData = generateSignatureDataStrict(transactionData, ['amount', 'creditProofId', 'userId']);
+      // 生成业务级SM2签名（与后端 verifySM2Signature 配对）
+      const signatureData = generateSignatureDataStrict(
+        { userId: String(user.id), amount: parseInt(amount), creditProofId: creditProof.id },
+        ['amount', 'creditProofId', 'userId']
+      );
       const signature = signWithSM2(signatureData, keyPair.privateKey);
+      keyPair.privateKey = null; // 用后即焚
 
-      // 保存原始签名和请求数据，供大额借款二次提交使用
+      // 保存请求数据，供大额借款二次提交使用
       const borrowData = {
         userId: user.id,
         amount: parseInt(amount),
         creditProof: creditProofWithZKP,
         verificationCode,
-        signature,
-        term
+        term,
+        signature
       };
       setPendingBorrowData(borrowData);
 
@@ -647,6 +663,22 @@ const Borrow = ({ user, cryptoLogs, setCryptoLogs }) => {
           </Card>
         </Grid>
 
+        {(() => {
+          const coolingOffStatus = getCoolingOffStatus(loanConfig, userData);
+          if (coolingOffStatus) {
+            return (
+              <Grid item xs={12}>
+                <Alert severity="warning">
+                  您当前处于新用户冷静期（注册第 {coolingOffStatus.daysSinceRegister + 1} 天，共需 {coolingOffStatus.totalDays} 天）。
+                  原始可借额度 ¥{coolingOffStatus.originalLimit.toLocaleString()} 已缩减为 ¥{coolingOffStatus.coolingOffLimit.toLocaleString()}，
+                  剩余 {coolingOffStatus.remainingDays} 天后自动恢复。
+                </Alert>
+              </Grid>
+            );
+          }
+          return null;
+        })()}
+
         <Grid item xs={12}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h5" gutterBottom>
@@ -701,11 +733,18 @@ const Borrow = ({ user, cryptoLogs, setCryptoLogs }) => {
                 </Alert>
               )}
 
-              {creditProof && (
-                <Alert severity="info" sx={{ mb: 2 }}>
-                  当前信用分：{Number(userData?.creditScore || creditProof.creditScore)}，可借额度：{getRemainingLoanLimit(loanConfig, allLoans, userData)}
-                </Alert>
-              )}
+              {creditProof && (() => {
+                const coolingOffStatus = getCoolingOffStatus(loanConfig, userData);
+                return (
+                  <Alert severity={coolingOffStatus ? "warning" : "info"} sx={{ mb: 2 }}>
+                    当前信用分：{Number(userData?.creditScore || creditProof.creditScore)}
+                    {coolingOffStatus
+                      ? `，可借额度：${getRemainingLoanLimit(loanConfig, allLoans, userData)}（冷静期缩减，原始额度 ¥${coolingOffStatus.originalLimit.toLocaleString()}）`
+                      : `，可借额度：${getRemainingLoanLimit(loanConfig, allLoans, userData)}`
+                    }
+                  </Alert>
+                );
+              })()}
 
               <Button
                 variant="contained"

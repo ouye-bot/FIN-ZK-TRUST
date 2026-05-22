@@ -56,15 +56,17 @@ function MfaVerify({ onLoginSuccess }) {
       const data = await response.json();
     if (data.success) {
       // 将认证信息暂存到 sessionStorage，用于页面刷新后恢复
-      sessionStorage.setItem('mfa_auth', JSON.stringify({ 
-        token: data.token, 
-        user: data.user, 
-        sessionKey: data.sessionKey 
+      sessionStorage.setItem('mfa_auth', JSON.stringify({
+        token: data.token,
+        user: data.user,
+        sessionKey: data.sessionKey
       }));
       // 清理临时 token
       localStorage.removeItem('tempToken');
-      // 强制刷新到 profile 页面，避开 React Portal 冲突
-      window.location.href = '/profile';
+      // 延迟跳转，让 React 完成 DOM 卸载（避免 MUI Collapse 动画冲突）
+      setTimeout(() => {
+        window.location.href = '/profile';
+      }, 100);
       return;
     } else {
         safeSetError(data.message || '验证码无效');

@@ -12,16 +12,7 @@ import {
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon
 } from '@mui/icons-material';
-
-const API_BASE = process.env.REACT_APP_API_URL || '';
-
-// 带认证的 fetch 封装
-async function authFetch(url, options = {}) {
-  const token = localStorage.getItem('token');
-  const headers = { ...options.headers };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  return fetch(url, { ...options, headers });
-}
+import { post, get } from '../utils/apiUtils';
 
 function BlockchainExplorer() {
   const [explorerData, setExplorerData] = useState(null);
@@ -40,7 +31,7 @@ function BlockchainExplorer() {
     setZkpDetailOpen(true);
     setZkpDetailLoading(true);
     try {
-      const res = await authFetch(`/api/v1/blockchain/zkp-verify/${proofId}`);
+      const res = await get(`/api/v1/blockchain/zkp-verify/${proofId}`);
       const data = await res.json();
       setZkpDetail(data.success ? data : null);
     } catch (e) {
@@ -55,8 +46,8 @@ function BlockchainExplorer() {
     setError(null);
     try {
       const [explorerRes, statusRes] = await Promise.all([
-        authFetch(`${API_BASE}/api/v1/blockchain/explorer?limit=50`),
-        authFetch(`${API_BASE}/api/v1/blockchain/status`)
+        get(`/api/v1/blockchain/explorer?limit=50`),
+        get(`/api/v1/blockchain/status`)
       ]);
       const [explorerData, statusData] = await Promise.all([explorerRes.json(), statusRes.json()]);
       if (explorerData.success) {
@@ -81,11 +72,7 @@ function BlockchainExplorer() {
     setVerifyLoading(true);
     setVerifyResult(null);
     try {
-      const res = await authFetch(`${API_BASE}/api/v1/blockchain/verify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hash: verifyId.trim() })
-      });
+      const res = await post(`/api/v1/blockchain/verify`, { hash: verifyId.trim() });
       const data = await res.json();
       setVerifyResult(data);
     } catch (e) {
@@ -100,11 +87,7 @@ function BlockchainExplorer() {
     setVerifyLoading(true);
     setVerifyResult(null);
     try {
-      const res = await authFetch(`${API_BASE}/api/v1/blockchain/verify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hash: hashValue })
-      });
+      const res = await post(`/api/v1/blockchain/verify`, { hash: hashValue });
       const data = await res.json();
       setVerifyResult(data);
     } catch (e) {

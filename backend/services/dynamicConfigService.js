@@ -67,13 +67,31 @@ async function getCreditScore(userId) {
 }
 
 async function updateCreditScore(userId, delta, reason, transactionId = null) {
-  const user = await userDao.findById(userId);
-  if (!user) throw new Error('用户不存在');
+  const { transaction } = require('../config/database');
 
-  const currentScore = user.credit_score || 600;
-  const newScore = Math.max(DEFAULTS.MIN_SCORE, Math.min(DEFAULTS.MAX_SCORE, currentScore + delta));
+  const newScore = await transaction(async (connection) => {
+    // 使用 FOR UPDATE 锁定行，防止并发更新丢失
+    const [rows] = await connection.execute(
+      'SELECT credit_score FROM users WHERE id = ? FOR UPDATE', [userId]
+    );
+    if (rows.length === 0) throw new Error('用户不存在');
 
-  await userDao.updateCreditScore(userId, newScore);
+    // 解密当前信用分
+    const creditScoreData = { credit_score: rows[0].credit_score };
+    const { decryptFields } = require('../utils/sm4Crypto');
+    await decryptFields('users', creditScoreData, userId, connection);
+    const currentScore = Number(creditScoreData.credit_score) || 600;
+
+    const computedScore = Math.max(DEFAULTS.MIN_SCORE, Math.min(DEFAULTS.MAX_SCORE, currentScore + delta));
+
+    // 加密并写入新信用分
+    const newScoreData = { credit_score: computedScore };
+    const { encryptFields } = require('../utils/sm4Crypto');
+    await encryptFields('users', newScoreData, userId, connection);
+    await connection.execute('UPDATE users SET credit_score = ? WHERE id = ?', [newScoreData.credit_score, userId]);
+
+    return computedScore;
+  });
 
   const creditHistoryDao = require('../dao/creditHistoryDao');
   creditHistoryDao.create({

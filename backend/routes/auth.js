@@ -10,15 +10,16 @@ const { logCryptoOperation } = require('../utils/cryptoLogger');
 const blockchainService = require('../services/blockchainService');
 const blockchainQueueService = require('../services/blockchainQueueService');
 
-// 已使用的刷新令牌黑名单（防止重放）
-const usedRefreshTokens = new Set();
+// 已使用的刷新令牌黑名单（防止重放），使用Map存储时间戳实现逐条TTL清理
+const usedRefreshTokens = new Map();
 const REFRESH_TOKEN_BLACKLIST_TTL = 10 * 60 * 1000; // 10 分钟
 // 定期清理过期的黑名单条目
 setInterval(() => {
-  // JWT 本身有过期，Set 只保留最近 10 分钟的量即可
-  if (usedRefreshTokens.size > 10000) {
-    usedRefreshTokens.clear();
-    logger.info('刷新令牌黑名单已清理');
+  const now = Date.now();
+  for (const [jti, addedAt] of usedRefreshTokens) {
+    if (now - addedAt > REFRESH_TOKEN_BLACKLIST_TTL) {
+      usedRefreshTokens.delete(jti);
+    }
   }
 }, 60000).unref();
 
@@ -360,7 +361,8 @@ router.post('/refresh-token', async (req, res) => {
     }
 
     // 检查刷新令牌是否已被使用（防止重放）
-    if (usedRefreshTokens.has(refreshToken)) {
+    const addedAt = usedRefreshTokens.get(refreshToken);
+    if (addedAt && (Date.now() - addedAt) < REFRESH_TOKEN_BLACKLIST_TTL) {
       logger.warning('刷新令牌已被使用，可能遭到重放', { userId: decoded.id });
       return res.status(401).json({
         success: false,
@@ -368,8 +370,8 @@ router.post('/refresh-token', async (req, res) => {
       });
     }
 
-    // 将旧令牌加入黑名单
-    usedRefreshTokens.add(refreshToken);
+    // 将旧令牌加入黑名单（带时间戳）
+    usedRefreshTokens.set(refreshToken, Date.now());
 
     // 查找用户
     const user = await userDao.findById(decoded.id);

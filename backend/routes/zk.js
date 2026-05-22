@@ -3,12 +3,14 @@ const router = express.Router();
 const { runTask, getStats } = require('../services/zkProcessPool');
 const zkQueue = require('../services/zkQueue');
 const path = require('path');
+const cryptoNode = require('crypto');
 const fs = require('fs');
 const userDao = require('../dao/userDao');
 const transactionDao = require('../dao/transactionDao');
 const proofDao = require('../dao/proofDao');
 const { execute } = require('../config/database');
 const logger = require('../utils/logger');
+const { verifyProof } = require('../services/zkService');
 
 // 查询用户是否有逾期借款
 async function checkUserHasOverdue(userId) {
@@ -83,38 +85,54 @@ router.get('/task/:taskId', async (req, res) => {
   res.json({ success: true, ...status });
 });
 
-// System balance
-let systemBalance = 10000; // Initial system balance: 10000 yuan
-
-// Get system balance (admin only)
-router.get('/system-balance', async (req, res) => {
-  try {
-    if (!req.user || req.user.role !== 'admin') {
-      return res.status(403).json({ success: false, message: 'Unauthorized' });
-    }
-    res.json({ success: true, balance: systemBalance });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-});
-
-// Verify credit proof
+// Verify credit proof (真正验证 ZKP，不再硬编码)
 router.post('/verify-proof', async (req, res) => {
   try {
     const { userId, verificationCode } = req.body;
 
-    // Verify the proof using zero-knowledge proof verification
-    // Note: This is a placeholder, actual verification would depend on your ZK implementation
-    const isValid = true; // Simplified for now
-
-    if (!isValid) {
-      return res.json({ success: false, message: 'Invalid proof' });
+    if (!userId || !verificationCode) {
+      return res.status(400).json({ success: false, message: '缺少必要参数' });
     }
 
-    // Record the proof fee transaction
-    systemBalance += 10; // 10 yuan proof fee
+    // 从数据库查找对应的信用证明（时序安全比较验证口令）
+    const proofs = await proofDao.findByUserId(parseInt(userId));
+    const matchingProof = proofs.find(p => {
+      if (!p.verification_code || !verificationCode) return false;
+      const a = Buffer.from(p.verification_code, 'utf8');
+      const b = Buffer.from(verificationCode, 'utf8');
+      return a.length === b.length && cryptoNode.timingSafeEqual(a, b);
+    });
 
-    // Create transaction record in database
+    if (!matchingProof) {
+      return res.json({ success: false, message: '验证口令无效' });
+    }
+
+    if (new Date(matchingProof.expires_at) <= new Date()) {
+      return res.json({ success: false, message: '信用证明已过期' });
+    }
+
+    // 如果存储了 ZKP proof，进行真正的零知识证明验证
+    let isValid = false;
+    if (matchingProof.zk_proof && matchingProof.public_signals) {
+      try {
+        const proof = JSON.parse(matchingProof.zk_proof);
+        const publicSignals = JSON.parse(matchingProof.public_signals);
+        isValid = await verifyProof(proof, publicSignals);
+      } catch (verifyErr) {
+        logger.error('ZKP 链上验证异常', { error: verifyErr.message, userId });
+        isValid = false;
+      }
+    } else {
+      // ZKP数据缺失，验证失败
+      logger.error('信用证明无 ZKP 数据，验证失败', { userId, proofId: matchingProof.proof_id });
+      isValid = false;
+    }
+
+    if (!isValid) {
+      return res.json({ success: false, message: '零知识证明验证失败' });
+    }
+
+    // 记录验证费用交易（使用数据库而非进程内存）
     await transactionDao.create({
       user_id: parseInt(userId),
       type: 'proof_fee',
@@ -122,215 +140,14 @@ router.post('/verify-proof', async (req, res) => {
       status: 'completed'
     });
 
-    res.json({ success: true });
+    res.json({ success: true, message: '证明验证成功' });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('证明验证失败', { error: error.message });
+    res.status(500).json({ success: false, message: '证明验证失败' });
   }
 });
 
-// @deprecated 请使用 POST /api/v1/loan/borrow 替代（路由 /loan.js）
-router.post('/lend', async (req, res) => {
-  try {
-    const { userId, amount, duration, interestRate } = req.body;
-
-    // Get user from database
-    const user = await userDao.findById(parseInt(userId));
-
-    if (!user) {
-      return res.json({ success: false, message: '用户不存在' });
-    }
-
-    // Check if user has valid proof
-    const proofs = await proofDao.findByUserId(parseInt(userId));
-    const hasValidProof = proofs.some(p => new Date(p.expires_at) > new Date());
-
-    if (!hasValidProof) {
-      return res.json({ success: false, message: '没有有效的信用证明' });
-    }
-
-    // Calculate total amount (principal + interest)
-    const totalAmount = parseInt(amount) + (parseInt(amount) * interestRate * duration / 36500);
-
-    // Create new transaction
-    const newTransaction = await transactionDao.create({
-      user_id: parseInt(userId),
-      type: 'lend',
-      amount: parseInt(amount),
-      total_amount: totalAmount,
-      status: 'pending'
-    });
-
-    // Update user balance
-    await userDao.updateBalance(parseInt(userId), user.balance - parseInt(amount));
-
-    res.json({
-      success: true,
-      message: '放贷成功',
-      transaction: newTransaction
-    });
-  } catch (error) {
-    console.error('放贷失败:', error);
-    res.status(500).json({ success: false, message: '放贷失败' });
-  }
-});
-
-// @deprecated 请使用 POST /api/v1/loan/repay 替代（路由 /loan.js）
-router.post('/repay', async (req, res) => {
-  try {
-    const { userId, loanId } = req.body;
-
-    // Get user from database
-    const user = await userDao.findById(parseInt(userId));
-
-    if (!user) {
-      return res.json({ success: false, message: '用户不存在' });
-    }
-
-    // Get transaction from database
-    const transaction = await transactionDao.findById(parseInt(loanId));
-
-    if (!transaction) {
-      return res.json({ success: false, message: '交易不存在' });
-    }
-
-    if (transaction.type !== 'loan' || transaction.status !== 'pending') {
-      return res.json({ success: false, message: '无效的还款请求' });
-    }
-
-    // Check if user has enough balance
-    if (user.balance < transaction.amount) {
-      return res.json({ success: false, message: '余额不足' });
-    }
-
-    // Update transaction status
-    await transactionDao.updateStatus(parseInt(loanId), 'completed');
-
-    // Update user balance
-    await userDao.updateBalance(parseInt(userId), user.balance - transaction.amount);
-
-    // Calculate credit score change based on repayment timing
-    // Note: This is a simplified version, actual implementation would need due date information
-    let scoreChange = 10; // Default for on-time repayment
-    let reason = '按时还款';
-
-    // Update credit score
-    const newScore = Math.max(600, Math.min(850, user.credit_score + scoreChange));
-    await userDao.updateCreditScore(parseInt(userId), newScore);
-
-    res.json({
-      success: true,
-      message: '还款成功',
-      repaidAmount: transaction.amount,
-      newBalance: user.balance - transaction.amount,
-      creditScore: newScore,
-      scoreChange
-    });
-  } catch (error) {
-    console.error('还款失败:', error);
-    res.status(500).json({ success: false, message: '还款失败' });
-  }
-});
-
-// @deprecated 请使用 POST /api/v1/loan/repay（带 transactionId）替代
-router.post('/collect-loan', async (req, res) => {
-  try {
-    const { userId, transactionId } = req.body;
-
-    // Get user from database
-    const user = await userDao.findById(parseInt(userId));
-
-    if (!user) {
-      return res.json({ success: false, message: '用户不存在' });
-    }
-
-    // Get transaction from database
-    const transaction = await transactionDao.findById(parseInt(transactionId));
-
-    if (!transaction) {
-      return res.json({ success: false, message: '交易不存在' });
-    }
-
-    if (transaction.type !== 'lend' || transaction.status !== 'pending') {
-      return res.json({ success: false, message: '无效的收回请求' });
-    }
-
-    // Update transaction status
-    await transactionDao.updateStatus(parseInt(transactionId), 'completed');
-
-    // Update user balance with total amount (principal + interest)
-    await userDao.updateBalance(parseInt(userId), user.balance + (transaction.total_amount || 0));
-
-    res.json({
-      success: true,
-      message: '收回贷款成功',
-      collectedAmount: transaction.total_amount || 0,
-      newBalance: user.balance + (transaction.total_amount || 0)
-    });
-  } catch (error) {
-    console.error('收回贷款失败:', error);
-    res.status(500).json({ success: false, message: '收回贷款失败' });
-  }
-});
-
-// @deprecated 请使用 GET /api/v1/loan/loans 替代（路由 /loan.js）
-router.get('/all-loans', async (req, res) => {
-  try {
-    // Get all loan transactions from database
-    const transactions = await transactionDao.findByType('loan');
-    
-    // Get user information for each transaction
-    const loans = [];
-    for (const transaction of transactions) {
-      const user = await userDao.findById(transaction.user_id);
-      loans.push({
-        ...transaction,
-        username: user ? user.username : 'Unknown'
-      });
-    }
-
-    res.json({
-      success: true,
-      loans: loans
-    });
-  } catch (error) {
-    console.error('获取借款记录失败:', error);
-    res.status(500).json({ success: false, message: '获取借款记录失败' });
-  }
-});
-
-// @deprecated 请使用 GET /api/v1/loan/loans?type=lend 替代
-router.get('/all-lends', async (req, res) => {
-  try {
-    // Get all lend transactions from database
-    const transactions = await transactionDao.findByType('lend');
-    
-    // Get user information for each transaction
-    const lends = [];
-    for (const transaction of transactions) {
-      const user = await userDao.findById(transaction.user_id);
-      lends.push({
-        ...transaction,
-        username: user ? user.username : 'Unknown'
-      });
-    }
-
-    res.json({
-      success: true,
-      lends: lends
-    });
-  } catch (error) {
-    console.error('获取放贷记录失败:', error);
-    res.status(500).json({ success: false, message: '获取放贷记录失败' });
-  }
-});
-
-// Add findByType method to transactionDao if it doesn't exist
-// This should be added to transactionDao.js
-/*
-exports.findByType = async (type) => {
-  const sql = 'SELECT * FROM transactions WHERE type = ? ORDER BY created_at DESC';
-  return await execute(sql, [type]);
-};
-*/
+// 所有废弃端点已移除（/lend, /repay, /collect-loan, /all-loans, /all-lends）
+// 请使用 /api/v1/loan 和 /api/v1/credit 下的正式端点
 
 module.exports = router;

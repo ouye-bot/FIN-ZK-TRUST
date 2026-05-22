@@ -97,6 +97,16 @@ async function dispatchOperation(operationType, payload) {
       return await blockchainService.registerUserOnChain(
         payload.userId, payload.publicKey
       );
+    case 'registerPublicKey':
+      // registerPublicKey(userId, publicKey) — 仅写入 PublicKeyRegistry
+      return await blockchainService.registerPublicKey(
+        payload.userId, payload.publicKey
+      );
+    case 'revokePublicKey':
+      // revokePublicKey(userId, pkHash)
+      return await blockchainService.revokePublicKey(
+        payload.userId, payload.pkHash
+      );
     case 'verifyZKPOnChain':
       // verifyZKPOnChain(proof, publicSignals, userAddress, sm3Hash)
       return await blockchainService.verifyZKPOnChain(

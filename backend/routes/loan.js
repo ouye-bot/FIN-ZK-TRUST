@@ -9,6 +9,7 @@ const creditHistoryDao = require('../dao/creditHistoryDao');
 const { transaction } = require('../config/database');
 const { verifyProof } = require('../services/zkService');
 const { verifySM2Signature, buildSignatureData } = require('../utils/cryptoUtils');
+const cryptoNode = require('crypto');
 const { CREDIT_RULES, getInterestRate } = require('./credit');
 const challengeService = require('../services/challengeService');
 const dynamicConfig = require('../services/dynamicConfigService');
@@ -172,10 +173,16 @@ router.post('/borrow', validate(borrowSchema), async (req, res) => {
     // 验证信用证明和口令
     const matchingProof = await proofDao.findByProofId(creditProof.id);
 
-    if (!matchingProof || new Date(matchingProof.expires_at) <= new Date() || matchingProof.verification_code !== verificationCode) {
+    // 时序安全比较验证口令
+    let codeValid = false;
+    if (matchingProof && matchingProof.verification_code && verificationCode) {
+      const a = Buffer.from(matchingProof.verification_code, 'utf8');
+      const b = Buffer.from(verificationCode, 'utf8');
+      codeValid = a.length === b.length && cryptoNode.timingSafeEqual(a, b);
+    }
+    if (!matchingProof || new Date(matchingProof.expires_at) <= new Date() || !codeValid) {
       logger.warning('借款失败：信用证明或验证口令无效', {
-        proofId: creditProof.id,
-        verificationCode
+        proofId: creditProof.id
       });
       return res.status(400).json({
         success: false,
@@ -223,7 +230,13 @@ router.post('/borrow', validate(borrowSchema), async (req, res) => {
     }
 
     // 检查借款额度
-    const proofData = JSON.parse(matchingProof.proof_data);
+    let proofData;
+    try {
+      proofData = JSON.parse(matchingProof.proof_data);
+    } catch (parseErr) {
+      logger.error('信用证明数据解析失败', { proofId: creditProof.id, error: parseErr.message });
+      return res.status(400).json({ success: false, message: '信用证明数据格式无效' });
+    }
     const proofDataCreditScore = proofData.creditScore;
     const loanLimit = await dynamicConfig.getLoanLimit(proofDataCreditScore, userRisk);
 
@@ -404,6 +417,15 @@ router.post('/repay', validate(repaySchema), async (req, res) => {
       });
     }
 
+    // 验证交易归属（防止用户还他人的贷款）
+    if (transaction.user_id !== parseInt(userId)) {
+      logger.warning('还款失败：交易不属于当前用户', { userId, transactionUserId: transaction.user_id, transactionId });
+      return res.status(403).json({
+        success: false,
+        message: '无权操作此交易'
+      });
+    }
+
     // 验证SM2签名
     if (!user.sm2_public_key) {
       logger.warning('还款失败：用户未提供SM2公钥', { userId });
@@ -425,7 +447,14 @@ router.post('/repay', validate(repaySchema), async (req, res) => {
     // 验证信用证明和口令
     const matchingProof = await proofDao.findByProofId(creditProof.id);
 
-    if (!matchingProof || new Date(matchingProof.expires_at) <= new Date() || matchingProof.verification_code !== verificationCode) {
+    // 时序安全比较验证口令（与借款接口保持一致）
+    let codeValid = false;
+    if (matchingProof && matchingProof.verification_code && verificationCode) {
+      const a = Buffer.from(matchingProof.verification_code, 'utf8');
+      const b = Buffer.from(verificationCode, 'utf8');
+      codeValid = a.length === b.length && cryptoNode.timingSafeEqual(a, b);
+    }
+    if (!matchingProof || new Date(matchingProof.expires_at) <= new Date() || !codeValid) {
       logger.warning('还款失败：信用证明或验证口令无效', {
         proofId: creditProof.id,
         verificationCode
@@ -508,7 +537,10 @@ router.post('/repay', validate(repaySchema), async (req, res) => {
       const now = new Date();
       const daysRemaining = Math.max(1, Math.ceil((dueDate - now) / (24 * 60 * 60 * 1000)));
 
-      const remainingInterest = await calculateInterest(remainingPrincipal, daysRemaining, creditScore, false);
+      // 使用原始贷款利率计算剩余利息（而非当前动态利率，避免利率变更影响已签约贷款）
+      const originalTerm = transaction.term || 30;
+      const originalDailyRate = agreedInterest / (principal * originalTerm);
+      const remainingInterest = Math.round(remainingPrincipal * daysRemaining * originalDailyRate * 100) / 100;
 
       const newTotalAmount = Math.round((remainingPrincipal + remainingInterest) * 100) / 100;
 

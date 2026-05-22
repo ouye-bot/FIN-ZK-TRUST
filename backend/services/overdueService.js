@@ -1,4 +1,4 @@
-const { execute } = require('../config/database');
+const { execute, transaction } = require('../config/database');
 const logger = require('../utils/logger');
 const transactionDao = require('../dao/transactionDao');
 
@@ -22,32 +22,35 @@ const checkOverdueLoans = async () => {
       return result;
     }
 
-    for (const loan of overdueLoans) {
-      try {
-        const dueDate = new Date(loan.due_date);
-        const now = new Date();
-        const daysOverdue = Math.floor((now - dueDate) / (24 * 60 * 60 * 1000));
+    // 在单个事务内批量标记逾期，保证原子性
+    await transaction(async (connection) => {
+      for (const loan of overdueLoans) {
+        try {
+          const dueDate = new Date(loan.due_date);
+          const now = new Date();
+          const daysOverdue = Math.floor((now - dueDate) / (24 * 60 * 60 * 1000));
 
-        await execute(
-          'UPDATE transactions SET status = ? WHERE id = ?',
-          ['overdue', loan.id]
-        );
+          await connection.execute(
+            'UPDATE transactions SET status = ? WHERE id = ?',
+            ['overdue', loan.id]
+          );
 
-        result.marked++;
-        logger.info('借款已标记为逾期', {
-          transactionId: loan.id,
-          userId: loan.user_id,
-          dueDate: loan.due_date,
-          daysOverdue
-        });
-      } catch (error) {
-        result.errors++;
-        logger.error('标记借款逾期失败', {
-          transactionId: loan.id,
-          error: error.message
-        });
+          result.marked++;
+          logger.info('借款已标记为逾期', {
+            transactionId: loan.id,
+            userId: loan.user_id,
+            dueDate: loan.due_date,
+            daysOverdue
+          });
+        } catch (error) {
+          result.errors++;
+          logger.error('标记借款逾期失败', {
+            transactionId: loan.id,
+            error: error.message
+          });
+        }
       }
-    }
+    });
 
     if (overdueLoans.length === 100) {
       logger.info('逾期借款处理达到100条上限，下一轮定时任务将继续处理');

@@ -2,6 +2,7 @@ import React from 'react';
 import { Paper, Typography, Button, Accordion, AccordionSummary, AccordionDetails, Box } from '@mui/material';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import { post } from '../utils/apiUtils';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -29,16 +30,12 @@ class ErrorBoundary extends React.Component {
     const userId = userStr ? JSON.parse(userStr).id : null;
 
     if (userId) {
-      fetch('/api/v1/crypto-log', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId,
-          operationType: '错误边界',
-          description: error.message,
-          data: { componentStack: errorInfo.componentStack }
-        })
-      }).catch(err => {
+      post('/api/v1/crypto-log', {
+        userId,
+        operationType: '错误边界',
+        description: error.message,
+        data: { componentStack: errorInfo.componentStack }
+      }, true).catch(err => {
         console.warn('Error logging failed, silently degrading:', err);
       });
     }
