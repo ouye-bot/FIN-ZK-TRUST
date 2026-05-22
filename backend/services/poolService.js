@@ -127,8 +127,17 @@ exports.initializePool = async () => {
   }
 };
 
-// 获取资金池整体信息
+// 获取资金池整体信息（5秒 TTL 内存缓存，消除高并发下的重复查询）
+let poolInfoCache = null;
+let poolInfoCacheTime = 0;
+const POOL_INFO_TTL = 5000;
+
 exports.getPoolInfo = async () => {
+  const now = Date.now();
+  if (poolInfoCache && (now - poolInfoCacheTime) < POOL_INFO_TTL) {
+    return poolInfoCache;
+  }
+
   try {
     const pool = await poolDao.getPool();
 
@@ -140,7 +149,7 @@ exports.getPoolInfo = async () => {
 
     const poolStatus = safeAvailableAmount < 0 ? 'abnormal' : 'normal';
 
-    return {
+    const result = {
       // V2 分层池字段
       platformCapital: safePlatformCapital,
       userCapital: safeUserCapital,
@@ -163,6 +172,10 @@ exports.getPoolInfo = async () => {
       userPoolStatus: poolStatus,
       emergencyBorrow: 0
     };
+
+    poolInfoCache = result;
+    poolInfoCacheTime = now;
+    return result;
   } catch (error) {
     logger.error('获取资金池信息失败:', error);
     throw error;
