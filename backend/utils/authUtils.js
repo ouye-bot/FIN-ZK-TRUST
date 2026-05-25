@@ -11,6 +11,9 @@ dotenv.config();
  * @returns {string} - JWT令牌
  */
 exports.generateToken = (user) => {
+  if (!user.id || !user.username) {
+    throw new Error('JWT payload missing required fields: id and username');
+  }
   const jti = crypto.randomUUID();
   const payload = {
     id: user.id,
@@ -19,7 +22,8 @@ exports.generateToken = (user) => {
   };
 
   return jwt.sign(payload, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN || '24h'
+    expiresIn: process.env.JWT_EXPIRES_IN || '24h',
+    issuer: 'finzktrust'
   });
 };
 
@@ -29,6 +33,9 @@ exports.generateToken = (user) => {
  * @returns {string} - 刷新令牌
  */
 exports.generateRefreshToken = (user) => {
+  if (!user.id || !user.username) {
+    throw new Error('JWT payload missing required fields: id and username');
+  }
   const jti = crypto.randomUUID();
   const payload = {
     id: user.id,
@@ -36,9 +43,10 @@ exports.generateRefreshToken = (user) => {
     type: 'refresh',
     jti
   };
-  
+
   return jwt.sign(payload, process.env.JWT_REFRESH_SECRET, {
-    expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d'
+    expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+    issuer: 'finzktrust'
   });
 };
 
@@ -49,7 +57,7 @@ exports.generateRefreshToken = (user) => {
  */
 exports.verifyToken = (token) => {
   try {
-    return jwt.verify(token, process.env.JWT_SECRET);
+    return jwt.verify(token, process.env.JWT_SECRET, { issuer: 'finzktrust' });
   } catch (error) {
     logger.error('Token verification failed:', { error: error.message });
     return null;
@@ -63,7 +71,7 @@ exports.verifyToken = (token) => {
  */
 exports.verifyRefreshToken = (token) => {
   try {
-    return jwt.verify(token, process.env.JWT_REFRESH_SECRET);
+    return jwt.verify(token, process.env.JWT_REFRESH_SECRET, { issuer: 'finzktrust' });
   } catch (error) {
     logger.error('Refresh token verification failed:', { error: error.message });
     return null;

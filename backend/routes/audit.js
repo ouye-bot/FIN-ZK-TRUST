@@ -1,5 +1,6 @@
 const express = require('express');
 const cryptoLogger = require('../services/cryptoLogger');
+const logger = require('../utils/logger');
 
 const router = express.Router();
 
@@ -9,7 +10,7 @@ router.get('/verify', async (req, res) => {
     const result = await cryptoLogger.verifyChain();
     res.status(200).json({ success: true, ...result });
   } catch (error) {
-    console.error('Error verifying audit chain:', error);
+    logger.error('Error verifying audit chain:', { error: error.message });
     res.status(500).json({ success: false, message: 'Failed to verify audit chain' });
   }
 });
@@ -36,7 +37,7 @@ router.get('/entries', async (req, res) => {
     
     res.status(200).json({ success: true, logs: sanitizedLogs, total });
   } catch (error) {
-    console.error('Error getting audit entries:', error);
+    logger.error('Error getting audit entries:', { error: error.message });
     res.status(500).json({ success: false, message: 'Failed to get audit entries' });
   }
 });

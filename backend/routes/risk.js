@@ -8,9 +8,14 @@ const logger = require('../utils/logger');
 router.post('/assess', async (req, res) => {
   try {
     const { userId, loanAmount, loanDuration } = req.body;
-    
+
     logger.info('风险评估请求', { userId, loanAmount, loanDuration });
-    
+
+    // 数据隔离：验证请求用户只能评估自己的风险
+    if (req.user && parseInt(req.body.userId, 10) !== req.user.id) {
+      return res.status(403).json({ success: false, message: '无权限访问该资源' });
+    }
+
     // 从数据库获取用户信息
     const user = await userDao.findById(parseInt(userId));
     if (!user) {
@@ -122,9 +127,14 @@ router.post('/assess', async (req, res) => {
 router.get('/monitor/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
-    
+
     logger.info('风险监控请求', { userId });
-    
+
+    // 数据隔离：验证请求用户只能监控自己的风险
+    if (req.user && parseInt(userId, 10) !== req.user.id) {
+      return res.status(403).json({ success: false, message: '无权限访问该资源' });
+    }
+
     // 从数据库获取用户信息
     const user = await userDao.findById(parseInt(userId));
     if (!user) {

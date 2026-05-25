@@ -5,8 +5,17 @@ const { getSecurityLevel } = require('../config/endpointRegistry');
 
 const nonceCache = new Map();
 const NONCE_CACHE_MAX = 10000;
+let cleanupCounter = 0;
 
-setInterval(async () => {
+function evictOldestNonceEntries(count) {
+  const entries = nonceCache.entries();
+  for (let i = 0; i < count; i++) {
+    const entry = entries.next();
+    if (!entry.done) nonceCache.delete(entry.value[0]);
+  }
+}
+
+const cleanupTimer = setInterval(async () => {
   const now = Date.now();
 
   for (const [nonce, expiresAt] of nonceCache.entries()) {
@@ -16,15 +25,12 @@ setInterval(async () => {
   }
 
   if (nonceCache.size > NONCE_CACHE_MAX) {
-    const excess = nonceCache.size - NONCE_CACHE_MAX;
-    const entries = nonceCache.entries();
-    for (let i = 0; i < excess; i++) {
-      const entry = entries.next();
-      if (!entry.done) nonceCache.delete(entry.value[0]);
-    }
+    evictOldestNonceEntries(nonceCache.size - NONCE_CACHE_MAX);
   }
 
-  if (Math.floor(Date.now() / 60000) % 10 === 0) {
+  cleanupCounter++;
+  if (cleanupCounter >= 10) {
+    cleanupCounter = 0;
     try {
       const result = await execute(
         'DELETE FROM replay_nonces WHERE expires_at < ?',
@@ -38,6 +44,7 @@ setInterval(async () => {
     }
   }
 }, 60 * 1000);
+cleanupTimer.unref();
 
 const generateRequestId = () => {
   return crypto.randomBytes(16).toString('hex');
@@ -69,7 +76,7 @@ exports.antiReplayMiddleware = async (req, res, next) => {
     }
 
     const now = Date.now();
-    const requestTime = parseInt(timestamp);
+    const requestTime = parseInt(timestamp, 10);
     if (isNaN(requestTime) || Math.abs(now - requestTime) > 5 * 60 * 1000) {
       const requestId = generateRequestId();
       logger.warning('Request expired, possible replay attack', { path: req.path, method: req.method, timestamp, requestId });
@@ -82,7 +89,7 @@ exports.antiReplayMiddleware = async (req, res, next) => {
 
     if (typeof nonce !== 'string' || nonce.length < 32) {
       const requestId = generateRequestId();
-      logger.warning('Invalid nonce', { path: req.path, method: req.method, nonce, requestId });
+      logger.warning('Invalid nonce', { path: req.path, method: req.method, nonce: nonce.substring(0, 8) + '...', requestId });
       return res.status(403).json({
         code: '403_INVALID_NONCE',
         message: 'Invalid nonce, length must be at least 32 characters',
@@ -94,55 +101,41 @@ exports.antiReplayMiddleware = async (req, res, next) => {
       const cacheExpiry = nonceCache.get(nonce);
       if (Date.now() < cacheExpiry) {
         const requestId = generateRequestId();
-        logger.warning('Duplicate request rejected (cache)', { path: req.path, method: req.method, nonce, requestId });
+        logger.warning('Duplicate request rejected (cache)', { path: req.path, method: req.method, nonce: nonce.substring(0, 8) + '...', requestId });
         return res.status(403).json({
           code: '403_REPLAY_ATTACK',
           message: 'Duplicate request, possible replay attack',
           requestId
         });
       }
-    }
-
-    try {
-      const dbResults = await execute(
-        'SELECT nonce, expires_at FROM replay_nonces WHERE nonce = ? AND expires_at > ?',
-        [nonce, Date.now()]
-      );
-      if (dbResults.length > 0) {
-        nonceCache.set(nonce, dbResults[0].expires_at);
-        const requestId = generateRequestId();
-        logger.warning('Duplicate request rejected (database)', { path: req.path, method: req.method, nonce, requestId });
-        return res.status(403).json({
-          code: '403_REPLAY_ATTACK',
-          message: 'Duplicate request, possible replay attack',
-          requestId
-        });
-      }
-    } catch (dbError) {
-      logger.warning('Nonce数据库查询失败，降级到内存校验', { error: dbError.message });
     }
 
     const expiryTime = Date.now() + 5 * 60 * 1000;
 
     try {
-      await execute(
-        'INSERT INTO replay_nonces (nonce, expires_at) VALUES (?, ?)',
+      // ON DUPLICATE KEY UPDATE + affectedRows===2 依赖 MySQL 行为：
+      // 新插入返回 affectedRows=1，已存在时 UPDATE 返回 affectedRows=2
+      const result = await execute(
+        'INSERT INTO replay_nonces (nonce, expires_at) VALUES (?, ?) ON DUPLICATE KEY UPDATE nonce = nonce',
         [nonce, expiryTime]
       );
-    } catch (dbError) {
-      if (dbError.code === 'ER_DUP_ENTRY') {
+      if (result.affectedRows === 2) {
         const requestId = generateRequestId();
-        logger.warning('Duplicate request rejected (DB insert conflict)', { path: req.path, method: req.method, nonce, requestId });
+        logger.warning('Duplicate request rejected (database upsert)', { path: req.path, method: req.method, nonce: nonce.substring(0, 8) + '...', requestId });
         return res.status(403).json({
           code: '403_REPLAY_ATTACK',
           message: 'Duplicate request, possible replay attack',
           requestId
         });
-      } else {
-        logger.warning('Nonce持久化写入失败，降级到内存校验', { error: dbError.message });
       }
+    } catch (dbError) {
+      // DB 写入失败时降级到内存校验：nonce 仅存入内存，服务重启后可被重放
+      logger.warning('Nonce持久化写入失败，降级到内存校验', { error: dbError.message });
     }
 
+    if (nonceCache.size >= NONCE_CACHE_MAX) {
+      evictOldestNonceEntries(nonceCache.size - NONCE_CACHE_MAX + 1);
+    }
     nonceCache.set(nonce, expiryTime);
 
     logger.info('Anti-replay verification passed', { path: req.path, method: req.method });

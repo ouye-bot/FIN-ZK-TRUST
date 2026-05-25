@@ -151,9 +151,10 @@ class ErrorMonitor {
    */
   cleanup() {
     const oneHourAgo = Date.now() - 60 * 60 * 1000;
-    this.errors = this.errors.filter(error => 
+    this.errors = this.errors.filter(error =>
       new Date(error.timestamp).getTime() > oneHourAgo
     );
+    this.errorCounts = {};
   }
 }
 
@@ -161,9 +162,10 @@ class ErrorMonitor {
 const errorMonitor = new ErrorMonitor();
 
 // 定期清理旧数据
-setInterval(() => {
+const cleanupTimer = setInterval(() => {
   errorMonitor.cleanup();
 }, 60 * 60 * 1000); // 每小时清理一次
+cleanupTimer.unref();
 
 /**
  * 统一错误处理中间件

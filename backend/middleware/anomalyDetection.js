@@ -10,13 +10,17 @@ const detectLoginBruteForce = async (req) => {
     return null;
   }
 
-  const ip = req.ip || req.connection.remoteAddress;
+  const ip = req.ip || req.socket?.remoteAddress || 'unknown-ip';
   const now = Date.now();
   const windowMs = 5 * 60 * 1000;
 
   if (loginFailures.size >= MAX_ENTRIES) {
-    const oldestKey = loginFailures.keys().next().value;
-    if (oldestKey) loginFailures.delete(oldestKey);
+    const targetSize = Math.floor(MAX_ENTRIES * 0.9);
+    const toEvict = loginFailures.size - targetSize;
+    for (let i = 0; i < toEvict; i++) {
+      const oldestKey = loginFailures.keys().next().value;
+      if (oldestKey) loginFailures.delete(oldestKey);
+    }
   }
 
   let entry = loginFailures.get(ip);
@@ -65,6 +69,7 @@ const detectLargeTransaction = async (req) => {
     const averageAmount = totalAmount / loans.length;
     const currentAmount = Number(req.body?.amount || 0);
 
+    if (averageAmount === 0) return;
     const ratio = currentAmount / averageAmount;
     
     if (ratio > 3) {
@@ -102,13 +107,20 @@ const detectHighFrequency = async (req) => {
     return;
   }
 
-  const userId = req.user?.id || req.ip || 'anonymous';
+  const isAuthenticated = req.user?.id;
+  const userId = isAuthenticated
+    ? req.user.id
+    : req.ip || req.socket?.remoteAddress || 'unknown-ip';
   const now = Date.now();
   const windowMs = 60 * 1000;
 
   if (apiCallCounts.size >= MAX_ENTRIES) {
-    const oldestKey = apiCallCounts.keys().next().value;
-    if (oldestKey) apiCallCounts.delete(oldestKey);
+    const targetSize = Math.floor(MAX_ENTRIES * 0.9);
+    const toEvict = apiCallCounts.size - targetSize;
+    for (let i = 0; i < toEvict; i++) {
+      const oldestKey = apiCallCounts.keys().next().value;
+      if (oldestKey) apiCallCounts.delete(oldestKey);
+    }
   }
 
   let entry = apiCallCounts.get(userId);
@@ -119,7 +131,8 @@ const detectHighFrequency = async (req) => {
 
   entry.count++;
 
-  if (entry.count > 30) {
+  if (entry.count > 30 && !entry.logged) {
+    entry.logged = true;
     logger.warning('异常行为检测：高频操作', {
       rule: 'R3_HIGH_FREQUENCY',
       userId,
@@ -134,6 +147,7 @@ const detectHighFrequency = async (req) => {
         timestamp: new Date().toISOString()
       }
     });
+    return { blocked: true, message: '操作过于频繁，请稍后再试' };
   }
 };
 
@@ -179,8 +193,9 @@ const anomalyDetectionMiddleware = async (req, res, next) => {
     logger.error('异常检测 R2 异常', { error: error.message });
   }
 
+  let r3Result = null;
   try {
-    await detectHighFrequency(req);
+    r3Result = await detectHighFrequency(req);
   } catch (error) {
     logger.error('异常检测 R3 异常', { error: error.message });
   }
@@ -191,10 +206,22 @@ const anomalyDetectionMiddleware = async (req, res, next) => {
     logger.error('异常检测 R4 异常', { error: error.message });
   }
 
+  if (r3Result?.blocked) {
+    return res.status(429).json({ success: false, message: r3Result.message });
+  }
+
+  // H7: Clear brute-force counter on successful response
+  res.on('finish', () => {
+    if (res.statusCode < 400 && req.path === '/api/v1/auth/login' && req.method === 'POST') {
+      const ip = req.ip || req.socket?.remoteAddress || 'unknown-ip';
+      loginFailures.delete(ip);
+    }
+  });
+
   next();
 };
 
-setInterval(() => {
+const cleanupInterval = setInterval(() => {
   const now = Date.now();
 
   for (const [ip, data] of loginFailures.entries()) {
@@ -214,5 +241,6 @@ setInterval(() => {
     apiCallCountsCount: apiCallCounts.size
   });
 }, 5 * 60 * 1000);
+cleanupInterval.unref();
 
 module.exports = { anomalyDetectionMiddleware };

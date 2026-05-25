@@ -24,6 +24,7 @@ import { syncLogToBackend } from './utils/logUtils';
 import { getDeviceKey } from './utils/deviceKeyManager';
 import { encryptPrivateKey, decryptPrivateKey, deriveKey } from './utils/secureKeyStore';
 import { getSM2KeyPair, saveSM2KeyPair, getSM2KeyPairWithAesKey, signWithSM2 } from './utils/sm2Utils';
+import { preloadZkWorker, terminateZkWorker } from './utils/zkWorkerPool';
 
 // 模块级密钥存储，确保签名处理器立即获取，避免 React 状态异步
 let globalAesKey = null;
@@ -327,6 +328,7 @@ function App() {
   const login = async (username, password) => {
     try {
       console.log('Attempting login for user:', username);
+      localStorage.removeItem('token'); // 清除旧 token，避免过期 token 导致登录请求被安全链拦截
       const response = await post('/api/v1/auth/login', { username, password }, true);
 
       const data = await response.json();
@@ -451,6 +453,8 @@ function App() {
         }
 
         setError('');
+        // 登录成功后立即预加载ZKP WASM，消除用户首次生成证明时的冷启动延迟
+        preloadZkWorker();
         return true;
       } else {
         setError(data.message || '登录失败');
@@ -508,6 +512,7 @@ function App() {
     localStorage.removeItem('sm2_salt');
     localStorage.removeItem('deviceKeyEncrypted');
     sessionStorage.removeItem('pendingKeyPair');
+    terminateZkWorker();
   };
 
   return (

@@ -9,14 +9,14 @@ const logger = require('../utils/logger');
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    console.log('Getting user info for ID:', id);
+    logger.info('Getting user info for ID:', { id });
 
     // 权限校验：用户只能访问自己的数据
     const currentUserId = req.user?.id;
-    console.log('Current user ID:', currentUserId);
+    logger.info('Current user ID:', { currentUserId });
 
     if (currentUserId && currentUserId.toString() !== id.toString()) {
-      console.log('Permission denied: user', currentUserId, 'tried to access user', id);
+      logger.info('Permission denied: user tried to access another user', { currentUserId, targetId: id });
       return res.status(403).json({
         success: false,
         message: '无权限访问该资源'
@@ -25,10 +25,10 @@ router.get('/:id', async (req, res) => {
 
     // 从数据库获取用户数据
     const user = await userDao.findById(parseInt(id));
-    console.log('Found user from database:', user);
+    logger.info('Found user from database', { user: user ? { id: user.id, username: user.username } : null });
 
     if (!user) {
-      console.log('User not found in database');
+      logger.info('User not found in database', { id });
       return res.status(404).json({
         success: false,
         message: '用户不存在'
@@ -57,7 +57,7 @@ router.get('/:id', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('获取用户信息失败:', error);
+    logger.error('获取用户信息失败', { error: error.message });
     res.status(500).json({
       success: false,
       message: '获取用户信息失败'
@@ -75,6 +75,13 @@ router.put('/:id/update-sm2-key', async (req, res) => {
       return res.status(400).json({
         success: false,
         message: '缺少SM2公钥'
+      });
+    }
+
+    if (!/^[0-9a-fA-F]{130}$/.test(sm2PublicKey)) {
+      return res.status(400).json({
+        success: false,
+        message: 'SM2公钥格式无效'
       });
     }
 
@@ -115,7 +122,7 @@ router.put('/:id/update-sm2-key', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('更新SM2公钥失败:', error);
+    logger.error('更新SM2公钥失败', { error: error.message });
     res.status(500).json({
       success: false,
       message: '更新SM2公钥失败'

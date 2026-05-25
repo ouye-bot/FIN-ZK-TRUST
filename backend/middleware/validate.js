@@ -10,8 +10,8 @@ const validate = (schema, source = 'body') => {
   return (req, res, next) => {
     const { error, value } = schema.validate(req[source], {
       abortEarly: false,     // 返回所有错误，而非遇到第一个就停止
-      stripUnknown: false,   // 不删除未定义的字段（让下游决定）
-      allowUnknown: true     // 允许包含未定义的字段（creditProof 等复杂对象）
+      stripUnknown: true,    // 删除未定义的字段，防止 mass assignment
+      allowUnknown: false    // 不允许包含未定义的字段（嵌套对象的 .unknown(true) 仍生效）
     });
 
     if (error) {

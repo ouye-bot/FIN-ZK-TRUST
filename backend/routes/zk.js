@@ -48,7 +48,7 @@ router.post('/generate-proof', async (req, res) => {
       logger.info('ZKP生成-用户逾期状态', { userId, hasNoOverdue });
     }
 
-    const taskId = await zkQueue.addTask({ creditScore, threshold, hasNoOverdue });
+    const taskId = await zkQueue.addTask({ creditScore, threshold, hasNoOverdue, userId: req.body.userId });
 
     const workerTaskId = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
 
@@ -77,6 +77,7 @@ router.post('/generate-proof', async (req, res) => {
 });
 
 // GET /zk/task/:taskId - 查询任务状态
+// 注意：taskId 为随机字符串，无 req.user 时仅依赖 taskId 不可猜测性提供安全保障
 router.get('/task/:taskId', async (req, res) => {
   const status = await zkQueue.getTaskStatus(req.params.taskId);
   if (!status) {
@@ -92,6 +93,11 @@ router.post('/verify-proof', async (req, res) => {
 
     if (!userId || !verificationCode) {
       return res.status(400).json({ success: false, message: '缺少必要参数' });
+    }
+
+    // 数据隔离：验证请求用户只能验证自己的证明
+    if (req.user && parseInt(userId, 10) !== req.user.id) {
+      return res.status(403).json({ success: false, message: '无权限访问该资源' });
     }
 
     // 从数据库查找对应的信用证明（时序安全比较验证口令）

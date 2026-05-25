@@ -142,6 +142,20 @@ app.use(bodyParser.json());
 // API 速率限制（登录接口，按 IP）
 app.use('/api/v1/auth/login', loginLimiter);
 
+// API 速率限制（MFA 验证，按 IP）
+const mfaLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  message: {
+    success: false,
+    code: 'RATE_LIMITED',
+    message: 'MFA验证请求过于频繁，请 1 分钟后再试'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api/v1/mfa/verify', mfaLimiter);
+
 // Swagger API 文档
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./config/swagger');

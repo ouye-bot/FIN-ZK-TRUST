@@ -28,15 +28,6 @@ router.post('/', validate(redeemSchema), async (req, res) => {
       return res.status(403).json({ success: false, message: '无权操作其他用户的赎回' });
     }
 
-    // 验证请求参数
-    if (!userId || !amount || !creditProof || !verificationCode || !signature) {
-      logger.warning('赎回失败：缺少必要参数', { userId, amount, hasCreditProof: !!creditProof, hasVerificationCode: !!verificationCode, hasSignature: !!signature });
-      return res.status(400).json({
-        success: false,
-        message: '缺少必要的参数'
-      });
-    }
-
     // 验证SM2签名
     const user = await userDao.findById(userId);
     if (!user) {
@@ -190,7 +181,9 @@ router.post('/', validate(redeemSchema), async (req, res) => {
       success: true,
       message: '赎回成功',
       amount: totalRedeemed,
-      newBalance: redeemResult.newBalance
+      newBalance: redeemResult.newBalance,
+      redeemId: newTransaction.id.toString(),
+      hash: transactionHash
     });
   } catch (error) {
     logger.error('赎回失败', { error: error.message, userId: req.body.userId });

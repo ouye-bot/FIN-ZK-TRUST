@@ -1,5 +1,7 @@
 const express = require('express');
 const router = express.Router();
+const Joi = require('joi');
+const validate = require('../middleware/validate');
 const jwt = require('jsonwebtoken');
 const userDao = require('../dao/userDao');
 const { execute } = require('../config/database');
@@ -22,6 +24,22 @@ setInterval(() => {
     }
   }
 }, 60000).unref();
+
+// Joi 验证模式
+const registerSchema = Joi.object({
+  username: Joi.string().min(3).max(50).required(),
+  password: Joi.string().min(8).max(128).required(),
+  sm2PublicKey: Joi.string().pattern(/^[0-9a-fA-F]{130}$/).required()
+});
+
+const loginSchema = Joi.object({
+  username: Joi.string().min(1).max(50).required(),
+  password: Joi.string().min(1).max(128).required()
+});
+
+const refreshTokenSchema = Joi.object({
+  refreshToken: Joi.string().min(1).required()
+});
 
 /**
  * @swagger
@@ -79,7 +97,7 @@ setInterval(() => {
  */
 
 // 注册API
-router.post('/register', async (req, res) => {
+router.post('/register', validate(registerSchema), async (req, res) => {
   try {
     const { username, password, sm2PublicKey } = req.body;
     
@@ -227,7 +245,7 @@ router.post('/register', async (req, res) => {
  */
 
 // 登录API
-router.post('/login', async (req, res) => {
+router.post('/login', validate(loginSchema), async (req, res) => {
   try {
     const { username, password } = req.body;
     await logCryptoOperation('密码验证', username, '发起', '用户登录验证');
@@ -324,7 +342,8 @@ router.post('/login', async (req, res) => {
       user: {
         id: user.id,
         username: user.username,
-        creditScore: user.credit_score || 0
+        creditScore: user.credit_score || 0,
+        sm2PublicKey: user.sm2_public_key || ''
       }
     });
   } catch (error) {
@@ -338,7 +357,7 @@ router.post('/login', async (req, res) => {
 });
 
 // 刷新令牌API
-router.post('/refresh-token', async (req, res) => {
+router.post('/refresh-token', validate(refreshTokenSchema), async (req, res) => {
   try {
     const { refreshToken } = req.body;
     

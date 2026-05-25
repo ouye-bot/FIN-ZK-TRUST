@@ -86,15 +86,6 @@ router.post('/', validate(investSchema), async (req, res) => {
       return res.status(403).json({ success: false, message: '无权操作其他用户的投资' });
     }
 
-    // 验证请求参数
-    if (!userId || !amount || !term || !creditProof || !verificationCode || !signature) {
-      logger.warning('投资失败：缺少必要参数', { userId, amount, term, hasCreditProof: !!creditProof, hasVerificationCode: !!verificationCode, hasSignature: !!signature });
-      return res.status(400).json({
-        success: false,
-        message: '缺少必要的参数'
-      });
-    }
-
     // 验证SM2签名
     const user = await userDao.findById(userId);
     if (!user) {
@@ -259,7 +250,9 @@ router.post('/', validate(investSchema), async (req, res) => {
     res.json({
       success: true,
       message: '投资成功',
-      transaction: newTransaction
+      transaction: newTransaction,
+      transactionId: newTransaction.id.toString(),
+      hash: transactionHash
     });
   } catch (error) {
     logger.error('投资失败', { error: error.message, userId: req.body.userId });

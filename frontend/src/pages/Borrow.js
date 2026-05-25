@@ -315,7 +315,7 @@ const Borrow = ({ user, cryptoLogs, setCryptoLogs }) => {
           correlationInfo: {
             userId: user.id,
             amount: parseInt(amount),
-            transactionId: data.transactionId
+            transactionId: data.transaction.id
           }
         });
 
@@ -326,7 +326,7 @@ const Borrow = ({ user, cryptoLogs, setCryptoLogs }) => {
           detail: `生成借款记录SM3哈希: ${data.hash ? data.hash.substring(0, 8) + '...' : '未知'}`,
           correlationInfo: {
             userId: user.id,
-            transactionId: data.transactionId
+            transactionId: data.transaction.id
           }
         });
 
@@ -467,6 +467,11 @@ const Borrow = ({ user, cryptoLogs, setCryptoLogs }) => {
   };
 
   const handleConfirmRepay = async () => {
+    if (!creditProof) {
+      setError('请先在"信用证明"页面生成信用证明');
+      return;
+    }
+
     const selectedTransaction = allLoans.find(l => l.id === repayTransactionId);
     const totalRepayment = selectedTransaction ? Number(selectedTransaction.total_amount) || 0 : 0;
     const repayValue = Number(repayAmount);
@@ -909,7 +914,7 @@ const Borrow = ({ user, cryptoLogs, setCryptoLogs }) => {
             value={repayVerificationCode}
             onChange={(e) => setRepayVerificationCode(e.target.value)}
             margin="normal"
-            disabled={!creditProof}
+            disabled={repayLoading}
           />
         </DialogContent>
         <DialogActions>

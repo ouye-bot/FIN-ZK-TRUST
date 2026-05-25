@@ -104,7 +104,7 @@ router.post('/generate-proof', async (req, res) => {
     const user = await userDao.findById(parseInt(userId));
 
     if (!user) {
-      return res.json({
+      return res.status(404).json({
         success: false,
         message: '用户不存在'
       });
@@ -195,6 +195,7 @@ router.post('/generate-proof', async (req, res) => {
 
     // 构建 ZKP 标准嵌套结构
     const proofResult = {
+      id: proofId,
       proofId: proofId,
       verificationCode: verificationCode,
       proofData: proofData,
@@ -246,7 +247,7 @@ router.post('/verify-proof', async (req, res) => {
     const proof = await proofDao.findByProofId(proofId);
 
     if (!proof) {
-      return res.json({
+      return res.status(404).json({
         success: false,
         message: '信用证明不存在'
       });
@@ -254,7 +255,7 @@ router.post('/verify-proof', async (req, res) => {
 
     // 检查是否过期
     if (new Date(proof.expires_at) < new Date()) {
-      return res.json({
+      return res.status(410).json({
         success: false,
         message: '信用证明已过期'
       });
@@ -308,7 +309,7 @@ router.post('/verify-proof', async (req, res) => {
       });
     } else {
       logger.warning('信用证明验证失败', { proofId });
-      res.json({
+      res.status(400).json({
         success: false,
         message: '信用证明验证失败'
       });

@@ -113,25 +113,6 @@ router.post('/borrow', validate(borrowSchema), async (req, res) => {
       return res.status(403).json({ success: false, message: '无权操作其他用户的借款' });
     }
 
-    // 验证请求参数
-    if (!userId || !amount || !creditProof || !verificationCode || !signature) {
-      logger.warning('借款失败：缺少必要参数', { userId, amount, hasCreditProof: !!creditProof, hasVerificationCode: !!verificationCode, hasSignature: !!signature });
-      return res.status(400).json({
-        success: false,
-        message: '缺少必要的参数'
-      });
-    }
-
-    // 验证借款期限
-    const validTerms = [7, 14, 30, 60, 90];
-    if (!validTerms.includes(term)) {
-      logger.warning('借款失败：无效的借款期限', { userId, term });
-      return res.status(400).json({
-        success: false,
-        message: '无效的借款期限，可选期限为：7, 14, 30, 60, 90天'
-      });
-    }
-
     // 验证SM2签名
     const user = await userDao.findById(userId);
     if (!user) {
@@ -394,15 +375,6 @@ router.post('/repay', validate(repaySchema), async (req, res) => {
     // 数据隔离检查
     if (parseInt(userId) !== req.user.id) {
       return res.status(403).json({ success: false, message: '无权操作其他用户的还款' });
-    }
-
-    // 验证请求参数
-    if (!userId || !transactionId || !creditProof || !verificationCode || !signature) {
-      logger.warning('还款失败：缺少必要参数', { userId, transactionId, hasCreditProof: !!creditProof, hasVerificationCode: !!verificationCode, hasSignature: !!signature });
-      return res.status(400).json({
-        success: false,
-        message: '缺少必要的参数'
-      });
     }
 
     // 读取用户数据

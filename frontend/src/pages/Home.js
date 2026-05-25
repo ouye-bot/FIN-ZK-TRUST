@@ -238,6 +238,7 @@ function Home({ user, onLogin, error, cryptoLogs, setCryptoLogs }) {
       }));
 
       setRegisterProgress('正在注册账户...');
+      localStorage.removeItem('token'); // 清除旧 token，避免过期 token 导致注册请求被安全链拦截
       const response = await post('/api/v1/auth/register', {
         username,
         password,

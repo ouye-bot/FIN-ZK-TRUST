@@ -155,7 +155,7 @@ router.get('/my-invest/:userId', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error getting user invest info:', error);
+    logger.error('Error getting user invest info:', { error: error.message });
     res.status(500).json({
       success: false,
       message: '获取投资信息失败'

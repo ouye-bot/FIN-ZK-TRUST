@@ -198,10 +198,12 @@ exports.verifyPBKDF2Hash = (password, storedHash) => {
   const parts = storedHash.split(':');
   if (parts.length !== 4 || parts[0] !== 'pbkdf2') return false;
   const [, iterations, salt, expectedHash] = parts;
+  const iterCount = parseInt(iterations, 10);
+  if (isNaN(iterCount) || iterCount < 10000) return false;
 
   // 优先尝试当前配置的 digest
   try {
-    const derived = crypto.pbkdf2Sync(password, salt, parseInt(iterations), PBKDF2_KEYLEN, PBKDF2_DIGEST);
+    const derived = crypto.pbkdf2Sync(password, salt, iterCount, PBKDF2_KEYLEN, PBKDF2_DIGEST);
     const derivedHex = derived.toString('hex');
     if (derivedHex.length !== expectedHash.length) return false;
     if (crypto.timingSafeEqual(Buffer.from(derivedHex, 'hex'), Buffer.from(expectedHash, 'hex'))) return true;
@@ -210,7 +212,7 @@ exports.verifyPBKDF2Hash = (password, storedHash) => {
   // 如果主 digest 失败，尝试另一个
   const altDigest = PBKDF2_DIGEST === PBKDF2_DIGEST_SM3 ? PBKDF2_DIGEST_FALLBACK : PBKDF2_DIGEST_SM3;
   try {
-    const derived = crypto.pbkdf2Sync(password, salt, parseInt(iterations), PBKDF2_KEYLEN, altDigest);
+    const derived = crypto.pbkdf2Sync(password, salt, iterCount, PBKDF2_KEYLEN, altDigest);
     const derivedHex = derived.toString('hex');
     if (derivedHex.length !== expectedHash.length) return false;
     return crypto.timingSafeEqual(Buffer.from(derivedHex, 'hex'), Buffer.from(expectedHash, 'hex'));
@@ -343,10 +345,12 @@ exports.canonicalStringify = (data) => {
   return '{' + keys.map(k => JSON.stringify(k) + ':' + exports.canonicalStringify(data[k])).join(',') + '}';
 };
 
-// 测试专用：暴露缓存实例供性能测试清除
-exports._signatureCache = signatureCache;
-exports._hashCache = hashCache;
-exports._test_clearCache = () => {
-  signatureCache.clear();
-  hashCache.clear();
-};
+// 测试专用：暴露缓存实例供性能测试清除（仅非生产环境）
+if (process.env.NODE_ENV !== 'production') {
+  exports._signatureCache = signatureCache;
+  exports._hashCache = hashCache;
+  exports._test_clearCache = () => {
+    signatureCache.clear();
+    hashCache.clear();
+  };
+}

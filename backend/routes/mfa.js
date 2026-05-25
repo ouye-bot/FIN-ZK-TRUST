@@ -268,7 +268,7 @@ router.post('/verify', async (req, res) => {
         username: fullUser.username,
         role: fullUser.role,
         balance: Number(fullUser.balance),
-        credit_score: Number(fullUser.credit_score)
+        creditScore: Number(fullUser.credit_score)
       };
 
       const newToken = jwt.sign(
@@ -302,7 +302,7 @@ router.post('/verify', async (req, res) => {
           username: fullUser.username,
           role: fullUser.role,
           balance: Number(fullUser.balance),
-          credit_score: Number(fullUser.credit_score)
+          creditScore: Number(fullUser.credit_score)
         };
 
         const newToken = jwt.sign(
