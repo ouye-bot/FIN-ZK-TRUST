@@ -11,7 +11,9 @@ const borrowSchema = Joi.object({
   }).unknown(true).required(),
   verificationCode: Joi.string().required(),
   signature: Joi.string().min(64).max(256).required(),
-  term: Joi.number().integer().valid(7, 14, 30, 60, 90).optional().default(30)
+  term: Joi.number().integer().valid(7, 14, 30, 60, 90).optional().default(30),
+  challengeId: Joi.string().optional(),
+  challengeSignature: Joi.string().optional()
 });
 
 // 还款接口校验规则
@@ -46,7 +48,9 @@ const redeemSchema = Joi.object({
     id: Joi.string().required()
   }).unknown(true).required(),
   verificationCode: Joi.string().required(),
-  signature: Joi.string().min(64).max(256).required()
+  signature: Joi.string().min(64).max(256).required(),
+  challengeId: Joi.string().optional(),
+  challengeSignature: Joi.string().optional()
 });
 
 module.exports = {

@@ -7,6 +7,10 @@ const logger = require('../utils/logger');
 
 const blacklistCache = new Map();
 const validTokens = new Map();
+let blacklistMissCount = 0;
+
+const MAX_BLACKLIST_ENTRIES = 10000;
+const MAX_VALID_TOKEN_ENTRIES = 10000;
 
 const isTokenBlacklisted = async (jti, expiresAt) => {
   const now = Date.now();
@@ -53,6 +57,10 @@ const isTokenBlacklisted = async (jti, expiresAt) => {
       return true;
     }
     logger.error('CRITICAL: Blacklist database query failed and token not in cache', { error: dbError.message, jti });
+    blacklistMissCount++;
+    if (blacklistMissCount % 100 === 0) {
+      logger.error(`Blacklist fail-open count reached ${blacklistMissCount}`);
+    }
     return false;
   }
 };
@@ -119,7 +127,19 @@ const blacklistCleanupInterval = setInterval(async () => {
     }
   }
 
-  if (Math.floor(Date.now() / 600000) % 1 === 0) {
+  // Enforce max size — evict earliest-expiring entries if over limit
+  if (blacklistCache.size > MAX_BLACKLIST_ENTRIES) {
+    const sorted = [...blacklistCache.entries()].sort((a, b) => a[1] - b[1]);
+    const toRemove = sorted.slice(0, sorted.length - MAX_BLACKLIST_ENTRIES);
+    for (const [jti] of toRemove) blacklistCache.delete(jti);
+  }
+  if (validTokens.size > MAX_VALID_TOKEN_ENTRIES) {
+    const sorted = [...validTokens.entries()].sort((a, b) => a[1] - b[1]);
+    const toRemove = sorted.slice(0, sorted.length - MAX_VALID_TOKEN_ENTRIES);
+    for (const [jti] of toRemove) validTokens.delete(jti);
+  }
+
+  if (Math.floor(Date.now() / 600000) % 6 === 0) {
     try {
       const result = await execute(
         'DELETE FROM token_blacklist WHERE expires_at < ?',

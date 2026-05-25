@@ -58,9 +58,19 @@ exports.generateRefreshToken = (user) => {
 exports.verifyToken = (token) => {
   try {
     return jwt.verify(token, process.env.JWT_SECRET, { issuer: 'finzktrust' });
-  } catch (error) {
-    logger.error('Token verification failed:', { error: error.message });
-    return null;
+  } catch (issuerError) {
+    // Fallback: allow tokens without issuer (migration period — remove after 7 days)
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      if (!decoded.issuer) {
+        logger.warn('Token without issuer accepted (migration period)', { jti: decoded.jti });
+        return decoded;
+      }
+      return null;
+    } catch (error) {
+      logger.error('Token verification failed:', { error: error.message });
+      return null;
+    }
   }
 };
 
@@ -72,8 +82,18 @@ exports.verifyToken = (token) => {
 exports.verifyRefreshToken = (token) => {
   try {
     return jwt.verify(token, process.env.JWT_REFRESH_SECRET, { issuer: 'finzktrust' });
-  } catch (error) {
-    logger.error('Refresh token verification failed:', { error: error.message });
-    return null;
+  } catch (issuerError) {
+    // Fallback: allow tokens without issuer (migration period — remove after 7 days)
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
+      if (!decoded.issuer) {
+        logger.warn('Refresh token without issuer accepted (migration period)', { jti: decoded.jti });
+        return decoded;
+      }
+      return null;
+    } catch (error) {
+      logger.error('Refresh token verification failed:', { error: error.message });
+      return null;
+    }
   }
 };
